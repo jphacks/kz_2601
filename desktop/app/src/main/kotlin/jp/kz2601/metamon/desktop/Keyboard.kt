@@ -59,6 +59,7 @@ object KeyboardText {
     val PREVIEW get() = Strings["desktop_keys_preview"]
     val NO_PREVIEW get() = Strings["desktop_preview_none"]
     val DELETE_CONFIRM get() = Strings["desktop_keys_delete_confirm"]
+    val UNDO get() = Strings["feedback_undo"]
     val NO_NEW get() = Strings["desktop_keys_no_new"]
     val NO_SAVE get() = Strings["desktop_keys_no_save"]
     val PALETTE_PLACEHOLDER get() = Strings["desktop_keys_palette_placeholder"]
@@ -106,6 +107,9 @@ enum class Shortcut(private val text: () -> String, val bubble: Boolean = false)
 
     /** 写真を大きく見る(PhotoPreview.kt)。Space は入力欄・ボタンが先に受け、何も選んでいない時だけ開く。 */
     PREVIEW({ KeyboardText.PREVIEW }, bubble = true),
+
+    /** 一覧・表で消した行を戻す(#3351)。入力欄の Ctrl+Z(文字の取り消し)を先に通す。戻す物が無ければ流す。 */
+    UNDO({ KeyboardText.UNDO }, bubble = true),
     ;
 
     val title: String get() = text()
@@ -139,6 +143,7 @@ object Keymap {
         Shortcut.CLOSE -> listOf(KeyChord(Key.Escape))
         Shortcut.HELP -> listOf(KeyChord(Key.F1), KeyChord(Key.Slash, primary = true))
         Shortcut.PREVIEW -> listOf(KeyChord(Key.Spacebar))
+        Shortcut.UNDO -> listOf(KeyChord(Key.Z, primary = true))
         // macOS のキーボードの delete は Backspace。項目の削除は ⌘⌫(Finder と同じ)。fn+delete(前方削除)も受ける
         Shortcut.DELETE -> if (os == HostOs.MAC) listOf(KeyChord(Key.Backspace, primary = true), KeyChord(Key.Delete)) else listOf(KeyChord(Key.Delete))
     }
@@ -177,6 +182,7 @@ object Keymap {
         Key.P -> "P"
         Key.S -> "S"
         Key.F -> "F"
+        Key.Z -> "Z"
         else -> k.toString()
     }
 }
@@ -333,6 +339,7 @@ class DesktopKeyboard(
             Shortcut.DELETE -> dispatch(ScreenShortcuts.deleteAction(screen, form) ?: return false, ctx())
             Shortcut.CLOSE -> if (session.canClose(session.top)) session.back(session.top) else return false
             Shortcut.PREVIEW -> if (!openPreview()) session.message = KeyboardText.NO_PREVIEW
+            Shortcut.UNDO -> return session.undoDelete()
         }
         return true
     }

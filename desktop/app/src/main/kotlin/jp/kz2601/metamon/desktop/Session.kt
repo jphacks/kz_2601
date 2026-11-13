@@ -100,6 +100,24 @@ class DesktopSession(
     /** 画面に出す一言(保存できない理由・OS の機能の結果)。 */
     var message: String? by mutableStateOf(null)
 
+    /** 一覧・表の行を消した直後の「元に戻す」(#3351)。null は帯を出さない。 */
+    var recordUndo: DeletionTicket? by mutableStateOf(null)
+        private set
+    private var undoSeq = 0L
+
+    /** 最後に消した行を戻す(帯の「元に戻す」・Ctrl+Z)。戻せたら true。 */
+    fun undoDelete(): Boolean {
+        val t = recordUndo ?: return false
+        recordUndo = null
+        store = RecordUndo.restore(store, t) ?: return false
+        return true
+    }
+
+    /** 帯を閉じる(時間切れ・×)。[ticket] が今の物の時だけ(後から消した分の帯を消さない)。 */
+    fun dismissRecordUndo(ticket: DeletionTicket? = recordUndo) {
+        if (recordUndo == ticket) recordUndo = null
+    }
+
     /** 起きたこと(適合テストの effects と同じ形)。 */
     val effects = mutableListOf<JsonElement>()
 
@@ -142,6 +160,7 @@ class DesktopSession(
         if (records.wipes == seenWipes) return
         seenWipes = records.wipes
         drafts.clear()
+        recordUndo = null
         go(NavigationState.initial(dsl))
         if (detailRoot != null) {
             detailRoot = null
@@ -337,7 +356,10 @@ class DesktopSession(
                     message = Strings["desktop_delete_not_allowed"]
                     return
                 }
+                // 一覧・表の行から消した時だけ戻せる(フォームの削除ボタンは画面ごと閉じる)
+                val ticket = ctx.recordId?.let { RecordUndo.ticket(store, entity, it, ++undoSeq) }
                 store = store.delete(entity, id)
+                if (ticket != null) recordUndo = ticket
                 effects += obj("deleted" to obj("entity" to JsonPrimitive(entity), "recordId" to JsonPrimitive(id)))
                 if (ctx.recordId == null) {
                     drafts.entries.removeAll { it.value.draft === ctx.form }
