@@ -184,3 +184,19 @@ func (c *countingModel) Complete(ctx context.Context, system, user string, schem
 	c.texts += len(reBlock.FindAllStringSubmatch(user, -1))
 	return c.m.Complete(ctx, system, user, schema)
 }
+
+func TestOrNone(t *testing.T) {
+	for _, c := range []struct {
+		name, v string
+		it      *loop.Item
+		want    string
+	}{
+		{"value wins", "bug", &loop.Item{HoldReason: "pii"}, "bug"},
+		{"empty and held", "", &loop.Item{HoldReason: "pii"}, "(held: pii)"},
+		{"empty and not held", "", &loop.Item{}, "(none)"},
+	} {
+		if got := orNone(c.v, c.it); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+}
