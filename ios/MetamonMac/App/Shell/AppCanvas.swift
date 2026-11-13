@@ -27,6 +27,8 @@ struct AppCanvas: View {
     var onOpenVoice: (@MainActor () -> Void)?
     /// 失敗のトーストの「直してと頼む」(#1885): 依頼文を入れて会話を開く(送らない)。nil ならボタンを出さない
     var onAskFix: (@MainActor (String) -> Void)?
+    /// 画面の並びの編集(#2323)の「完了」の保存先。nil なら編集に入らない
+    var onSaveGridEdit: (@MainActor (GridEditDraft) async -> MacGridEditSave.Outcome)?
     /// ウインドウの入力の見張り(#943)。作ったランタイムを渡す(アプリの切り替え・⌘W の前に確認する)
     var discardGuard: MacDiscardGuard?
 
@@ -77,6 +79,9 @@ struct AppCanvas: View {
                 // 他の端末の変化(#2072): サーバーにあるアプリだけ購読する。同じアプリの別のウインドウとは 1 本を共有
                 if server != nil { created.attachRealtime(MacRealtimeSync.shared.acquire(appId: app.id, version: app.version)) }
                 created.onAskFix = onAskFix
+                created.onSaveGridEdit = onSaveGridEdit
+                // 並びを保存して作り直した: 編集していた画面を開き直す(#2323)
+                if let screen = MacGridEditReturn.take(appId: app.id) { created.reveal(screen: screen) }
                 created.books = MacServices.shared.books // 本の情報(#1276)。モックの時は nil
                 #if !APP_STORE_REVIEW
                 created.feedClient = MacServices.shared.feeds // 天気・祝日などの feed(#1288)。モックの時は nil
@@ -175,6 +180,9 @@ private struct AppCanvasContent: View {
             .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .toolbar { MacUpcomingNotificationsToolbar(notifications: runtime.notifications) } // 次の通知(#1325)
             .toolbar { MacSyncStatusToolbar(engine: runtime.recordSync) } // 未送信 N 件(#976)
+            .toolbar { MacGridEditToolbar(runtime: runtime) } // 画面の並びを編集(#2323)
+            .overlay(alignment: .top) { if runtime.gridEdit != nil { MacGridEditBar(runtime: runtime) } }
+            .environment(\.gridEditSession, runtime.gridEdit) // 編集中の画面だけ枠とつまみを出す(#2323)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)
