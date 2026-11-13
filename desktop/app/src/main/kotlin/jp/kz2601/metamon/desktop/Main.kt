@@ -36,6 +36,9 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
+import jp.kz2601.metamon.desktop.notify.NoticeArgs
 import jp.kz2601.metamon.desktop.platform.JumpArgs
 import jp.kz2601.metamon.desktop.platform.JumpCommand
 import jp.kz2601.metamon.desktop.platform.JumpListPlan
@@ -68,9 +71,12 @@ import javax.swing.SwingUtilities
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
 fun main(rawArgs: Array<String>) {
+    // 通知のボタン(#3210)で起動した時は `tailorit-notice:…` の引数が付く。ほかの引数の並びは崩さない
+    val press = NoticeArgs.parse(rawArgs.toList())
+    val withoutNotice = NoticeArgs.strip(rawArgs.toList())
     // 「送る」(#3209)は `--send-to` の後ろに選んだファイルが付く。先に切り出して、ほかの引数の並びは崩さない
-    val sent = SendToArgs.files(rawArgs.toList())
-    val argv = SendToArgs.strip(rawArgs.toList())
+    val sent = SendToArgs.files(withoutNotice)
+    val argv = SendToArgs.strip(withoutNotice)
     // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する
     val jump = JumpArgs.parse(argv)
     // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける(`--jump=…` もここで落ちる)
@@ -84,6 +90,7 @@ fun main(rawArgs: Array<String>) {
         return
     }
     OpenWithInbox.offer(openFiles)
+    press?.let(NoticeActions::deliver)
     runApp(args, parsed.action, jump, sent)
 }
 
@@ -153,7 +160,16 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
+        // 通知のボタン(#3210): 開くはアプリを前に出す。どのボタンかは通知の onAction にも渡る
+        NoticeActions.onPress { p ->
+            SwingUtilities.invokeLater { if (p.action == NoticeAction.OPEN) tray.open() }
+        }
         SingleInstance.onHandoff { handed ->
+            val press = NoticeArgs.parse(handed)
+            if (press != null) {
+                NoticeActions.deliver(press)
+                return@onHandoff
+            }
             val files = SendToArgs.files(handed)
             val raw = SendToArgs.strip(handed)
             val cmd = JumpArgs.parse(raw)
