@@ -141,6 +141,9 @@ fun DesktopApp(
     onOpenNoticeLink: ((String) -> Unit)? = null,
     /** 最後に見た画面の写しを残すアプリ(#3204)。null なら撮らない(詳細のウィンドウ・テスト)。 */
     thumbnailAppId: String? = null,
+    /** サーバーのアプリの一覧(#2379)と、選んだ時に DSL を読んで開く口(開けなければ false)。 */
+    serverApps: ServerAppsModel? = null,
+    onOpenServerApp: (suspend (ServerAppRow) -> Boolean)? = null,
 ) {
     val noticeScope = rememberCoroutineScope()
     val openNoticeLink: (String) -> Unit = onOpenNoticeLink ?: { url ->
@@ -218,6 +221,15 @@ fun DesktopApp(
     }
     // トレイの「アカウント」(#2374): 前にあるウィンドウで開く
     LocalTray.current?.let { tray -> LaunchedEffect(tray.accountRequests) { if (tray.takeAccount(isActive)) keyboard.accountOpen = true } }
+    // パレットにサーバーのアプリ(#2379)。選んだら DSL を読んでアプリのウィンドウで開く
+    val serverScope = rememberCoroutineScope()
+    if (serverApps != null && onOpenServerApp != null) {
+        keyboard.serverApps = {
+            ServerAppPalette.commands(serverApps.rows, serverApps.fromCache) { row ->
+                serverScope.launch { if (!onOpenServerApp(row)) session.message = Strings["desktop_server_app_open_failed"] }
+            }
+        }
+    }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

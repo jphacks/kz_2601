@@ -52,6 +52,7 @@ import jp.kz2601.metamon.desktop.platform.SendToArgs
 import jp.kz2601.metamon.desktop.platform.SendToInbox
 import jp.kz2601.metamon.desktop.platform.SendToShortcut
 import jp.kz2601.metamon.desktop.power.ScreenAwake
+import jp.kz2601.metamon.desktop.net.ServerApps
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
@@ -166,7 +167,31 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     }
     // 最後に見た画面の写し(#3204)。記録の JSON を渡した開発・スクリーンショットの起動では撮らない
     val thumbnails = remember { desktopStore.thumbnails.takeIf { args.getOrNull(1) == null } }
-    val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
+    // サーバーのアプリ(#2379)。MOCK・サインインしていない時は何も出さない(サインイン #2151 までは TAILORIT_DEV_TOKEN をサインインと見る)
+    val apiConfig = remember { DesktopApiConfig.fromEnvironment() }
+    val appConfig = remember { DesktopApi.appConfig(apiConfig, desktopStore.documents) }
+    val serverApps = remember {
+        ServerAppsModel(appConfig?.let { ServerApps(it, desktopStore.documents) { apiConfig.devToken != null } }) { id ->
+            desktopStore.documents.load(id)?.document?.dsl?.app?.icon
+        }
+    }
+    LaunchedEffect(serverApps) { serverApps.refresh() }
+    val opener = remember { appConfig?.let { ServerAppOpener(it, desktopStore.documents) } }
+    // 最後に開いた同梱のアプリが無く、サーバーの一覧があればホームから(引数で選んだ時は選んだアプリ)
+    val home = remember {
+        args.isEmpty() && System.getProperty("tailorit.example") == null && serverApps.available &&
+            desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } == null
+    }
+    val registry = remember { WindowRegistry().also { it.open(if (home) WindowKey.home() else WindowKey.app(first)) } }
+    // 一覧で選んだ: DSL を読み、アプリのウィンドウで開く(開いていれば前に出す)
+    val openServerApp: suspend (ServerAppRow) -> Boolean = { row ->
+        val dsl = opener?.load(row.id)
+        if (dsl != null) {
+            hub.put(row.id, dsl)
+            registry.open(WindowKey.app(row.id))
+        }
+        dsl != null
+    }
     val firstWindowId = remember { registry.windows.first().id }
     // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
     val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
@@ -192,7 +217,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
             val cmd = JumpArgs.parse(raw)
             SwingUtilities.invokeLater {
                 val p = LaunchArgs.parse(raw)
-                val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.takeUnless { it.isHome }?.appId ?: first
                 tray.openApp(id)
                 if (p.action == LaunchAction.QUICK_RECORD || cmd == JumpCommand.QUICK_RECORD) tray.quickRecord()
                 OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
@@ -212,7 +237,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
     val active = registry.active
     LaunchedEffect(active?.id) {
-        val appId = active?.key?.appId ?: return@LaunchedEffect
+        val appId = active?.key?.takeUnless { it.isHome }?.appId ?: return@LaunchedEffect
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
         if (jumpList !== JumpListPublisher.Noop) {
             val before = RecentApps.decode(desktopStore.settings.getString(RecentApps.KEY))
@@ -250,14 +275,20 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     CompositionLocalProvider(LocalAiButtonMetrics provides aiButtonMetrics) {
         registry.windows.toList().forEach { w ->
             key(w.id) {
-                DesktopWindow(
-                    w, registry, hub, tray, updates, layouts, sendTo,
-                    startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
-                    autoNav = autoNav?.takeIf { w.id == firstWindowId },
-                    onboarding = onboarding,
-                    showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
-                    thumbnails = thumbnails,
-                )
+                if (w.key.isHome) {
+                    HomeWindow(w, registry, tray, serverApps, openServerApp)
+                } else {
+                    DesktopWindow(
+                        w, registry, hub, tray, updates, layouts, sendTo,
+                        startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
+                        autoNav = autoNav?.takeIf { w.id == firstWindowId },
+                        onboarding = onboarding,
+                        showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
+                        thumbnails = thumbnails,
+                        serverApps = serverApps,
+                        openServerApp = openServerApp,
+                    )
+                }
             }
         }
     }
@@ -279,6 +310,8 @@ private fun ApplicationScope.DesktopWindow(
     onboarding: OnboardingStore,
     showOnboarding: Boolean,
     thumbnails: ThumbnailStore?,
+    serverApps: ServerAppsModel,
+    openServerApp: suspend (ServerAppRow) -> Boolean,
 ) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
@@ -374,10 +407,44 @@ private fun ApplicationScope.DesktopWindow(
                         },
                         sendTo = sendTo,
                         thumbnailAppId = w.key.appId.takeIf { kind == WindowKind.APP },
+                        serverApps = serverApps.takeIf { it.available },
+                        onOpenServerApp = openServerApp,
                     )
                 }
                 }
             } }
+        }
+    }
+}
+
+/** ホーム(#2379): サーバーのアプリの一覧。選んだらそのアプリのウィンドウを開き、ホームは閉じる。 */
+@Composable
+private fun ApplicationScope.HomeWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    tray: TrayController,
+    serverApps: ServerAppsModel,
+    openServerApp: suspend (ServerAppRow) -> Boolean,
+) {
+    val state = rememberWindowState(size = WindowBounds.defaultSize(WindowKind.APP))
+    Window(
+        onCloseRequest = { if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication() },
+        visible = tray.windowVisible,
+        title = Strings.format("desktop_window_title", Strings["settings_usage_apps"]),
+        state = state,
+    ) {
+        LaunchedEffect(Unit) { window.minimumSize = Dimension(360, 560) }
+        DisposableEffect(window) {
+            val l = object : WindowAdapter() {
+                override fun windowGainedFocus(e: WindowEvent?) = registry.activate(w.id)
+            }
+            window.addWindowFocusListener(l)
+            onDispose { window.removeWindowFocusListener(l) }
+        }
+        CompositionLocalProvider(LocalTray provides tray) {
+            TailorItTheme {
+                ServerAppsHome(serverApps) { row -> openServerApp(row).also { if (it) registry.close(w.id) } }
+            }
         }
     }
 }

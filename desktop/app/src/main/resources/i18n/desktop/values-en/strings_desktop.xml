@@ -264,6 +264,8 @@
     <string name="desktop_sync_not_signed_in">Not sending (not signed in)</string>
     <string name="desktop_sync_now">Send now</string>
     <string name="desktop_sync_offline_pending">Not sending (%1$d waiting to send)</string>
+    <string name="desktop_server_app_open_failed">Couldn\'t open the app. Try again where you\'re online.</string>
+    <string name="desktop_server_apps_cached">Last saved list</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_sync_synced">Up to date</string>
     <string name="desktop_text_zoom_now">Text size %1$s</string>
