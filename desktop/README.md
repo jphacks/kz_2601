@@ -15,6 +15,8 @@ cd desktop
 ./gradlew :desktop:test :dsl:test         # 適合テスト(docs/dsl/conformance)と :dsl のテスト
 ```
 
+配布物(msi・deb・rpm)の作り方・入れ方・決まっていないことは [docs/desktop/packaging.md](../docs/desktop/packaging.md)。
+
 stg の appconfig を手元で試す(サインインが入るまでの確かめ用。トークンはファイルに書かない):
 
 ```
