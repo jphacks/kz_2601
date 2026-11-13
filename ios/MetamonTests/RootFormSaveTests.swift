@@ -59,6 +59,7 @@ final class RootFormSaveTests: XCTestCase {
         await save(rt, editing, at: tabRoot)
         XCTAssertEqual(rt.toast, L10n.tr("保存しました"))
         XCTAssertEqual(editing.payload["body"], .string("豆乳"), "既存の記録は値を残す")
+        XCTAssertFalse(editing.hasUnsavedChanges, "保存の間に入れていなければ保存済み")
 
         rt.toast = nil
         await save(rt, editing, at: tabRoot)
@@ -95,8 +96,8 @@ final class RootFormSaveTests: XCTestCase {
 
         let saving = Task { await save(rt, draft, at: tabRoot) }
         // 書き込み(recordSync の actor)を待っている間に次の入力が入る。main actor で見えた時は必ず await の途中
-        for _ in 0..<1000 where !rt.saveFlight.isSaving(draft) { await Task.yield() }
-        XCTAssertTrue(rt.saveFlight.isSaving(draft), "保存の途中に入れる")
+        for _ in 0..<1000 where !rt.isSaving(draft) { await Task.yield() }
+        XCTAssertTrue(rt.isSaving(draft), "保存の途中に入れる")
         draft.values["body"] = .string("次のメモ")
         await saving.value
 
@@ -105,6 +106,74 @@ final class RootFormSaveTests: XCTestCase {
         XCTAssertEqual(saved.first?.data["body"], .string("買い物"), "保存したのは押した時の値")
         XCTAssertEqual(draft.payload["body"], .string("次のメモ"), "入れ直した値を消さない")
         XCTAssertEqual(rt.toast, L10n.tr("保存しました"))
+    }
+
+    /// 保存の間に入れ直した値は保存していない: 保存の後も未保存のまま(閉じる前に破棄の確認が出る・もう一度保存すれば書く)
+    func testTypingDuringSaveStaysUnsaved() async throws {
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("買い物")
+        await typeDuringSave(rt, draft, "次のメモ")
+
+        XCTAssertTrue(draft.hasUnsavedChanges, "送ったのは「買い物」。入れ直した値は保存していない")
+        // タブの根は離れる操作が無いので確認しない(M10)。シート・積まれた画面なら同じフォームで確認が出る
+        XCTAssertTrue(ScreenView.guardsDiscard(route: Route(screen: "form", stack: "sheet"), paths: [:], form: draft))
+
+        await save(rt, draft, at: tabRoot)
+        let saved = await rt.recordSync.cached(appId: appId, entity: "memo")
+        XCTAssertEqual(Set(saved.compactMap { $0.data["body"] }), [.string("買い物"), .string("次のメモ")])
+        XCTAssertFalse(draft.hasUnsavedChanges)
+    }
+
+    /// 既存の記録を直している間に入れ直した: 未保存のまま残り、もう一度保存すると書く(変更なしで飛ばさない)
+    func testTypingDuringEditSaveStaysUnsaved() async throws {
+        let rt = try runtime()
+        let entity = try XCTUnwrap(rt.dsl.entity("memo"))
+        let first = FormDraft(entity: entity)
+        first.values["body"] = .string("牛乳")
+        await save(rt, first, at: tabRoot)
+        let firstSaved = await rt.recordSync.cached(appId: appId, entity: "memo")
+        let record = try XCTUnwrap(firstSaved.first)
+
+        let editing = FormDraft(entity: entity, record: record)
+        editing.values["body"] = .string("豆乳")
+        await typeDuringSave(rt, editing, "アーモンドミルク")
+
+        XCTAssertTrue(editing.hasUnsavedChanges)
+        XCTAssertTrue(editing.needsWrite, "もう一度の保存を「変更なし」で飛ばさない")
+        let duringSave = await rt.recordSync.cached(appId: appId, entity: "memo")
+        XCTAssertEqual(duringSave.first?.data["body"], .string("豆乳"))
+
+        rt.toast = nil
+        await save(rt, editing, at: tabRoot)
+        XCTAssertEqual(rt.toast, L10n.tr("保存しました"))
+        let resaved = await rt.recordSync.cached(appId: appId, entity: "memo")
+        XCTAssertEqual(resaved.first?.data["body"], .string("アーモンドミルク"))
+        XCTAssertFalse(editing.hasUnsavedChanges)
+    }
+
+    /// 保存の間に入れ直した後にサーバーが断った: 入れ直した値を送った値で上書きしない・未保存のまま
+    func testRefusedSaveKeepsInputTypedDuringSave() async throws {
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("散歩した")
+        await typeDuringSave(rt, draft, "次のメモ")
+        let saved = try XCTUnwrap(rt.lastSavedForm)
+
+        rt.revokeSaveFeedback(for: .rejected(appId: appId, entity: "memo", message: "bad", recordId: saved.recordId))
+
+        XCTAssertEqual(draft.payload["body"], .string("次のメモ"), "入れ直した値を残す")
+        XCTAssertTrue(draft.hasUnsavedChanges)
+        XCTAssertNil(draft.lastSaveResult)
+    }
+
+    /// 書き込み(recordSync の actor)を待っている間に `text` を入れる
+    private func typeDuringSave(_ rt: AppRuntime, _ draft: FormDraft, _ text: String) async {
+        let saving = Task { await save(rt, draft, at: tabRoot) }
+        for _ in 0..<1000 where !rt.isSaving(draft) { await Task.yield() }
+        XCTAssertTrue(rt.isSaving(draft), "保存の途中に入れる")
+        draft.values["body"] = .string(text)
+        await saving.value
     }
 
     /// single(#267)は 1 件を上書きし続ける。最初の保存(まだ記録が無い)でも入力を空に戻さない。

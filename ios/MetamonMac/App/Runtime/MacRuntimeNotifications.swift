@@ -363,9 +363,6 @@ private struct MacNotificationsOffBar: ViewModifier {
 
     /// システム設定の「通知」のこのアプリの欄
     private func openSettings() {
-        let bundleId = Bundle.main.bundleIdentifier ?? ""
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(bundleId)") {
-            NSWorkspace.shared.open(url)
-        }
+        NSWorkspace.shared.open(PrivacySettingsPane.notifications.url) // #2257
     }
 }
