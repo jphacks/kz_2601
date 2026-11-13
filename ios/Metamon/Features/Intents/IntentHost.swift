@@ -94,10 +94,16 @@ final class IntentHost {
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
+            var listed: [AppSummary]?
             await ControlIntentBridge.refreshCatalog(
-                apps: { await self.apps() },
+                apps: {
+                    let apps = await self.apps()
+                    listed = apps
+                    return apps
+                },
                 targets: { await RecordTargetEntity.all(host: self, cachedOnly: true) }
             )
+            if let listed, !Task.isCancelled { HomeQuickActions.update(apps: listed) } // 長押しメニュー(#2232)も同じ一覧で
         }
         refreshTask = task
         return task
