@@ -7,6 +7,7 @@ backend(ai / appconfig)の 5xx の増加・panic・Claude の失敗・応答の�
 ## 目次
 
 1. [ログの形](#ログの形)
+   - [クライアントの属性](#クライアントの属性)
 2. [Error Reporting](#error-reporting)
 3. [監視(Terraform)](#監視terraform)
 4. [人の作業 1: apply](#人の作業-1-apply)
@@ -29,7 +30,23 @@ backend(ai / appconfig)の 5xx の増加・panic・Claude の失敗・応答の�
 | `uid_hash` | 認証できた呼び出し元の擬名。`sha256("ai-usage:" + uid)` の先頭 8 バイト(`ai.usage` と同じ値・[ai-cost.md](ai-cost.md))。**生の uid は出さない** |
 | `@type` / `serviceContext` | `ERROR` 以上だけ。`ReportedErrorEvent` と `K_SERVICE` / `K_REVISION`(Error Reporting 用) |
 
-リクエストごとのアクセスログ(`httpx.Log`)は `event="http.request"`・`method`・`path`(クエリは出さない)・`status`・`duration`・`client`。**5xx は `ERROR`**、それ以外は `INFO`。
+リクエストごとのアクセスログ(`httpx.Log`)は `event="http.request"`・`method`・`path`(クエリは出さない)・`status`・`duration`・`requestId`・クライアントの属性(下の「クライアントの属性」)。**5xx は `ERROR`**、それ以外は `INFO`。
+
+### クライアントの属性
+
+どの OS・どの版のクライアントから来たかを、ログの行に付ける属性です。コードは `backend/internal/httpx/client.go`(`ClientAttrs`)。クライアントが全部のリクエストに付けるヘッダから作ります。使い方は [docs/backend/client-platforms.md](../backend/client-platforms.md)、OS で絞って調べる手順は [障害対応の手順書](../ops/incident-runbook.md#os-ごとに絞って見る)。
+
+| 属性(ログの鍵) | 元のヘッダ | 値 | 付く行 |
+| --- | --- | --- | --- |
+| `clientPlatform` | `X-Client-Platform` | `ios` / `android` / `macos` / `windows` / `linux` / `other`。**必ず付く**(ヘッダが無くても `other`) | `http.request`・`appcheck` |
+| `clientVersion` | `X-Client-Version` | ヘッダの値そのまま(例 `1.0.0`)。ヘッダが無い時は付かない | 同上 |
+| `clientBuild` | `X-Client-Build` | 同上(例 `12`) | 同上 |
+| `clientDslVersion` | `X-Client-DSL-Version` | 同上。クライアントが描ける DSL の `schemaVersion` の最大 | 同上 |
+
+- **`ai.usage` の行には付かない。** Claude を呼んだ 1 回ごとの `ai.usage` は `requestId` が付くので、OS で分けたい時は同じ `requestId` の `http.request` と突き合わせる(`backend/cmd/ai-session-report` の OS 別の集計もこの方法)。
+- `clientPlatform` の丸め方(`NormalizePlatform`): 前後の空白と大文字小文字は無視する。空・知らない値・32 文字を超える値は `other`。
+- `clientVersion`・`clientBuild`・`clientDslVersion` は丸めず、32 文字を超えたら先頭の 32 文字で切る。
+- 情報として残すだけで、答えは変えない(AI の回数制限の OS ごとの上書きだけは `clientPlatform` を使う。[client-platforms.md](../backend/client-platforms.md))。
 
 **リクエストの途中のログ**: リクエストの処理中に出すログは、`log.Printf` ではなく `slog` の `LogAttrs(ctx, …)` / `ErrorContext(ctx, …)` などの **ctx を渡す形**で出す。ctx から trace・`requestId`・`uid_hash` がアクセスログと同じように付く。属性は 1 行に 1 つ(#516)。`log.Printf` のままでよいのは、起動時(`cmd/*` の main がリクエストを受ける前)と CLI(`cmd/ai-eval` など)だけ。ai の今のログ:
 
@@ -40,6 +57,55 @@ backend(ai / appconfig)の 5xx の増加・panic・Claude の失敗・応答の�
 | `chat: store get failed (falling back to create)` | `WARNING` | `app_hash`・`error` | `/v1/chat` の auto で今の DSL を読めず、新規として続ける時 |
 
 **出さないもの**: 生の uid、リクエストの本文・クエリ・発話・プロンプト・応答の本文、トークン。テスト(`logging_test.go`・`auth/loguid_test.go`・`ai/usage_log_test.go`)で確かめています。
+
+### event の一覧
+
+`jsonPayload.event` に名前が入る行。多くは `message` も同じ名前(違うのは `http.request` の `request` と、`ai.server_need` の `ai.server_need missing`)。調べる時は `message` でなく `jsonPayload.event` で絞る。
+
+**本文と uid を出さない決まり**: どの event も、ラベル・回数・時間・擬名の鍵だけを持つ。入力の文・DSL・記録・プロンプト・応答・外の API の引数と答えは出さない。人は生の uid でなく `uid_hash`(上の表の擬名)で表し、別の役の人も同じ作りの `payer_uid_hash`(費用を持つ作成者)・`creator_uid_hash`(作成者)・`path_uid_hash`(記録の持ち主)で表す。アプリは製品の計測(`session.*`・`app.*`・`share.*`・`ai.generate`)では `app_hash`(appId の擬名)で表す。運用で止めるアプリを探す行(`runner.*`・`ext.call`)は `app_id`、通話(`calls.*`)は `appId` で、アプリの ID そのものを出す。生の uid を出す event は無い。新しい event を足す時もこの決まりに合わせ、この表に 1 行足す(名前順)。
+
+| event | 出すパッケージ | いつ出るか | 主な鍵 | フィルタの例 |
+| --- | --- | --- | --- | --- |
+| `ai.button.availability` | `internal/appconfig`(`aibutton_metrics.go`) | `POST /v1/metrics/ai-button` の 1 日分ごと([ai-button-metrics.md](../analytics/ai-button-metrics.md)) | `report_id`・`day`・`availability`・`client_build` | `jsonPayload.event="ai.button.availability"` |
+| `ai.button.failure` | `internal/appconfig`(`aibutton_metrics.go`) | 同じ送信の、task × 理由ごと(0 回は出さない) | `ai.button.availability` の鍵 + `task`・`reason`・`count` | `jsonPayload.event="ai.button.failure" AND jsonPayload.reason="context_too_long"` |
+| `ai.button.task` | `internal/appconfig`(`aibutton_metrics.go`) | 同じ送信の、task ごと | `ai.button.availability` の鍵 + `task`・`attempts`・`failures` | `jsonPayload.event="ai.button.task"` |
+| `ai.chat` | `internal/ai`(`chat_log.go`) | `/v1/chat` の 1 回ごと | `mode`・`outcome`(`replied` / `failed` / `bad_request`)・`reply_kind`・`source`・`turn`・`duration_ms`・`claude_ms`・`error_code`・`uid_hash` | `jsonPayload.event="ai.chat" AND jsonPayload.outcome="failed"` |
+| `ai.generate` | `internal/ai`(`generate_log.go`) | `/v1/generate` の 1 回ごと(失敗は `WARNING`) | `mode`・`outcome`・`validation_passed`・`first_generation`・`attempts`・`regenerations`・`retry_reasons`・`validation_codes`・`error_code`・`prompt_version`・`duration_ms`・`uid_hash`・`app_hash` | `jsonPayload.event="ai.generate" AND jsonPayload.outcome="failed"` |
+| `ai.server_need` | `internal/ai`(`server_need.go`) | create / edit の出力に `serverNeed` が無かった時(`WARNING`) | `mode` | `jsonPayload.event="ai.server_need"` |
+| `ai.usage` | `internal/ai`(`usage_log.go`) | Claude の呼び出しの 1 回ごと(再試行も 1 行ずつ・[ai-cost.md](ai-cost.md)) | `operation`・`model`・`attempt`・`outcome`・`error_kind`・`stop_reason`・`input_tokens`・`output_tokens`・`latency_ms`・`uid_hash`・`payer_uid_hash` | `jsonPayload.event="ai.usage" AND jsonPayload.outcome="error"` |
+| `app.opened` | `internal/appconfig`(`metrics.Emit`) | `GET /v1/apps/{appId}/dsl` を `If-None-Match` 無しで読んだ時([product-metrics.md](../metrics/product-metrics.md)) | `app_hash`・`uid_hash` | `jsonPayload.event="app.opened"` |
+| `app.published` | `internal/appconfig`(`metrics.Emit`) | 「探す」への掲載が通った時 | `app_hash`・`uid_hash` | `jsonPayload.event="app.published"` |
+| `app.shared` | `internal/appconfig`(`metrics.Emit`) | 共有のリンクを作れた時 | `app_hash`・`uid_hash` | `jsonPayload.event="app.shared"` |
+| `budget.free_paused` | `internal/budget`(`middleware.go`) | 無料の生成の 1 日の費用の遮断で依頼を断った時 | `path`・`threshold_usd`・`uid_hash` | `jsonPayload.event="budget.free_paused"` |
+| `calls.no_join_time` | `internal/calls`(`service.go`) | 入った時刻の無い退出(課金しない・`WARNING`) | `uid_hash` | `jsonPayload.event="calls.no_join_time"` |
+| `calls.removed` | `internal/calls`(`enforce.go`) | 払った時間が尽き、サーバーが参加者を部屋から出した時 | `appId`・`reason`・`uid_hash` | `jsonPayload.event="calls.removed"` |
+| `calls.settled` | `internal/calls`(`service.go`) | 通話の 1 回の精算 | `appId`・`minutes`・`coins`・`uid_hash` | `jsonPayload.event="calls.settled"` |
+| `calls.token_issued` | `internal/calls`(`service.go`) | 通話のトークンを出した時(更新も) | `appId`・`renew`・`video`・`coins`・`uid_hash` | `jsonPayload.event="calls.token_issued"` |
+| `calls.uncovered_minutes` | `internal/calls`(`service.go`) | 予約した分を超えた分(課金しない・`WARNING`) | `minutes`・`coins`・`uid_hash` | `jsonPayload.event="calls.uncovered_minutes"` |
+| `coins.credited` | `internal/coins`(`service.go`) | コインの購入を反映した時 | `productId`・`environment`・`credited`・`uid_hash` | `jsonPayload.event="coins.credited" AND jsonPayload.credited=false` |
+| `coins.hold_expired` | `internal/coins`(`service.go`) | 精算されなかった仮押さえを戻した時(`WARNING`) | `op`・`coins`・`uid_hash` | `jsonPayload.event="coins.hold_expired"` |
+| `coins.not_committed` | `internal/coins`(`service.go`) | 戻した / 期限の切れた仮押さえを精算しようとした時(`WARNING`) | `op`・`reserved`・`uid_hash` | `jsonPayload.event="coins.not_committed"` |
+| `coins.over_reserve` | `internal/coins`(`service.go`) | 費用が仮押さえより高かった時(仮押さえの分だけ取る・`WARNING`) | `op`・`reserved`・`coins`・`uid_hash` | `jsonPayload.event="coins.over_reserve"` |
+| `coins.overflow_bought` | `internal/coins`(`overflow.go`) | 月の枠を超えた分の塊を買った時 | `kind`・`month`・`blocks`・`bought`・`coins`・`uid_hash` | `jsonPayload.event="coins.overflow_bought"` |
+| `coins.slot_bought` | `internal/coins`(`slots.go`) | アプリの枠を買った時 | `appSlots`・`coins`・`uid_hash` | `jsonPayload.event="coins.slot_bought"` |
+| `coins.unpriced_model` | `internal/coins`(`service.go`) | 費用の分からないモデルだった時(仮押さえの分を取る・`WARNING`) | `op`・`reserved`・`uid_hash` | `jsonPayload.event="coins.unpriced_model"` |
+| `coins.would_block` | `internal/coins`(`service.go`) | 記録だけの段で、払えなかったはずの呼び出し | `op`・`required`・`balance`・`uid_hash` | `jsonPayload.event="coins.would_block"` |
+| `coins.would_overflow` | `internal/runner/quota`(`allowance.go`) | 記録だけの段で、月の枠を超えて塊を買ったはずの時 | `kind`・`month`・`used`・`allowance`・`blocks`・`coins`・`creator_uid_hash` | `jsonPayload.event="coins.would_overflow"` |
+| `coins.would_spend` | `internal/coins`(`service.go`) | 記録だけの段で、呼び出しにかかったはずの分 | `op`・`reserved`・`coins`・`usd`・`uid_hash` | `jsonPayload.event="coins.would_spend"` |
+| `ext.call` | `internal/extapi`(`service.go`) | 外の API の呼び出しの 1 回ごと | `provider`・`op`・`result`・`ms`・`billing`・`coins`・`limit`・`app_id`・`uid_hash` | `jsonPayload.event="ext.call" AND jsonPayload.result!="ok"` |
+| `feeds.fetch` | `internal/feeds`(`fetch_log.go`) | 外へ取りに行った 1 回ごと(キャッシュは出さない・失敗は `WARNING`) | `provider`・`status`・`bytes`・`duration_ms` | `jsonPayload.event="feeds.fetch" AND severity>=WARNING` |
+| `http.request` | `internal/httpx`(`middleware.go`) | リクエストの 1 回ごと(5xx は `ERROR`・上の「ログの形」) | `method`・`path`・`status`・`duration`・`requestId`・`clientPlatform`・`clientVersion`・`clientBuild`・`clientDslVersion`・`uid_hash` | `jsonPayload.event="http.request" AND jsonPayload.status>=500` |
+| `plan_limit.would_block` | `internal/plan`(`plan.go`) | プランの上限で止める / 止めたはずの時(`PLAN_LIMITS_MODE`) | `blocked`・`plan`・`resource`・`used`・`limit`・`uid_hash` | `jsonPayload.event="plan_limit.would_block" AND jsonPayload.blocked=false` |
+| `pro_gate.would_block` | `internal/paid`(`paid.go`) | Pro の要る機能で止める / 止めたはずの時(`PRO_GATE_MODE`) | `mode`・`blocked`・`where`・`features`・`uid_hash` | `jsonPayload.event="pro_gate.would_block"` |
+| `runner.allowance_warn` | `internal/runner`(`allowance.go`) | 月の枠の知らせを作成者に送ると決めた時 | `app_id`・`month`・`kind`・`level`・`stopped`・`result` | `jsonPayload.event="runner.allowance_warn"` |
+| `runner.quota_warn` | `internal/runner`(`quota_warn.go`) | 1 日の上限の知らせを作成者に送ると決めた時 | `app_id`・`day`・`level`・`result` | `jsonPayload.event="runner.quota_warn"` |
+| `runner.run` | `internal/runner`(`exec.go`) | 自動の動きの 1 回の実行ごと | `event_id`・`app_id`・`rule_id`・`version`・`trigger`・`scope`・`attempt`・`outcome`・`reason`・`duration_ms` | `jsonPayload.event="runner.run" AND jsonPayload.outcome!="ok"` |
+| `runner.schedules` | `internal/runner`(`schedules.go`) | 決まった時間の動きを作り直した時 | `event_id`・`app_id`・`version`・`outcome`・`scheduled_rules`・`reason` | `jsonPayload.event="runner.schedules"` |
+| `runner.scope_violation` | `internal/runner/scope`(`scope.go`) | 自動の動きが、自分のアプリの範囲の外の記録に触ろうとして止めた時(`ERROR`) | `app_id`・`path_app_id`・`public`・`path_uid_hash` | `jsonPayload.event="runner.scope_violation"` |
+| `runner.stop` | `internal/runner`(`stops.go`) | 通報が集まり、アプリの通知を自動で止めた時(`WARNING`) | `app_id`・`level`・`by`・`reporters`・`until` | `jsonPayload.event="runner.stop"` |
+| `runner.usage` | `internal/runner/quota`(`usage_log.go`) | 自動の動きの 1 回の実行で使った量 | `app_id`・`rule_id`・`trigger`・`outcome`・`reads`・`writes`・`notify_recipients`・`tasks_ops`・`cpu_ms`・`limit` | `jsonPayload.event="runner.usage"` |
+| `session.start` | `internal/appconfig`(`metrics.Emit`) | `GET /v1/apps` の最初の頁 | `uid_hash` | `jsonPayload.event="session.start"` |
+| `share.imported` | `internal/appconfig`(`metrics.Emit`) | 共有のリンク・「探す」からの取り込みで写しを作った時 | `app_hash`・`source`(`share` / `public`)・`uid_hash` | `jsonPayload.event="share.imported"` |
 
 例(5xx のアクセスログ):
 

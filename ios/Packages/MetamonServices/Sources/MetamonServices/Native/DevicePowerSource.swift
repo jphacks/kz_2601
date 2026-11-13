@@ -1,6 +1,8 @@
 import Foundation
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import IOKit.ps
 #endif
 
 // 端末の電池・充電・省電力モード(#1989・親 #1835)。式・スキーマ・AI の決まりにはまだ出さない(#1775 の決定待ち)。
@@ -9,7 +11,7 @@ import UIKit
 /// 端末の電源の状態。
 public struct DevicePowerState: Equatable, Sendable {
     public enum Charge: String, Equatable, Sendable {
-        /// 分からない(シミュレータ・監視が無効・Mac など)
+        /// 分からない(シミュレータ・監視が無効・電池の無い Mac など)
         case unknown
         case unplugged
         case charging
@@ -230,8 +232,18 @@ extension DevicePowerReadings {
                 .NSProcessInfoPowerStateDidChange,
             ]
         )
+        #elseif os(macOS)
+        // Mac(#2268): 内蔵電池を IOKit の電源の情報から読む。電池の無い Mac(デスクトップ)は不明(残りは nil)。
+        // 「監視」は電源の変化の通知(IOPSNotificationCreateRunLoopSource)を張っている間のこと
+        DevicePowerReadings(
+            isMonitoringEnabled: { MacPowerSources.notifier.isEnabled },
+            setMonitoringEnabled: { MacPowerSources.notifier.setEnabled($0) },
+            rawLevel: { MacPowerSources.reading(from: MacPowerSources.systemDescriptions()).rawLevel },
+            charge: { MacPowerSources.reading(from: MacPowerSources.systemDescriptions()).charge },
+            isLowPowerMode: { ProcessInfo.processInfo.isLowPowerModeEnabled },
+            notificationNames: [MacPowerSources.didChange, .NSProcessInfoPowerStateDidChange]
+        )
         #else
-        // Mac は電池を読まない(#1989 の対象外)。省電力モードだけ OS から読む
         DevicePowerReadings(
             isMonitoringEnabled: { false },
             setMonitoringEnabled: { _ in },
@@ -243,6 +255,67 @@ extension DevicePowerReadings {
         #endif
     }
 }
+
+#if os(macOS)
+/// Mac の電源の情報(#2268)。ノートの Mac の内蔵電池だけを見る(UPS などの外の電源は見ない)
+enum MacPowerSources {
+    /// 電源が変わった時にこちらで流す通知(IOKit の run loop source から)
+    static let didChange = Notification.Name("jp.kz2601.metamon.powerSourcesDidChange")
+    static let notifier = Notifier()
+
+    /// `IOPSGetPowerSourceDescription` の辞書の並びから内蔵電池を読む。無い(デスクトップ)・容量が読めない時は -1 / unknown
+    static func reading(from descriptions: [[String: Any]]) -> (rawLevel: Float, charge: DevicePowerState.Charge) {
+        guard let battery = descriptions.first(where: {
+            ($0[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType && ($0[kIOPSIsPresentKey] as? Bool ?? true)
+        }) else { return (-1, .unknown) }
+        guard let current = battery[kIOPSCurrentCapacityKey] as? Int, let max = battery[kIOPSMaxCapacityKey] as? Int, max > 0 else {
+            return (-1, .unknown)
+        }
+        let level = Float(current) / Float(max)
+        let onAC = (battery[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+        let charging = battery[kIOPSIsChargingKey] as? Bool ?? false
+        let charged = battery[kIOPSIsChargedKey] as? Bool ?? false
+        let charge: DevicePowerState.Charge
+        if !onAC {
+            charge = .unplugged
+        } else if charged || (!charging && level >= 1) {
+            charge = .full
+        } else {
+            charge = .charging // つながっている(最適化充電で止めている間も含む)
+        }
+        return (level, charge)
+    }
+
+    static func systemDescriptions() -> [[String: Any]] {
+        guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef] else { return [] }
+        return list.compactMap { IOPSGetPowerSourceDescription(blob, $0)?.takeUnretainedValue() as? [String: Any] }
+    }
+
+    /// 電源の変化の通知を main の run loop に張る / 外す
+    final class Notifier: @unchecked Sendable {
+        private let lock = NSLock()
+        private var source: CFRunLoopSource?
+
+        var isEnabled: Bool { lock.withLock { source != nil } }
+
+        func setEnabled(_ on: Bool) {
+            lock.withLock {
+                if on, source == nil {
+                    guard let created = IOPSNotificationCreateRunLoopSource({ _ in
+                        NotificationCenter.default.post(name: MacPowerSources.didChange, object: nil)
+                    }, nil)?.takeRetainedValue() else { return }
+                    CFRunLoopAddSource(CFRunLoopGetMain(), created, .defaultMode)
+                    source = created
+                } else if !on, let existing = source {
+                    CFRunLoopRemoveSource(CFRunLoopGetMain(), existing, .defaultMode)
+                    source = nil
+                }
+            }
+        }
+    }
+}
+#endif
 
 #if os(iOS)
 extension DevicePowerState.Charge {
