@@ -39,6 +39,7 @@ struct MetamonMacApp: App {
         BetaWelcomeStore.shared.applyLaunchOverride()
         MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)
         MacPushHost.shared.install(services: MacServices.shared) // プッシュの端末の登録(#982)
+        MacUnreadNotices.shared.install() // 未読の直ったお知らせの数をサイドバーと Dock に(#3245)。前面に来た時に読み直す
         #endif
         // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)と共有に渡した書き出しの写し(#946)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()

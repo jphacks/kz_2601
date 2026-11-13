@@ -104,6 +104,9 @@ struct AppSidebar: View {
                               mascotSize: MacTheme.Mascot.small, showsBackdrop: false)
             }
         }
+        #if !APP_STORE_REVIEW
+        .safeAreaInset(edge: .bottom, spacing: 0) { MacSidebarSettingsRow() } // 設定の行と未読のお知らせの数(#3245)
+        #endif
         .navigationTitle("アプリ")
         .accessibilityIdentifier("shell.sidebar") // UI テスト(#1140)
         .alert("名前を変える", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {

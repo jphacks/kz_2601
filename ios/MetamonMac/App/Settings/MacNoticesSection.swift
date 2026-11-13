@@ -127,7 +127,13 @@ private struct MacNoticesList: View {
             await model.load()
             await model.loadConsent()
         }
-        .onDisappear { Task { await model.markAllSeen() } }
+        .onChange(of: model.unreadCount) { _, count in MacUnreadNotices.shared.set(count) } // サイドバーと Dock の数(#3245)
+        .onDisappear {
+            Task {
+                await model.markAllSeen()
+                await MacUnreadNotices.shared.refresh(force: true)
+            }
+        }
     }
 }
 #endif
