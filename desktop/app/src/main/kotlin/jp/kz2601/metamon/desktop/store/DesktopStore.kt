@@ -7,6 +7,7 @@ import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordStore
 import jp.kz2601.metamon.services.local.SyncQueue
+import jp.kz2601.metamon.services.social.AuthorProfile
 import java.io.File
 
 /**
@@ -28,6 +29,8 @@ class DesktopStore(val root: File?) {
     private val consentValues = JsonKeyValueStore(root?.resolve(CONSENT_FILE))
     val aiConsent = AiConsentStore(consentValues)
     val crashReporting = CrashReportingPreference(consentValues)
+    /** 共有の投稿に出す表示名(本人が決めた名前だけ。OS のユーザー名・PC の名前は使わない)。設定ファイルに持つ。 */
+    val authorProfile = AuthorProfile(settings)
     val records = RecordStore(root?.resolve("records"))
     val documents = DocumentCache(root?.resolve("documents"))
 
@@ -52,6 +55,7 @@ class DesktopStore(val root: File?) {
         queue?.discardAll() ?: queueDir?.deleteRecursively()
         records.removeEverything()
         documents.removeAll()
+        authorProfile.clear()
         settings.clear()
         aiConsent.forget()
         sweepTempFiles(root)
