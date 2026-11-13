@@ -18,6 +18,9 @@
     <string name="desktop_calendar_written">予定を書き出しました: %1$s</string>
     <string name="desktop_chart_empty">まだデータがありません</string>
     <string name="desktop_close">閉じる</string>
+    <string name="desktop_coin_estimate">約 %1$d コイン</string>
+    <string name="desktop_coin_estimate_a11y">送ると約 %1$d コインを使います</string>
+    <string name="desktop_coin_estimate_a11y_balance">送ると約 %1$d コインを使います。残り %2$d コイン</string>
     <string name="desktop_data_add">追加</string>
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
     <string name="desktop_drag_image_name">画像</string>
