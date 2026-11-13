@@ -1,0 +1,14 @@
+: keep-alive
+
+event: app
+data: {"name":"家計簿","tabs":["支出","まとめ"],"attempt":0}
+
+event: component
+data: {"attempt":0,"screen":"expenses","component":{"index":0,"type":"text","label":"今月の支出"}}
+
+event: component
+data: {"attempt":0,"screen":"expenses","component":{"index":1,"id":"add","type":"button","label":"追加"}}
+
+event: result
+data: {"appId":"app1","version":2,"mode":"full","summary":"家計簿を作りました","dsl":{"schemaVersion":1,"app":{"name":"家計簿","voiceEntry":"floating"},"initialScreen":"home","screens":[{"id":"home","title":"ホーム","components":[]}]}}
+

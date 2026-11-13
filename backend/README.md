@@ -1,13 +1,29 @@
 # backend (Go)
 
-単一モジュール・複数サービス構成。`cmd/<service>` が1つの Cloud Run サービスに対応する。
+単一モジュール・複数バイナリ構成。`cmd/<名前>` が 1 つの実行ファイル(Cloud Run のサービス・Job か、人が回す道具)に対応する。
 設計: `docs/backend/architecture.md`、API契約: `docs/backend/openapi-*.yaml`、DSL: `docs/dsl/README.md` + `docs/dsl/dsl.schema.json`。
 
-| cmd | 担当 | 役割 |
-|---|---|---|
-| `cmd/appconfig` | @2410as | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード |
-| `cmd/ai` | Claude Code | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig |
-| `cmd/runner` | Claude Code | 自動の動き(serverRules)を outbox から実行(#341・**未デプロイ**)。`POST /internal/tick`・ローカルは `make run-runner` |
+`cmd/` の全部(1 行 1 本・名前順)。Cloud Run で動く 6 本(ai・appconfig・appstore-reconcile・feedback-loop・purge・runner)は同じ `backend/Dockerfile` のイメージに `/app/<名前>` として入り、`--command` で切り替える。ほかは人が手元で回す道具(smoke はデプロイの後にも回る)。
+
+| cmd | 役割 | どこで動くか | 手元で回す | 詳しい docs |
+|---|---|---|---|---|
+| `cmd/ai` | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig | Cloud Run サービス `ai-stg` / `ai-prod` | `make run-ai`(`make dev` で appconfig と一緒に) | [openapi-ai.yaml](../docs/backend/openapi-ai.yaml) |
+| `cmd/ai-audit` | ai-eval の結果の DSL を「動くか」で採点する(押せないボタン・行けない画面など)。API は呼ばない | 手元 | `go run ./cmd/ai-audit` | [使い方](../docs/backend/ai-eval/ai-audit.md)・[ai-eval の監査](../docs/backend/ai-eval/2026-10-24-audit.md) |
+| `cmd/ai-eval` | 評価ケース(`internal/ai/eval/cases.json`)を本物の Claude で回して指標と DSL を書き出す。`-check-all` はケースの検査だけ(API なし) | 手元・`backend-ci`(`-check-all` だけ) | `go run ./cmd/ai-eval` | [ci-gate.md](../docs/backend/ai-eval/ci-gate.md) |
+| `cmd/ai-session-report` | 指定したユーザーの AI とのやり取りをセッションに切り、AI が外した疑いの強い順に並べる(読むだけ) | 手元(人が回す・定期では回さない) | `go run ./cmd/ai-session-report` | [ai-session-report.md](../docs/ops/ai-session-report.md) |
+| `cmd/appconfig` | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード・各機能の API | Cloud Run サービス `appconfig-stg` / `appconfig-prod` | `make run-appconfig`(`make dev` で ai と一緒に) | [openapi-appconfig.yaml](../docs/backend/openapi-appconfig.yaml) |
+| `cmd/appstore-reconcile` | App Store Server API から Pro の状態を取り直し、届かなかった通知の分を直す | Cloud Run Job `appstore-reconcile`(Cloud Scheduler で 1 日に数回・作るのは人) | `make run-appstore-reconcile`(エミュレータ・既定 `-dry-run`) | [app-store-notifications.md](../docs/infra/app-store-notifications.md) |
+| `cmd/coin-initial-backfill` | 初回コインの付与の記録(`coin_initial_grants`)を、記録が無かった頃のアカウントに書く | 手元(人が 1 回だけ) | `go run ./cmd/coin-initial-backfill` | [coin-initial-backfill.md](../docs/infra/coin-initial-backfill.md) |
+| `cmd/dslgen` | JSON Schema から Android(Kotlin)の DSL の型を作る。生成物は commit し、古いと `TestGeneratedKotlinIsUpToDate` が落ちる | 手元 | `make dsl-gen` | [351-dsl-cross-platform.md](../docs/decisions/351-dsl-cross-platform.md) |
+| `cmd/feedback` | アプリ内のフィードバックを読む(一覧・1 件)。書かない | 手元(運用する人) | `make run-feedback` | [feedback.md](../docs/backend/features/feedback.md) |
+| `cmd/feedback-loop` | 自己改善ループの各段(取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・止める仕組み) | Cloud Run Job `feedback-loop-<段>`(Cloud Scheduler・既定は作らない)と手元 | `make run-feedback-loop`(エミュレータ・`LOOP_ARGS`) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `cmd/matching-age-backfill` | 18 歳以上の申告をした作者のマッチングのプロフィールに `ownerAgeConfirmed` を書く(既定は件数だけ) | 手元(人が 1 回だけ) | `go run ./cmd/matching-age-backfill` | [matching-age-backfill.md](../docs/infra/matching-age-backfill.md) |
+| `cmd/moderate` | 通報の一覧・処理と、掲載・共有アプリの公開の停止(運用する人の道具) | 手元(運用する人) | `make run-moderate` | [moderation.md](../docs/infra/moderation.md) |
+| `cmd/product-metrics` | ログの出力からプロダクトの指標(生成の成功・D1/D7 など)を週ごとの Markdown の表にする。API は呼ばない | 手元 | `go run ./cmd/product-metrics` | [product-metrics.md](../docs/metrics/product-metrics.md) |
+| `cmd/purge` | 退会して一定期間たったアカウントと、古いフィードバックを消す | Cloud Run Job `account-purge`(Cloud Scheduler で毎日・`infra/purge.tf`) | `make run-purge` | [account-purge.md](../docs/infra/account-purge.md) |
+| `cmd/runner` | 自動の動き(serverRules)を outbox から実行する(#341)。`POST /internal/tick` | Cloud Run サービス `runner-prod`(prod だけ・非公開。`RUNNER_DEPLOY=1` と `runner_enabled = true` の時だけ出す)と Scheduler `runner-tick` | `make run-runner` | [runner.md](../docs/infra/runner.md) |
+| `cmd/smoke` | デモの発話を動いている ai(+ appconfig)に流して、ステップごとの時間とトークンを表にする | 手元・`deploy-cloudrun` のデプロイの後(非ブロッキング) | `make smoke-local` / `make smoke-stg` / `make smoke-prod` | [deploy-cloudrun](../docs/02_github_workflow.md#deploy-cloudrunbackend-の自動デプロイ) |
+| `cmd/stg-cleanup` | stg のテストのデータ(smoke のアプリ・回数制限のカウンタ・指定したテストユーザー)を消す(既定は件数だけ) | 手元(人が回す・定期では回さない) | `make run-stg-cleanup` | [stg-cleanup.md](../docs/infra/stg-cleanup.md) |
 
 共有型は `pkg/dsl`:
 
@@ -29,7 +45,7 @@
 | `internal/appconfig` | `openapi-appconfig.yaml` のハンドラ(apps / dsl / versions / entities / records) |
 | `internal/appconfigclient` | ai が appconfig を叩く薄い HTTP クライアント(Bearer 転送) |
 
-機能(共有・メンバー・通報など)のルートは、その機能のファイルの `init()` から `registerRoutes` で足す(AI のプロンプトと同じ形)。`handler.go` の `New()` には core(apps / dsl / versions / entities / records)だけを置く。足したルートは `routes_test.go` の `wantRoutes` にも書く。
+機能(共有・メンバー・通報など)のルートは、その機能のファイルの `init()` から `registerRoutes` で足す(AI のプロンプトと同じ形)。`handler.go` の `New()` には core(apps / dsl / versions / entities / records)だけを置く。足したルートは `routes_test.go` の `wantRoutes` にも書く。各機能の設計は [機能の文書の索引](../docs/backend/features/README.md)。
 
 並行 PR の衝突を減らす書き方(#516): slog の属性は 1 行に 1 つ。purge の新しい件数は `store.AccountPurgeResult` のフィールド(コメントは行の上)と `LogAttrs` に足す。`store.Memory` の新しい状態は空行で区切った自分の機能のブロックに置く(gofmt の桁揃えがほかの行に波及しない)。
 
@@ -54,6 +70,41 @@ curl -H "Authorization: Bearer $DEV_UID" localhost:8080/v1/apps/my-device/dsl   
 運用コマンド(`run-purge` などの機能ごとのターゲット)は `mk/<feature>.mk` に置く(Makefile が末尾で `-include` する)。
 新しく足す時は `mk/<feature>.mk` を新規に作り、ターゲットの直上に専用の `.PHONY: <target>` を書く。Makefile の共有行には足さない。
 
+網羅率: `make cover` でパッケージごとの網羅率を低い順の表で出す(しきい値で落とさない・`COVER_PKGS=./cmd/ai` で絞れる)。
+エミュレータ試験の分は環境変数が無いと skip されて数字に入らない。`make emulator` を別ターミナルで起動し、
+`FIRESTORE_EMULATOR_HOST=127.0.0.1:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 make cover` で回すと、`make test-emulator` の分も合わせた数字になる(`internal/store` など)。
+
+### make のターゲット
+
+`backend/` で `make <ターゲット>`(外からは `make -C backend <ターゲット>`)。ターゲットを足す PR では、この表にも 1 行足す(名前順)。「エミュレータ」は `localhost:8089` の Firestore エミュレータ(`make emulator`)に向くもの。
+
+| ターゲット | 何をするか | stg / prod に触れるか | dry-run が既定か | 置き場 |
+|---|---|---|---|---|
+| `build` | `go build ./...` | 触れない | — | `Makefile` |
+| `cover` | パッケージごとの網羅率を低い順の表で出す(`COVER_PKGS` で絞れる・しきい値で落とさない) | 触れない | — | `mk/cover.mk` |
+| `demo-check` | デモ前チェック兼ウォームアップ(`scripts/demo-check.sh $(ENV)`)。匿名ユーザーを作り、生成・対話・編集で Claude を 3 回呼び、最後に作った物を片付ける | 触れる(`ENV=stg` が既定・`ENV=prod` で本番) | いいえ | `Makefile` |
+| `dev` | `run-appconfig`(:8080)と `run-ai`(:8081)を一緒に起動する。Ctrl-C で両方止まる | 触れない(エミュレータ) | — | `Makefile` |
+| `dsl-gen` | `schema-check` の後、Android の DSL の型をスキーマから作り直す(`go run ./cmd/dslgen`) | 触れない | — | `Makefile` |
+| `emulator` | Firestore エミュレータを起動する(`scripts/firestore-emulator.sh start`)。Auth エミュレータは無し | 触れない | — | `Makefile` |
+| `lint` | `vet` の後、`staticcheck ./...`(入っていなければ入れ方を出すだけ)。CI の `golangci-lint run ./...` とは別 | 触れない | — | `Makefile` |
+| `run-ai` | ai を `AUTH_MODE=dev`・:8081 で起動し、appconfig は `localhost:8080` を見る | 触れない | — | `Makefile` |
+| `run-appconfig` | appconfig をエミュレータに向けて `AUTH_MODE=dev`・:8080 で起動する | 触れない(エミュレータ) | — | `Makefile` |
+| `run-appstore-reconcile` | App Store Server API で Pro の状態を取り直す照合(#315)をエミュレータに対して回す(`APPSTORE_RECONCILE_FLAGS`) | 触れない(エミュレータ・App Store は sandbox のキーを自分で渡す) | はい(`-dry-run`) | `mk/appstore.mk` |
+| `run-feedback` | アプリ内のフィードバック(#319)を読む(`FEEDBACK_ARGS`・既定 `list`) | 触れない(エミュレータ) | 読むだけ | `mk/feedback.mk` |
+| `run-feedback-loop` | 自己改善ループ(#364)のコマンドを回す(`LOOP_ARGS`・既定 `ingest`)。[feedback-loop.md](../docs/backend/features/feedback-loop.md) | 触れない(エミュレータ) | dry-run の口は無い。段は `LOOP_<段>=on` の時だけ動く | `mk/feedback-loop.mk` |
+| `run-moderate` | 運営の通報の確認・非公開化(#321)を試す(`ARGS`・例 `ARGS="reports"`)。[moderation.md](../docs/infra/moderation.md) | 触れない(エミュレータ) | 書き込みは `-yes` を付けた時だけ | `mk/moderate.mk` |
+| `run-purge` | 退会から 30 日を過ぎたアカウントの消去(#458)を試す(`PURGE_FLAGS`)。外す時は `PURGE_FLAGS=-delete-auth=false`。[account-purge.md](../docs/infra/account-purge.md) | 触れない(エミュレータ) | はい(`-dry-run`) | `mk/purge.mk` |
+| `run-runner` | 自動の動き(serverRules)の runner(#341)を :8082 で起動し、`RUNNER_TICK_INTERVAL`(既定 10s)ごとに outbox を処理する | 触れない(エミュレータ) | — | `mk/runner.mk` |
+| `run-stg-cleanup` | 試験データ(smoke-* アプリ・stg の回数制限・試験ユーザー)の掃除(#293)を試す(`STG_CLEANUP_FLAGS`・既定 `-smoke -stg-ratelimits`)。stg / prod は [stg-cleanup.md](../docs/infra/stg-cleanup.md) の手順で人が回す | 触れない(エミュレータだけに向く) | はい(`-apply` を付けるまで消さない) | `mk/stg-cleanup.mk` |
+| `schema-check` | `docs/dsl/dsl.schema.json` と `pkg/dsl/schema.json` が同じかを見る。違えば落ちる | 触れない | — | `Makefile` |
+| `schema-sync` | `docs/dsl/dsl.schema.json` を `pkg/dsl/schema.json` に写す | 触れない | — | `Makefile` |
+| `smoke-local` | appconfig(memory)と ai を :18080 / :18081 で起動し、`cmd/smoke` を回して止める(`SMOKE_ONLY=kakeibo` で 1 本)。`../.env` の `ANTHROPIC_API_KEY` で Claude を呼ぶ | 触れない(Claude は呼ぶ) | いいえ | `Makefile` |
+| `smoke-prod` | 本番に `cmd/smoke` を家計簿 1 本だけ回し(Claude 2 回)、作った smoke-* アプリを片付ける(`-cleanup`) | 触れる(prod) | いいえ | `Makefile` |
+| `smoke-stg` | stg に `cmd/smoke` を回す(Claude 3 回)。`FIREBASE_WEB_API_KEY` が無ければ health と 401 の確認だけ | 触れる(stg) | いいえ | `Makefile` |
+| `test` | `schema-check` の後、`go test ./...` | 触れない | — | `Makefile` |
+| `test-emulator` | エミュレータ試験を CI(`backend-emulator`)と同じ判定で回す。エミュレータが無ければ一時的に起動して止める | 触れない(エミュレータ) | — | `Makefile` |
+| `vet` | `go vet ./...` | 触れない | — | `Makefile` |
+
 ai → appconfig の結合をローカルで確認する時は、appconfig を上記で起動し、ai を
 `AUTH_MODE=dev APPCONFIG_BASE_URL=http://localhost:8080 ANTHROPIC_API_KEY=... PORT=8082 go run ./cmd/ai` で起動して
 `curl -H "Authorization: Bearer $DEV_UID" -d '{"appId":"my-device","transcript":"家計簿が欲しい"}' localhost:8082/v1/generate`
@@ -73,6 +124,7 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
+| `LOOP_SOURCE_GOOGLEPLAY` / `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | - | - | `cmd/feedback-loop` だけ。`on` で Google Play のレビューを改善ループに取り込む(既定 off・#2147)。パッケージ名の既定は `GOOGLE_PLAY_PACKAGE_NAME`、キーが空なら job の ADC。キーは Secret Manager から(JSON の中身・パスではない)([feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)) |
 | `MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD` | o | - | `GET /v1/client-config` の Linux の最低の版 / 最新の版(未設定 = 出さない・最新 < 最低なら最低に揃える・#2131)。詳しくは `docs/infra/runtime-config.md` |
 | `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD` | o | - | 同じく Windows(#2131) |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` | o | o | AI の 1 人 1 日の単位(既定 30 / 60 / 300)。他の `RATE_LIMIT_*` と理由は [docs/backend/rate-limit.md](../docs/backend/rate-limit.md) |
@@ -83,5 +135,9 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
 | `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
 | `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
+| `DEBUG_OVERRIDES` | o | o | **stg だけ**。`1` で、`DEBUG_OVERRIDE_UIDS` の uid のリクエストに限り `X-Debug-Plan: pro` / `free` で Pro の判定をそのリクエストだけ変える(#2085)。`APP_ENV` が `stg` でない時に入っていると**起動しない**。デプロイは入れない([stg-plan-override.md](../docs/infra/stg-plan-override.md)) |
+| `DEBUG_OVERRIDE_UIDS` | o | o | 上の対象にする uid(カンマ区切り)。`DEBUG_OVERRIDES=1` の時は空だと起動しない。repo には書かない |
+
+この表と docs/ に無い環境変数の一覧: `go test -run TestEnvDocs -v ./internal/envdoc`(表示だけで落とさない)。
 
 Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。

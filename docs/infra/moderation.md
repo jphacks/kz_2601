@@ -9,6 +9,7 @@ App Store Review Guidelines 1.2 / 1.2.1(a)(利用者が作った内容を共有�
 - [通報を受けたら(運用)](#通報を受けたら運用)
 - [cmd/moderate の使い方](#cmdmoderate-の使い方)
 - [通報のアラート](#通報のアラート)
+- [表示できない言葉の一覧の足し方・外し方](#表示できない言葉の一覧の足し方外し方)
 - [まだ決めていないこと](#まだ決めていないこと)
 
 ## 仕組み
@@ -76,6 +77,40 @@ go run ./cmd/moderate resolve <reportId> -yes     # -status dismissed で「該�
 - 通報が増えたら `google_monitoring_alert_policy.moderation_reports` の `threshold_value` を上げる。
 
 適用(人の作業・[infra/README.md](../../infra/README.md) の手順): `terraform plan -var-file=envs/prod.tfvars` で指標 2 つ・ポリシー 2 つの追加だけになっていることを見てから `apply`。
+
+## 表示できない言葉の一覧の足し方・外し方
+
+言葉そのものはこの文書にも Issue・PR の本文にも書かない(差分の中だけに置く)。
+
+### 置き場と形
+
+- 一覧は [`backend/internal/moderation/textfilter/terms.txt`](../../backend/internal/moderation/textfilter/terms.txt)。`go:embed` でバイナリに入るので、変えたら**デプロイして初めて効く**(切り替えだけなら `TEXT_FILTER`・上の表)。
+- 1 行 1 語で `<種類> <言葉>`。`#` で始まる行と空行は読み飛ばす。
+- 種類は `slur` / `sexual` / `threat` と `allow` の 4 つ。それ以外は `Parse` がエラーにする(起動の前のテストで落ちる)。
+  - `allow` は「当たる言葉を含むが問題ない言い回し」。照合の前に本文から取り除く。誤検出を直す時に使う。
+- 言葉は入力と同じ `Normalize`(NFKC・小文字・ひらがな→カタカナ・記号と空白を 1 つの空白に)をかけてから比べる。ひらがな・カタカナ・全角の書き分けは 1 行でよい。
+- 英数字だけの言葉は**単語の単位**で当たる。末尾の `*` は「その語で始まる単語」に当たる(英数字だけに使える。日本語に付けると `Parse` がエラー)。
+- 英数字以外を含む言葉は本文の**どこにでも**当たる(単語の区切りを見ない)。だから短い日本語ほど誤検出しやすい。
+
+### 足す・外す時の注意
+
+1. 足す言葉が、普通の文の中に部分として出てこないかを先に考える(日本語は部分一致なので特に)。
+2. 足したら、`textfilter_test.go` の `TestCheckRefuses` に**当たるべき例**を、`TestCheckAllowsCommonText` に**当たってはいけない普通の文**(誤検出の例)を足す。別の `testdata` の置き場は無く、例はこの 2 つのテストの表に書く。
+3. 誤検出が出たら、言葉を外すより先に `allow` の行で直せないかを見る。直したら、その文を `TestCheckAllowsCommonText` に足す(同じ誤検出を戻さないため)。
+4. 外す時は、`backend/internal/appconfig/textfilter_test.go` がその言葉を例に使っていないかを見る(使っていれば別の言葉に替える)。
+5. 一覧は「短く・明らかな物だけ」(`terms.txt` の頭の注記)。判断の分かれる言葉は足さず、通報と運営の非公開化に任せる。
+
+### 回すテスト
+
+```bash
+cd backend
+go test ./internal/moderation/textfilter/   # TestDefaultParses・TestParseErrors・TestNormalize・TestCheckRefuses・TestCheckAllowsCommonText・TestModeFromEnv
+go test ./internal/appconfig/ -run TestTextFilter   # 書き込みの時に 422 になるか(TestTextFilterModes ほか)
+```
+
+- `TestDefaultParses` は埋め込んだ `terms.txt` が読めて、日本語・英数字・`allow` がそれぞれ 1 行以上あることを見る。
+- どちらもエミュレータは要らない。`backend/` を変える PR では backend-ci の `go test ./... -race` でも回る。
+- 一覧を変える PR を誰がレビューするかは決めていない(下の「まだ決めていないこと」の見直しの担当)。
 
 ## まだ決めていないこと
 

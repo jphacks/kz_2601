@@ -1,6 +1,8 @@
 package jp.kz2601.metamon.desktop.net
 
 import jp.kz2601.metamon.services.AppConfigClient
+import jp.kz2601.metamon.services.consent.AiButtonMetricsSender
+import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.MetamonHttp
 import jp.kz2601.metamon.services.http.TokenProvider
@@ -76,5 +78,11 @@ object DesktopApi {
     fun appConfig(config: DesktopApiConfig, cache: DocumentCache? = null): AppConfigClient? {
         if (!config.isLive) return null
         return HttpAppConfigClient(http(config.appConfigUrl, devTokens(config.devToken)), cache)
+    }
+
+    /** aiButton の集計の送り先(`POST /v1/metrics/ai-button`・#2817)。記録を送るのと同じく、stg とトークンが両方ある時だけ */
+    fun aiButtonMetricsSender(config: DesktopApiConfig): AiButtonMetricsSender? {
+        if (!config.isLive || config.devToken.isNullOrEmpty()) return null
+        return HttpAiButtonMetricsSender(http(config.appConfigUrl, devTokens(config.devToken)))
     }
 }

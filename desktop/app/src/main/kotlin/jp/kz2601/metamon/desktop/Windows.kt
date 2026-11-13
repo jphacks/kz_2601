@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import jp.kz2601.metamon.desktop.store.RecordChangeSubscriptions
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
@@ -25,7 +26,13 @@ enum class WindowKind { APP, RECORD }
 data class WindowKey(val appId: String, val screen: String? = null, val recordId: String? = null) {
     val kind: WindowKind get() = if (recordId == null) WindowKind.APP else WindowKind.RECORD
 
+    /** ホーム(サーバーのアプリの一覧・#2379)。アプリを開かない。 */
+    val isHome: Boolean get() = appId == HOME_ID
+
     companion object {
+        const val HOME_ID = "home:"
+
+        fun home() = WindowKey(HOME_ID)
         fun app(appId: String) = WindowKey(appId)
         fun record(appId: String, screen: String, recordId: String) = WindowKey(appId, screen, recordId)
     }
@@ -90,7 +97,7 @@ class WindowRegistry {
 
     /** トレイの「すぐ記録」の行き先: 前にあるウィンドウのアプリの、アプリのウィンドウ(詳細には入れない)。無ければ開く。 */
     fun quickRecordWindow(): WindowEntry? {
-        val appId = active?.key?.appId ?: return null
+        val appId = active?.key?.takeUnless { it.isHome }?.appId ?: return null
         return latestAppWindow(appId)?.also { activate(it.id) } ?: open(WindowKey.app(appId))
     }
 
@@ -161,6 +168,18 @@ class SharedRecords(
         val old = store
         store = next
         persistence?.changed(models, old, next)
+    }
+
+    /**
+     * サーバーから取り直した共有の記録を混ぜる(#2214)。端末には書かない(他の人の記録を送り直さない)。
+     * [merge] は画面のスレッドで今の行に当てる(取り直しの間に足した自分の分を落とさない)。
+     */
+    fun mergeRemote(entity: String, merge: (List<Row>) -> List<Row>) {
+        post {
+            if (loading || wiping) return@post
+            val next = merge(store.list(entity))
+            if (next != store.list(entity)) store = store.copy(rows = store.rows + (entity to next))
+        }
     }
 
     /** 端末から読み終えた。 */
@@ -251,8 +270,14 @@ class AppHub(
     private val wipeStore: suspend () -> Unit = {},
     /** 一時ファイル(写真の「既定のアプリで開く」・引き出し)を消す。 */
     private val clearTempFiles: () -> Unit = { PhotoOpen.clearTemp() },
+    /** サーバーにあるアプリの変化の通知(#2808)。アプリごとに 1 本・最後のウィンドウを閉じたらやめる。null は張らない(モック) */
+    val live: RecordChangeSubscriptions? = null,
 ) {
-    class OpenedApp(val id: String, val dsl: AppDSL, val records: SharedRecords)
+    class OpenedApp(val id: String, dsl: AppDSL, val records: SharedRecords) {
+        /** 並びを直して保存すると替わる(#3207)。替わったらウィンドウの画面を作り直す。 */
+        var dsl by mutableStateOf(dsl)
+            internal set
+    }
 
     private val apps = LinkedHashMap<String, OpenedApp>()
     private val dsls = HashMap<String, AppDSL>()
@@ -263,15 +288,28 @@ class AppHub(
     @Synchronized
     fun app(id: String): OpenedApp = apps.getOrPut(id) { dsl(id).let { OpenedApp(id, it, openRecords(id, it)) } }
 
+    /** サーバーから読んだ DSL を置く(#2379)。開いていなければ次に開く時に使う(開いていればそのまま前に出す)。 */
+    @Synchronized
+    fun put(id: String, dsl: AppDSL) {
+        if (id !in apps) dsls[id] = dsl
+    }
+
     /** DSL だけ(トレイの名前・すぐ記録)。記録は開かない。 */
     @Synchronized
     fun dsl(id: String): AppDSL = apps[id]?.dsl ?: dsls.getOrPut(id) { load(id) }
+
+    /** 並びを直した DSL に替える(#3207)。開いているウィンドウ・トレイの両方。 */
+    @Synchronized
+    fun replaceDsl(id: String, dsl: AppDSL) {
+        dsls[id] = dsl
+        apps[id]?.dsl = dsl
+    }
 
     /** ウィンドウを 1 枚開いた。 */
     @Synchronized
     fun acquire(id: String): OpenedApp {
         refs[id] = (refs[id] ?: 0) + 1
-        return app(id)
+        return app(id).also { live?.open(id) }
     }
 
     /**
@@ -279,6 +317,7 @@ class AppHub(
      * 次に開く時は端末から読み直す。
      */
     fun release(id: String, timeoutMillis: Long = FLUSH_TIMEOUT_MILLIS) {
+        live?.close(id)
         val closing = synchronized(this) {
             val n = (refs[id] ?: 0) - 1
             if (n > 0) {
@@ -314,6 +353,7 @@ class AppHub(
 
     /** 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ち([timeoutMillis] まで)、それから閉じる。 */
     fun close(timeoutMillis: Long = FLUSH_TIMEOUT_MILLIS) {
+        live?.closeAll()
         val all = synchronized(this) { apps.values.toList().also { apps.clear(); refs.clear() } }
         runBlocking { withTimeoutOrNull(timeoutMillis) { all.forEach { it.records.idle() } } }
         all.forEach { it.records.close() }
