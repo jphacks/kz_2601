@@ -121,8 +121,7 @@ struct StatLeaf: View {
 
     /// 数値 1 段分(ViewThatFits の候補)。
     private func valueText(_ text: String, size: CGFloat) -> some View {
-        Text(text)
-            .font(.system(size: size, weight: .bold, design: .rounded).monospacedDigit())
+        ScaledValueText(text, size: size)
             .lineLimit(1)
     }
 
