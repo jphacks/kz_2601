@@ -28,6 +28,14 @@ struct MetamonMacApp: App {
         // 他の端末の変化(#2072): 進んだ版は一覧に当てる(中央が作り直される)。購読は同じ合図で張り直す
         MacRealtimeSync.shared.onDocument = { [weak library] doc in library?.applyRemoteVersion(doc) }
         MacRecordResend.shared.onResume = { MacRealtimeSync.shared.resume(force: $0) }
+        // ウインドウが閉じていても時々取り直す(#2253・iOS の BGAppRefreshTask に当たる): 送信待ち → 一覧 → 開いているアプリ
+        MacBackgroundRefresh.shared.refetch = { [weak library] in
+            guard let library else { return }
+            await library.refreshServerApps()
+            for appId in MacRealtimeSync.shared.openAppIds { _ = await library.refreshFromServer(appId) }
+            MacRealtimeSync.shared.catchUpAll()
+        }
+        MacBackgroundRefresh.shared.install()
         // ショートカット・Siri・Spotlight(App Intents・#1034)。記録の追加はウインドウを開かずに来るので、一覧は起動の最初に渡す
         IntentHost.shared.register(library: library, bundled: apps)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
