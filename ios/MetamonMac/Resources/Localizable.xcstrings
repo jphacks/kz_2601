@@ -5098,6 +5098,23 @@
         }
       }
     },
+    "すべてを選択" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select All"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてを選択"
+          }
+        }
+      }
+    },
     "そのままにする" : {
       "localizations" : {
         "en" : {
@@ -7108,6 +7125,23 @@
         }
       }
     },
+    "カット" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cut"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カット"
+          }
+        }
+      }
+    },
     "カテゴリごとの割合を円グラフで見せて" : {
       "localizations" : {
         "en" : {
@@ -8573,6 +8607,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プロフィールの送信が終わってから送れます"
+          }
+        }
+      }
+    },
+    "ペースト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペースト"
+          }
+        }
+      }
+    },
+    "ペーストしてスタイルを合わせる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste and Match Style"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペーストしてスタイルを合わせる"
           }
         }
       }
