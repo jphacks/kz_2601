@@ -149,6 +149,8 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
                 layouts.removeAll()
                 DeviceWipe.run(desktopStore.root)
             },
+            // DSL の差し替え(#2809)は画面のスレッドで
+            post = { SwingUtilities.invokeLater(it) },
         )
     }
     DisposableEffect(hub) {
@@ -384,6 +386,7 @@ private fun ApplicationScope.DesktopWindow(
                     LoadingSkeleton()
                 } else key(app.dsl) {
                     // 並びを直して保存したら DSL が替わるので作り直し、編集していた画面から開く(#3207)
+                    // アプリの版が変わって DSL を差し替えたら(#2809)も画面を新しい DSL で作り直して一言出す
                     DesktopApp(
                         app.dsl,
                         startScreen = reopenScreen ?: w.key.screen ?: startScreen,
@@ -409,6 +412,7 @@ private fun ApplicationScope.DesktopWindow(
                         thumbnailAppId = w.key.appId.takeIf { kind == WindowKind.APP },
                         serverApps = serverApps.takeIf { it.available },
                         onOpenServerApp = openServerApp,
+                        hotSwapNotice = if (app.reloads > 0) Strings["runtime_hot_reloaded"] else null,
                     )
                 }
                 }
