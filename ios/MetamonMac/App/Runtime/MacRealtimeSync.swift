@@ -97,6 +97,14 @@ final class MacRealtimeSync {
         }
     }
 
+    /// 購読している(ウインドウで開いている)アプリ
+    var openAppIds: [String] { entries.keys.sorted() }
+
+    /// 裏の定期の取り直し(#2253): 購読は張り直さず、開いている全部のアプリの表示中の entity を取り直す
+    func catchUpAll() {
+        for entry in entries.values { broadcastCatchUp(entry) }
+    }
+
     // MARK: - テスト用
 
     func isSubscribed(_ appId: String) -> Bool { entries[appId]?.stream != nil }
