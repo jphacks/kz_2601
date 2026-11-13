@@ -22,8 +22,8 @@ final class MacReleaseRequest2249Tests: XCTestCase {
         func myRequests() async throws -> [ReleaseRequest] { mine }
     }
 
-    private func model(_ client: FakeClient?, store: MacReleaseRequests = MacReleaseRequests()) -> MacReleaseRequestModel {
-        MacReleaseRequestModel(appId: "app-1", appName: "家計簿", client: client, store: store)
+    private func model(_ client: FakeClient?, store: MacReleaseRequests? = nil) -> MacReleaseRequestModel {
+        MacReleaseRequestModel(appId: "app-1", appName: "家計簿", client: client, store: store ?? MacReleaseRequests())
     }
 
     func testSendTrimsAndShowsReceived() async {
