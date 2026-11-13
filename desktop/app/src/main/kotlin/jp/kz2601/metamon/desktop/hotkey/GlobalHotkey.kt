@@ -117,7 +117,7 @@ interface GlobalHotkey : AutoCloseable {
     override fun close() = unregister()
 }
 
-/** 受けられない OS(今は Windows 以外)。登録はいつも [HotkeyFailure.UNSUPPORTED]。 */
+/** 受けられない OS(今は Windows・Linux の X11 以外)。登録はいつも [HotkeyFailure.UNSUPPORTED]。 */
 object UnsupportedGlobalHotkey : GlobalHotkey {
     override fun register(chord: HotkeyChord, onPressed: () -> Unit) = HotkeyRegistration.Failed(HotkeyFailure.UNSUPPORTED)
     override fun unregister() = Unit
@@ -155,9 +155,15 @@ object HotkeySettings {
 }
 
 object GlobalHotkeys {
-    /** OS ごとの実体。Windows は RegisterHotKey、他はまだ受けない。 */
-    fun forOs(osName: String = System.getProperty("os.name").orEmpty()): GlobalHotkey =
-        if (osName.startsWith("Windows", ignoreCase = true)) WindowsGlobalHotkey() else UnsupportedGlobalHotkey
+    /** OS ごとの実体。Windows は RegisterHotKey、Linux の X11 は XGrabKey(#2202)、他はまだ受けない。 */
+    fun forOs(
+        osName: String = System.getProperty("os.name").orEmpty(),
+        env: (String) -> String? = System::getenv,
+    ): GlobalHotkey = when {
+        osName.startsWith("Windows", ignoreCase = true) -> WindowsGlobalHotkey()
+        osName.startsWith("Linux", ignoreCase = true) && LinuxDisplay.detect(env) == LinuxDisplay.X11 -> X11GlobalHotkey()
+        else -> UnsupportedGlobalHotkey
+    }
 
     /**
      * 設定があれば登録する(off なら何もせず null)。登録は OS を待つので画面のスレッドで呼ばない。
