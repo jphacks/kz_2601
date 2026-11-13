@@ -94,6 +94,7 @@ scripts/agent-pr-guard.sh origin/develop HEAD    # 引数を省くと origin/dev
 ## PR の形
 
 - 本文: `Closes #<Issue>`・変更の要点・試したこと(テストのコマンドと結果)・対象外の領域に触れていないこと(`scripts/agent-pr-guard.sh` の結果)
+  - この形の本文は `scripts/agent-pr-body.sh --issue <N> --summary <file> --tests <file> --guard <file> [--stat <file>]` が標準出力に出す(GitHub には何も書かない。入力に URL・メンション・画像の埋め込みが有れば 1 で止まる)。「作者のインラインの自己レビュー」は PR の後に付けるので本文には含めない
 - 作者のインラインの自己レビュー(CONTRIBUTING の規約どおり)
 - 1 Issue 1 PR。Issue の範囲の外の変更を混ぜない
 - PR の本文・コミットのメッセージに、URL(リポジトリの中と Issue の番号以外)・メンション・画像の埋め込み・秘密の形を入れない(#366 の検査器 3)
