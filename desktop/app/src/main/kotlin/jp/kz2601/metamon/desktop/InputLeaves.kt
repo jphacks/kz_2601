@@ -50,6 +50,8 @@ import jp.kz2601.metamon.desktop.io.MediaFieldLeaf
 import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.desktop.io.fileOf
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.voice.TranscribeMic
+import jp.kz2601.metamon.desktop.voice.VoiceInput
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -153,7 +155,11 @@ fun InputLeaf(c: Component, form: FormDraft, onMessage: (String) -> Unit) {
                     visualTransformation = if (c.type == ComponentType.SECURE_FIELD) PasswordVisualTransformation() else VisualTransformation.None,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (c.type == ComponentType.TRANSCRIBE_FIELD) Note(Strings["desktop_input_transcribe_unavailable"])
+                if (c.type == ComponentType.TRANSCRIBE_FIELD) {
+                    // 音声入力が有効で文字にできる PC ならマイク、それ以外はキーボードで入れる旨(#1751)
+                    val voice = VoiceInput.shared?.takeIf { it.isAvailable }
+                    if (voice != null) TranscribeMic(voice, form, field, onMessage) else Note(Strings["desktop_input_transcribe_unavailable"])
+                }
             }
             ComponentType.PICKER -> {
                 Caption(caption)

@@ -44,6 +44,8 @@
     <string name="desktop_input_qr_unavailable">Scanning with a camera isn\'t available on this computer. You can read from an image file or an image on the clipboard</string>
     <string name="desktop_input_required">Enter %1$s</string>
     <string name="desktop_input_today">Today</string>
+    <string name="desktop_input_transcribe_speak">Dictate</string>
+    <string name="desktop_input_transcribe_stop">Stop and transcribe</string>
     <string name="desktop_input_transcribe_unavailable">Voice input isn\'t available on this computer. Please type instead</string>
     <string name="desktop_input_video_capture_unavailable">Recording video isn\'t available on this computer</string>
     <string name="desktop_io_added_rows">Added %1$d records</string>
