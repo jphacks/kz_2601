@@ -318,7 +318,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	if p.Billing == BillingPaid && s.Coins != nil {
 		billing = "coins"
 		hold, err = s.Coins.Reserve(ctx, coins.ReserveRequest{UID: who, Anonymous: anon, Op: coins.OpExt, AppID: r.AppID,
-			RequestID: r.RequestID, Kind: p.ID, Max: s.cfg.Reserve[p.ID]})
+			RequestID: r.RequestID, Kind: p.ID, Provider: p.ID, Max: s.cfg.Reserve[p.ID]})
 		if err != nil {
 			refundRuns()
 			if errors.Is(err, coins.ErrUnknownOp) {
