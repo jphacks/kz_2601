@@ -9,6 +9,9 @@ import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
 import jp.kz2601.metamon.desktop.io.UserDirs
+import jp.kz2601.metamon.desktop.notify.DesktopNotice
+import jp.kz2601.metamon.desktop.notify.TrayNotifier
+import jp.kz2601.metamon.desktop.notify.Notifier as DisplayNotifier
 import jp.kz2601.metamon.desktop.store.writeAtomically
 import jp.kz2601.metamon.desktop.voice.VoiceInput
 import jp.kz2601.metamon.dsl.Action
@@ -30,10 +33,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.awt.Desktop
 import java.awt.EventQueue
-import java.awt.GraphicsEnvironment
-import java.awt.SystemTray
-import java.awt.TrayIcon
-import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
 import java.net.http.HttpClient
@@ -85,7 +84,7 @@ class DesktopActionHost(
     private val exportDir: File = defaultExportDir(),
     private val notifier: Notifier = Notifier.Tray,
     /** null なら openVoice は使えない旨(既定はフラグが立っている時だけ作る) */
-    private val voice: VoiceInput? = VoiceInput.fromEnv(),
+    private val voice: VoiceInput? = VoiceInput.shared,
     /** 重い書き出し(PDF の頁を描く)を画面のスレッドの外で。 */
     private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "export") { it() } },
     /** カレンダーに渡す .ics を置く所(一時フォルダ・渡すたびに別のフォルダ)。 */
@@ -198,10 +197,10 @@ class DesktopActionHost(
      * [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。
      * 名前を空のファイルで取ってから、同じフォルダの一時ファイルに書き切って置き換える(書きかけのファイルを見せない)。書けなければ取った名前を消す。
      */
-    private fun writeNew(name: String, bytes: ByteArray): File {
+    internal fun writeNew(name: String, bytes: ByteArray, write: (File, ByteArray) -> Unit = { f, b -> writeAtomically(f, b) }): File {
         val file = FileNames.createFree(exportDir, name)
         try {
-            writeAtomically(file, bytes)
+            write(file, bytes)
         } catch (e: Exception) {
             file.delete()
             throw e
@@ -234,8 +233,7 @@ class DesktopActionHost(
         val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]
         val UNAVAILABLE_FOLLOW get() = Strings["desktop_unavailable_follow"]
 
-        fun defaultExportDir(): File {
-            val home = File(System.getProperty("user.home"))
+        fun defaultExportDir(home: File = File(System.getProperty("user.home"))): File {
             return home.resolve("Downloads").takeIf { it.isDirectory } ?: home
         }
     }
@@ -364,7 +362,7 @@ class HttpBookLookupClient(private val base: String, private val client: HttpCli
     }
 }
 
-/** 通知。デスクトップはトレイの吹き出しで出す(アプリが起動している間だけ・OS の予約は無い)。 */
+/** 通知の予約。鳴らす時は [Tray.display](既定はトレイの吹き出し・[jp.kz2601.metamon.desktop.notify.TrayNotifier])で出す(アプリが起動している間だけ・OS の予約は無い)。 */
 interface Notifier {
     fun schedule(n: Notification): String
     fun cancel(id: String): String?
@@ -379,22 +377,20 @@ interface Notifier {
     /** 予約・取り消しは画面のスレッドからもタイマーのスレッドからも来るので、[timers] はこの object で同期する。 */
     object Tray : Notifier {
         private val timers = HashMap<String, Timer>()
-        private var icon: TrayIcon? = null
 
-        /** 常駐トレイ(Tray.kt の DesktopTray)が出ている間はそのアイコンから出す。無ければ通知用のアイコンを足す。 */
+        /** 通知を出す口。テストで作り物に替える。 */
         @Volatile
-        var sink: ((title: String, body: String) -> Unit)? = null
+        var display: DisplayNotifier = TrayNotifier
 
-        /** すぐ出す(予約しない)。トレイが無ければ何もしない。 */
+        /** すぐ出す(予約しない)。出せなければ何もしない。 */
         fun notify(title: String, body: String) {
-            if (GraphicsEnvironment.isHeadless()) return
-            show(title, body)
+            display.show(DesktopNotice(title, body))
         }
 
         override fun schedule(n: Notification): String {
-            if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) return Strings["desktop_tray_unavailable"]
+            if (!display.available) return Strings["desktop_tray_unavailable"]
             val at = nextFire(n)
-            arm(n.id, at?.let { Duration.between(ZonedDateTime.now(it.zone), it).toMillis().coerceAtLeast(0) } ?: 0) { show(n.title, n.body) }
+            arm(n.id, at?.let { Duration.between(ZonedDateTime.now(it.zone), it).toMillis().coerceAtLeast(0) } ?: 0) { display.show(DesktopNotice(n.title, n.body)) }
             val whenText = at?.let { DateTimeFormatter.ofPattern("M/d HH:mm").format(it) } ?: Strings["desktop_notification_now"]
             return Strings.format("desktop_notification_scheduled", whenText)
         }
@@ -436,25 +432,5 @@ interface Notifier {
 
         /** 予約中の id(テスト用)。 */
         internal fun pending(): Set<String> = synchronized(this) { timers.keys.toSet() }
-
-        /** アイコンを作る・出すのは [timers] と別の鍵(AWT を待つ間に予約・取り消しを止めない)。 */
-        private val iconLock = Any()
-
-        private fun show(title: String, body: String) {
-            sink?.let { return it(title, body) }
-            synchronized(iconLock) { showOnIcon(title, body) }
-        }
-
-        private fun showOnIcon(title: String, body: String) {
-            runCatching {
-                val tray = SystemTray.getSystemTray()
-                val i = icon ?: TrayIcon(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), "Tailor It").also {
-                    it.isImageAutoSize = true
-                    tray.add(it)
-                    icon = it
-                }
-                i.displayMessage(title, body, TrayIcon.MessageType.INFO)
-            }
-        }
     }
 }
