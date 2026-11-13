@@ -18,6 +18,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/books"
+	"github.com/jphacks/kz_2601/backend/internal/debugoverride"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -43,6 +44,14 @@ func main() {
 		log.Fatalf("ai: refusing to start: %v", err)
 	} else if shared {
 		log.Printf("ai: warning: stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)")
+	}
+	// stg-only per-request Pro / free for listed test uids (#2085)
+	dbg, err := debugoverride.FromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: refusing to start: %v", err)
+	}
+	if dbg != nil {
+		log.Printf("ai: warning: %s=1; %s answers Pro / free for %d listed uids", debugoverride.EnabledEnv, debugoverride.Header, dbg.Len())
 	}
 	port := env("PORT", "8081")
 	model := env("CLAUDE_MODEL", "claude-sonnet-5-5")
@@ -76,7 +85,7 @@ func main() {
 	}
 	log.Printf("ai: pro gate mode=%s", proMode)
 	fsClient := newFirestore()
-	pro := newProChecker(fsClient)
+	pro := proChecker(debugoverride.Wrap(newProChecker(fsClient), dbg, logger))
 
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
@@ -140,11 +149,11 @@ func main() {
 	if paused {
 		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
 	}
-	handler := newAIHandler(ai.NewHandler(svc), logger,
+	handler := debugoverride.Middleware(dbg)(newAIHandler(ai.NewHandler(svc), logger,
 		newAppCheck(),
 		ai.Pause(paused, logger),
 		withBudget(newRateLimit(verifier, fsClient, pro), breaker),
-	)
+	))
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           handler,
