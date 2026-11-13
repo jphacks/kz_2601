@@ -103,6 +103,23 @@
         }
       }
     },
+    "NSMotionUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses Motion & Fitness data so the apps you build can show and record your steps today and recently, changes in air pressure and altitude, and what you're doing right now (walking, running, cycling, or riding in a vehicle)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで今日や最近の歩数、気圧や高度の変化、今の動き(歩いている・走っている・自転車や乗り物で移動しているなど)を表示・記録するために、モーションとフィットネスのデータを使用します。"
+          }
+        }
+      }
+    },
     "NSPhotoLibraryUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
