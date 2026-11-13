@@ -58,13 +58,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Used to read your reminders so the apps you build can show them in lists or by upcoming due date. Reminder titles and details are never sent off this device."
+            "value" : "Used to read and write your reminders so the apps you build can show them in lists or by upcoming due date and add new reminders. Reminder titles and details are never sent off this device."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成したアプリで、リマインダーを一覧や期限の近いものとして表示するために、リマインダーを読み取ります。リマインダーの題名や内容は端末の外に送りません。"
+            "value" : "生成したアプリで、リマインダーを一覧や期限の近いものとして表示したり、新しいリマインダーを追加したりするために、リマインダーを読み書きします。リマインダーの題名や内容は端末の外に送りません。"
           }
         }
       }
