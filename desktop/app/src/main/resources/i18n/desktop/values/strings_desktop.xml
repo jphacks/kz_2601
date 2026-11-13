@@ -167,6 +167,7 @@
     <string name="desktop_untitled">(無題)</string>
     <string name="desktop_url_failed">URL を開けませんでした</string>
     <string name="desktop_url_unsupported">このパソコンでは URL を開けません: %1$s</string>
+    <string name="desktop_usage_reset_pattern">M月d日 H:mm</string>
     <string name="desktop_voice_busy">文字にしています。少し待ってください</string>
     <string name="desktop_voice_downloading">音声モデル(%1$d MB)を初回だけ落としてから文字にします。音もモデルもこの PC の外には出しません</string>
     <string name="desktop_voice_failed">文字にできませんでした。もう一度お試しください</string>
