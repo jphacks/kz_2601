@@ -1,0 +1,26 @@
+{
+  "reviews": [
+    {
+      "reviewId": "gp:AOqpTOE-normal-1",
+      "authorName": "山田 太郎",
+      "comments": [
+        {
+          "userComment": {
+            "text": "\t予定のアプリを作ったら保存ボタンが押せませんでした。",
+            "lastModified": {"seconds": "1762905600", "nanos": 500000000},
+            "starRating": 2,
+            "reviewerLanguage": "ja_JP",
+            "device": "a14",
+            "androidOsVersion": 34,
+            "appVersionCode": 12,
+            "appVersionName": "1.2.0",
+            "thumbsUpCount": 3,
+            "thumbsDownCount": 0,
+            "deviceMetadata": {"productName": "a14 (Galaxy A14)", "manufacturer": "Samsung", "ramMb": 4096}
+          }
+        }
+      ]
+    }
+  ],
+  "tokenPagination": {"nextPageToken": "next-page-1"}
+}

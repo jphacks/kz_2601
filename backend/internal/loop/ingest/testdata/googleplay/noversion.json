@@ -1,0 +1,29 @@
+{
+  "reviews": [
+    {
+      "reviewId": "gp:AOqpTOE-noversion-1",
+      "authorName": "A Google user",
+      "comments": [
+        {
+          "userComment": {
+            "text": "使い方がよく分からない",
+            "lastModified": {"seconds": "1762646400"},
+            "starRating": 1,
+            "reviewerLanguage": "ja_JP"
+          }
+        }
+      ]
+    },
+    {
+      "reviewId": "gp:AOqpTOE-noversion-2",
+      "comments": [
+        {
+          "developerComment": {
+            "text": "ありがとうございます。",
+            "lastModified": {"seconds": "1762646400"}
+          }
+        }
+      ]
+    }
+  ]
+}

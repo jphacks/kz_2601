@@ -2,9 +2,11 @@
 # Firestore エミュレータ(gcloud SDK の cloud-firestore-emulator)の起動と試験(#546)。
 # CI(.github/workflows/backend-emulator.yml)と make -C backend emulator / test-emulator が共用する。
 #   start      前面で起動(Ctrl-C で止まる)
-#   wait       起動済みのエミュレータが応答するまで待つ(最大 90 秒)
+#   wait       起動済みのエミュレータが応答するまで待つ(上限 FIRESTORE_EMULATOR_WAIT_SECONDS 秒・既定 60)。
+#              超えたら FIRESTORE_EMULATOR_LOG のログの最後の 20 行を出して終わりのコード 1
 #   test       起動済みのエミュレータに対してエミュレータ試験を回す
 #   test-all   起動していなければ一時的に起動 → test → 自分で起動した分だけ止める
+#   judge F [S] go test -json の出力 F(と go test の終了コード S)だけで「黙ってスキップさせない」判定をする(テスト用)
 # 接続先は FIRESTORE_EMULATOR_HOST(既定 127.0.0.1:8089)。プロジェクトは demo-kz2601 固定
 # (demo- プロジェクトは実 GCP に繋がらない。テスト側もハードコード)。必要なもの: gcloud
 # (cloud-firestore-emulator コンポーネント)・Java 11+・Go・jq・curl。
@@ -14,7 +16,11 @@ export FIRESTORE_EMULATOR_HOST="${FIRESTORE_EMULATOR_HOST:-127.0.0.1:8089}"
 export GOOGLE_CLOUD_PROJECT=demo-kz2601
 BACKEND="$(cd "$(dirname "$0")/../backend" && pwd)"
 
-up() { curl -sf "http://$FIRESTORE_EMULATOR_HOST/" >/dev/null; }
+# 待ちの上限(秒)。超えたらログの最後を出して終わりのコード 1(#2864)
+WAIT_SECONDS="${FIRESTORE_EMULATOR_WAIT_SECONDS:-60}"
+
+# 応答の無いポートで止まらないよう 1 回の問い合わせにも上限を付ける
+up() { curl -sf --connect-timeout 2 --max-time 3 "http://$FIRESTORE_EMULATOR_HOST/" >/dev/null; }
 
 cmd_start() {
   echo "Firestore emulator: export FIRESTORE_EMULATOR_HOST=$FIRESTORE_EMULATOR_HOST GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT"
@@ -28,12 +34,28 @@ cmd_start() {
   wait "$pid"
 }
 
+# cmd_wait [<ログ>] [<起動した pid>]: 応答するまで待つ。ログは FIRESTORE_EMULATOR_LOG でも渡せる。
+# pid を渡すと、そのプロセスが先に終わった時は上限を待たずに止まる。
 cmd_wait() {
-  for _ in $(seq 1 90); do
+  case "$WAIT_SECONDS" in '' | *[!0-9]* | 0) echo "FIRESTORE_EMULATOR_WAIT_SECONDS は 1 以上の整数: $WAIT_SECONDS" >&2; return 2 ;; esac
+  local log="${1:-${FIRESTORE_EMULATOR_LOG:-}}" pid="${2:-}" reason deadline=$((SECONDS + WAIT_SECONDS))
+  while :; do
     if up; then echo "emulator ready"; return 0; fi
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+      reason="the emulator process exited before becoming ready"; break
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      reason="did not become ready in ${WAIT_SECONDS}s (FIRESTORE_EMULATOR_WAIT_SECONDS)"; break
+    fi
     sleep 1
   done
-  echo "::error::Firestore emulator did not become ready in 90s" >&2
+  echo "::error::Firestore emulator at $FIRESTORE_EMULATOR_HOST: $reason" >&2
+  if [ -n "$log" ] && [ -f "$log" ]; then
+    echo "--- last 20 lines of $log ---" >&2
+    tail -n 20 "$log" >&2
+  else
+    echo "(ログは無し。FIRESTORE_EMULATOR_LOG=<file> で最後の行を出す)" >&2
+  fi
   return 1
 }
 
@@ -50,9 +72,14 @@ cmd_test() {
   # shellcheck disable=SC2086
   go test -count=1 -json $pkgs > "$out" || status=$?
   jq -rj 'select(.Action=="output") | .Output' "$out"
+  judge "$out" "$status"
+}
 
-  # 黙ってスキップさせない: スキップ理由にエミュレータが出たら、または
-  # Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗
+# judge <go test -json の出力> [go test の終了コード]: 黙ってスキップさせない判定(scripts/firestore-emulator-test.sh で確かめる)。
+# スキップ理由にエミュレータが出たら、または Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗。
+# go test が失敗していればその終了コード。Firestore 系テストが 1 件も通っていなければ失敗
+judge() {
+  local out="$1" status="${2:-0}"
   if grep -q 'FIRESTORE_EMULATOR_HOST not set' "$out"; then
     echo "::error::emulator tests were skipped"; return 1
   fi
@@ -73,8 +100,8 @@ cmd_test_all() {
   log="$(mktemp -t firestore-emulator.XXXXXX)"
   "$0" start >"$log" 2>&1 &
   pid=$!
-  trap 'kill -TERM '"$pid"' 2>/dev/null || true; wait '"$pid"' 2>/dev/null || true' EXIT
-  cmd_wait || { cat "$log"; return 1; }
+  trap 'kill -TERM '"$pid"' 2>/dev/null || true; wait '"$pid"' 2>/dev/null || true; rm -f -- '"'$log'" EXIT
+  cmd_wait "$log" "$pid" || return 1
   cmd_test
 }
 
@@ -83,5 +110,6 @@ case "${1:-}" in
   wait) cmd_wait ;;
   test) cmd_test ;;
   test-all) cmd_test_all ;;
-  *) echo "usage: $0 start|wait|test|test-all" >&2; exit 2 ;;
+  judge) [ -n "${2:-}" ] || { echo "usage: $0 judge <go test -json の出力> [go test の終了コード]" >&2; exit 2; }; judge "$2" "${3:-0}" ;;
+  *) echo "usage: $0 start|wait|test|test-all|judge" >&2; exit 2 ;;
 esac

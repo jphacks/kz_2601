@@ -1,3 +1,5 @@
 .gradle/
 .kotlin/
 build/
+# パッケージ jp.kz2601.metamon.desktop.build のソースは入れる
+!app/src/**/build/

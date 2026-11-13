@@ -47,7 +47,9 @@ type payload struct {
 	Mode             string `json:"mode"`
 	Outcome          string `json:"outcome"`
 	ValidationPassed bool   `json:"validation_passed"`
-	Time             string `json:"time"` // bare slog record
+	Kind             string `json:"kind"`  // shared.usage
+	Count            int    `json:"count"` // shared.usage
+	Time             string `json:"time"`  // bare slog record
 }
 
 type entry struct {
@@ -63,6 +65,33 @@ var metricEvents = map[string]bool{
 }
 
 func parse(r io.Reader) ([]event, error) {
+	entries, err := readEntries(r)
+	if err != nil {
+		return nil, err
+	}
+	var out []event
+	for _, e := range entries {
+		p, ts := e.JSONPayload, e.Timestamp
+		if p == nil {
+			p, ts = &e.payload, e.Time
+		}
+		if !metricEvents[p.Event] || p.UIDHash == "" {
+			continue // anonymous lines cannot be attributed to a user
+		}
+		at, err := time.Parse(time.RFC3339Nano, ts)
+		if err != nil {
+			continue
+		}
+		out = append(out, event{At: at, Event: p.Event, UID: p.UIDHash, App: p.AppHash, Mode: p.Mode,
+			Outcome: p.Outcome, Passed: p.ValidationPassed})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	return out, nil
+}
+
+// readEntries decodes a JSON array of entries or JSON lines (entries or bare
+// slog records); lines that do not decode are skipped.
+func readEntries(r io.Reader) ([]entry, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -89,24 +118,7 @@ func parse(r io.Reader) ([]event, error) {
 			return nil, err
 		}
 	}
-	var out []event
-	for _, e := range entries {
-		p, ts := e.JSONPayload, e.Timestamp
-		if p == nil {
-			p, ts = &e.payload, e.Time
-		}
-		if !metricEvents[p.Event] || p.UIDHash == "" {
-			continue // anonymous lines cannot be attributed to a user
-		}
-		at, err := time.Parse(time.RFC3339Nano, ts)
-		if err != nil {
-			continue
-		}
-		out = append(out, event{At: at, Event: p.Event, UID: p.UIDHash, App: p.AppHash, Mode: p.Mode,
-			Outcome: p.Outcome, Passed: p.ValidationPassed})
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
-	return out, nil
+	return entries, nil
 }
 
 func day(t time.Time) time.Time {
@@ -386,7 +398,11 @@ func render(r *report) string {
 
 func main() {
 	in := flag.String("in", "-", "log export (JSON array or JSON lines); - for stdin")
+	which := flag.String("report", "product", "product (the weekly product tables) or shared (shared.usage per participant, #2298)")
 	flag.Parse()
+	if *which != "product" && *which != "shared" {
+		log.Fatalf("unknown -report %q (product or shared)", *which)
+	}
 	var r io.Reader = os.Stdin
 	if *in != "-" {
 		fh, err := os.Open(*in)
@@ -395,6 +411,16 @@ func main() {
 		}
 		defer func() { _ = fh.Close() }()
 		r = fh
+	}
+	if *which == "shared" {
+		us, err := parseShared(r)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if _, err := os.Stdout.WriteString(renderShared(aggregateShared(us))); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 	evs, err := parse(r)
 	if err != nil {
