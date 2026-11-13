@@ -1,5 +1,5 @@
 # backend(Go) の CI。PR が Open(非Draft) / develop・main への push で発火。
-# **5分以内が必須**(timeout-minutes: 5 で強制。超えたら lint 対象やテストを削るのではなく原因を直す)。
+# **10分以内が必須**(timeout-minutes: 10 で強制。2026-11-13 にテストが増えて 5 分を超えたので上げた。超えたら lint 対象やテストを削るのではなく原因を直す)。
 #
 # 設計メモ:
 # - workflow レベルの `paths:` フィルタは使わない。required status check にした時、
@@ -50,7 +50,7 @@ jobs:
     needs: backend-changes
     if: needs.backend-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend

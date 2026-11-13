@@ -109,11 +109,9 @@ struct SensorValueLeaf: View {
         ViewThatFits(in: [.horizontal, .vertical]) {
             ForEach(sizes, id: \.self) { size in
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(kind.format(v))
-                        .font(.system(size: size, weight: .bold, design: .rounded).monospacedDigit())
+                    ScaledValueText(kind.format(v), size: size)
                         .contentTransition(.numericText())
-                    Text(kind.unit)
-                        .font(.system(size: max(size * 0.4, 13), weight: .semibold, design: .rounded))
+                    ScaledValueText(kind.unit, size: max(size * 0.4, 13), weight: .semibold, monospacedDigit: false)
                         .foregroundStyle(.secondary)
                 }
                 .lineLimit(1)

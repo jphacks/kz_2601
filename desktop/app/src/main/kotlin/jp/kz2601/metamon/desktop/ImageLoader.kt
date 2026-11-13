@@ -67,7 +67,7 @@ object ImageLoader {
     }
 
     /** 手元のファイル(photoField の値)は中身が変わるので覚えない。 */
-    private fun cacheable(src: String): Boolean = !src.startsWith("file:")
+    internal fun cacheable(src: String): Boolean = !src.startsWith("file:")
 
     fun cached(src: String?, allowFile: Boolean, maxPx: Int = DISPLAY_PX, withPng: Boolean = true): LoadedImage? {
         if (src.isNullOrBlank() || !cacheable(src)) return null

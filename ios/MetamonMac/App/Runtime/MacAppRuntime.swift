@@ -107,6 +107,11 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored var pendingFixDraft: String?
     /// Field.health を Mac では書かないことの一言(#958・アプリごとに 1 回)
     @ObservationIgnored var healthNote = MacHealthNote()
+    /// 画面の並びを手で直す編集(#2323・iOS の #1442 と同じ `GridEditSession`)。`MacAppRuntime+GridEdit.swift`
+    var gridEdit: GridEditSession?
+    var gridEditSaving = false
+    /// 編集の「完了」の保存先。`AppCanvas` が `MacRootView`(版の一覧)につなぐ。nil なら編集に入らない
+    @ObservationIgnored var onSaveGridEdit: (@MainActor (GridEditDraft) async -> MacGridEditSave.Outcome)?
 
     /// `recordLease` を渡したらそのエンジンを使い(止めるのは `MacRecordEngines`)、`recordSync` を渡したらこのランタイムだけのエンジン
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, recordLease: MacRecordEngineLease? = nil,
@@ -331,11 +336,13 @@ final class MacAppRuntime: RuntimeNavigating {
             await export(action, ctx) // CSV / PDF を保存・共有・プリントで出す(`MacAppRuntime+Export.swift`・#1143・#946・#953)
 
         case .startActivity:
-            // ライブアクティビティ(#423)は iPhone のロック画面のもの。Mac には無いので一言だけ
+            // ライブアクティビティ(#423)は iPhone のロック画面のもの。試作のフラグ(#2254・既定 off)が on ならメニューバーに出す。
+            // off なら今まで通り一言だけ
+            if let spec = action.activity, MacMenuBarActivity.shared.start(appId: appId, appName: dsl.app.name, spec: spec) { break }
             toast = L10n.tr("ライブアクティビティは iPhone だけで表示されます")
 
         case .endActivity:
-            break // 出していないので止めるものも無い
+            MacMenuBarActivity.shared.end(appId: appId) // フラグが off なら出していないので何もしない
 
         case .openVoice:
             openVoice()

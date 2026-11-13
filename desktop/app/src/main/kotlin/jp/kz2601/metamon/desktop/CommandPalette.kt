@@ -100,10 +100,10 @@ object CommandRanking {
             .sortedWith(compareByDescending<Triple<PaletteCommand, Int, Int>> { it.second }.thenBy { it.third })
             .map { it.first }
 
-    private fun words(s: String): List<String> = s.split(Regex("[\\s/・_\\-()（）]+")).filter { it.isNotEmpty() }
+    internal fun words(s: String): List<String> = s.split(Regex("[\\s/・_\\-()（）]+")).filter { it.isNotEmpty() }
 
     /** q の文字が t に順に現れるなら、間に挟まった文字の数。 */
-    private fun subsequenceGap(t: String, q: String): Int? {
+    internal fun subsequenceGap(t: String, q: String): Int? {
         var at = 0
         var gap = 0
         var started = false
