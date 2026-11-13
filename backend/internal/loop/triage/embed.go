@@ -11,9 +11,9 @@ import (
 
 // Embeddings for the cluster suggestions (#2148). Only the masked summary of
 // an item is embedded, never its body. The source of the vectors is the
-// Embedder interface so it can be swapped; a real one and LOOP_EMBED are a
-// follow-up. Nothing here merges clusters: a high similarity is only a
-// candidate for the draft.
+// Embedder interface so it can be swapped; LOOP_EMBED=on (EmbedFromEnv)
+// uses FakeEmbedder until a model-backed one is wired in. Nothing here merges
+// clusters: a high similarity is only a candidate for the draft.
 
 // Embedder turns summaries into vectors: one per summary, in order, all of
 // the same length.

@@ -128,6 +128,7 @@ flowchart LR
 | `LOOP_ANTHROPIC_API_KEY` | — | 振り分け専用のキー(アプリの `ANTHROPIC_API_KEY` とは分ける) |
 | `LOOP_TRIAGE_MODEL` | `claude-haiku-5-5` | 振り分けのモデル |
 | `LOOP_MONTHLY_TOKEN_CAP` | `3000000` | 振り分けの月のトークンの上限 |
+| `LOOP_EMBED` | 空 = off | `on` で `draft` が、下書きの代表の要約と、待っている下書き・出した Issue(まだ直っていない)の束の代表の要約の近さを測り、`LOOP_EMBED_THRESHOLD`(既定 0.7)以上の束を最大 3 つ「同じかもしれない束」(束の名前と件数だけ)として本文に書く。自動では束ねない。今の埋め込みは文字の 2 字組の作り物(外の API を呼ばない)で、モデルの埋め込みは後で差し替える |
 | `LOOP_SOURCE_APPSTORE` | 空 | `on` でストアのレビューを取り込む |
 | `LOOP_SOURCE_GOOGLEPLAY` | 空 | `on` で Google Play のレビューを取り込む(Play Developer API の `reviews.list`・#2147)。Play が返すのは直近 1 週間ほどに書かれた・直されたレビューだけなので、週 1 回以上動かす。日時は最後に直された時刻。同じレビューを直しても最初の写しのまま(項目の ID はレビューの ID)。返信済みのレビューも取り込む(返信の文は読まない)。訳さず書いた人の言葉のまま。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `google_play_review` を足す |
 | `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | `GOOGLE_PLAY_PACKAGE_NAME` / 空 = job の ADC | Google Play のレビューを読むアプリのパッケージ名と、サービスアカウントのキー(JSON の中身そのもの・Secret Manager から入れる)。キーが無ければ job の SA で読む(鍵を作らずに済むのでこちらを勧める)。どちらの SA も Play Console で「返信」の権限(レビューを読むのに要る)を付ける |
@@ -301,5 +302,5 @@ go run ./cmd/feedback-loop audit -summary
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
 | 生成の失敗の急増を BigQuery から読む | Cloud Logging の API からは読める(`LOOP_GENFAIL_SOURCE=logging`・#2146)。ログの保存期間(既定 30 日)より長く比べたい・件数が `LOOP_GENFAIL_MAX_LINES` に収まらない時は、BigQuery のシンクを作って `ingest.GenLogSource` をもう 1 つ実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
-| 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
+| 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ。`LOOP_EMBED=on` で近い束を下書きに候補として書く(束ねるのは人)。モデルの埋め込みはまだ |
 | 本物の 1 週間分での一致率 | `triage-label-export` で書き出し、人が正解を付けて `triage-eval -model ai` で測る([手順](feedback-loop-triage-agreement.md)・#376 の完了の条件) |
