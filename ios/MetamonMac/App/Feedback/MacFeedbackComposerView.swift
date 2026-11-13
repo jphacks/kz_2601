@@ -83,7 +83,7 @@ struct MacFeedbackComposerView: View {
     }
 
     private var canSend: Bool {
-        !trimmed.isEmpty && trimmed.count <= FeedbackConsent.maxMessageLength && agreed && !sending && receipt == nil
+        MacFeedbackDraft.canSend(message: message, agreed: agreed, sending: sending, sent: receipt != nil)
     }
 
     var body: some View {
@@ -251,7 +251,8 @@ struct MacFeedbackComposerView: View {
 
     private func send() {
         guard canSend else { return }
-        var submission = FeedbackSubmission(kind: kind, message: trimmed)
+        var submission = MacFeedbackDraft.submission(kind: kind, message: message, context: context,
+                                                     attachDevice: attachDevice, attachApp: attachApp)
         if attachScreenshot, let shot = context.screenshot {
             guard let jpeg = MacFeedbackScreenshot.jpeg(shot) else {
                 error = L10n.tr("スクショを小さくできませんでした。スクショをオフにして送ってください。")
@@ -259,8 +260,6 @@ struct MacFeedbackComposerView: View {
             }
             submission.screenshotJPEG = jpeg
         }
-        if attachDevice { submission.device = context.device }
-        if attachApp { submission.app = context.app?.ref } // 送るのは appId と版だけ。記録は送らない
         sending = true
         Task {
             defer { sending = false }
@@ -272,10 +271,26 @@ struct MacFeedbackComposerView: View {
         }
     }
 }
-/// 書きかけの判定(#1309)。送った後と、空白・改行だけは捨てても失うものが無いので聞かない
+/// 書きかけの判定(#1309)と、送れるか・送る中身(#2325)。
 enum MacFeedbackDraft {
+    /// 送った後と、空白・改行だけは捨てても失うものが無いので聞かない
     static func isUnsent(message: String, sent: Bool) -> Bool {
         !sent && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 空・上限超え・同意なし・送信中・送った後は送れない
+    static func canSend(message: String, agreed: Bool, sending: Bool, sent: Bool) -> Bool {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count <= FeedbackConsent.maxMessageLength && agreed && !sending && !sent
+    }
+
+    /// 送る中身(スクショは view で足す)。オンにした添付だけ。アプリは appId と版だけで記録は送らない
+    static func submission(kind: FeedbackSubmission.Kind, message: String, context: MacFeedbackContext,
+                           attachDevice: Bool, attachApp: Bool) -> FeedbackSubmission {
+        var submission = FeedbackSubmission(kind: kind, message: message.trimmingCharacters(in: .whitespacesAndNewlines))
+        if attachDevice { submission.device = context.device }
+        if attachApp { submission.app = context.app?.ref }
+        return submission
     }
 }
 #endif

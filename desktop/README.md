@@ -2,6 +2,8 @@
 
 Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み込み・式・レコードの規則は Android と同じ `android/dsl`(純 Kotlin)をそのまま使う。Android SDK は要らない。
 
+部品・アクションごとの対応(描ける / 代わり / 使えません / 未定): [docs/desktop/support-matrix.md](../docs/desktop/support-matrix.md)
+
 ## 動かす
 
 JDK 17 以上が要る。
@@ -18,6 +20,8 @@ stg の appconfig を手元で試す(サインインが入るまでの確かめ�
 ```
 TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :desktop:listApps
 ```
+
+Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・まだ画面にはつながない)の API キーは `TAILORIT_FIREBASE_API_KEY` から読む(Firebase コンソールのプロジェクト設定 > 全般の「ウェブ API キー」。リポジトリ・ファイルには書かない)。`TAILORIT_IDENTITY_TOOLKIT_URL`・`TAILORIT_SECURE_TOKEN_URL` で接続先を差し替えられる(Auth エミュレーターなど)。
 
 ## 今できること
 

@@ -89,6 +89,7 @@ rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}_uid_{uid}   {count, scope: ap
 | `RATE_LIMIT_ANON_DAILY` | 30 | 新規 3 回(9)+ 修正・対話で 21。端末の無料枠(新規 3 回/日)に合わせた |
 | `RATE_LIMIT_USER_DAILY` | 60 | サインイン済みは匿名の 2 倍 |
 | `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
+| `RATE_LIMIT_ANON_DAILY_<OS>` / `_USER_DAILY_<OS>` / `_PRO_DAILY_<OS>` | 未設定(上の 3 つのまま) | OS ごとの上書き(#2133)。`<OS>` は `IOS` / `ANDROID` / `MACOS` / `WINDOWS` / `LINUX` / `OTHER`。ヘッダ `X-Client-Platform` を決まった語彙にそろえた値で選ぶ(ヘッダ無し・未知は `OTHER`・#2132)。数える箱は OS をまたいで 1 つ(`{env}_{日}_uid_{uid}`)なので、低い上書きの OS では他の OS で使った分も含めて止まる。ヘッダは端末の申告で偽れるため、上書きは「その OS だけ絞る」使い方が前提(高くすると他の OS からヘッダを偽って使える)。どの OS にどの値を入れるかは #1750 で決める |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
 | `RATE_LIMIT_WAIVED_HOURLY` | 30 | 1 人 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
