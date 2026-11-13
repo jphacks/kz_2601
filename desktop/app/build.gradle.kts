@@ -138,6 +138,9 @@ compose.desktop {
             // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
             // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
             appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
+            // Windows の「送る」(#3209): jpackage の既定の WiX には shell:sendto の置き場が無い(main.wxs を丸ごと差し替えることになる)ので、
+            // 入れた物(jpackage.app-path がある)の初回の起動でアプリが %APPDATA%\Microsoft\Windows\SendTo に置く(platform/SendTo.kt)
+
         }
     }
 }

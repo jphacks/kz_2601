@@ -28,6 +28,9 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.platform.SendToArgs
+import jp.kz2601.metamon.desktop.platform.SendToInbox
+import jp.kz2601.metamon.desktop.platform.SendToShortcut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
@@ -47,16 +50,19 @@ import javax.swing.SwingUtilities
  * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
-fun main(args: Array<String>) {
+fun main(argv: Array<String>) {
+    // 「送る」(#3209)は `--send-to` の後ろに選んだファイルが付く。ほかの引数の並びは崩さない
+    val sent = SendToArgs.files(argv.toList())
+    val args = SendToArgs.strip(argv.toList()).toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
-        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        if (!SingleInstance.handOff(args = argv.toList())) SingleInstance.reportRunning()
         return
     }
-    runApp(args)
+    runApp(args, sent)
 }
 
-private fun runApp(args: Array<String>) = application {
+private fun runApp(args: Array<String>, sent: List<File>? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     val first = remember {
@@ -102,15 +108,23 @@ private fun runApp(args: Array<String>) = application {
     }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
+    // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
+    val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
+    // 入れた物(MSI)で動いている Windows なら「送る」にショートカットを置く(置いてあれば何もしない)
+    remember { loadScope.launch { SendToShortcut.create().ensure() } }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
     val tray = remember { TrayController.create(hub.dsl(first)) }
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { a ->
+        SingleInstance.onHandoff { argv ->
+            val files = SendToArgs.files(argv)
+            val a = SendToArgs.strip(argv)
             SwingUtilities.invokeLater {
                 val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
+                // 送られたファイルは前にあるアプリの、アプリのウィンドウへ(すぐ記録と同じ行き先)
+                if (files != null) sendTo.offer(SendToArgs.readable(files), registry.quickRecordWindow()?.id)
             }
         }
     }
@@ -125,7 +139,7 @@ private fun runApp(args: Array<String>) = application {
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, sendTo, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
         }
     }
 }
@@ -133,7 +147,7 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, sendTo: SendToInbox, startScreen: String?) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -206,6 +220,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        sendTo = sendTo,
                     )
                 }
             }

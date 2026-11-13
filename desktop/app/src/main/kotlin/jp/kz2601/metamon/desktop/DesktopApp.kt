@@ -105,6 +105,8 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** Windows の「送る」で届いたファイル(#3209)。ドラッグ & ドロップと同じ振り分けに渡す。 */
+    sendTo: jp.kz2601.metamon.desktop.platform.SendToInbox? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -125,6 +127,13 @@ fun DesktopApp(
     val topComponents = { dsl.screen(session.top.screen)?.components.orEmpty() }
     // 書けるフォームが無い(読み取りだけ・フォームの無い画面)なら写真・動画は入れない
     val topDraft = { session.form(session.top)?.takeIf { !it.isReadOnly }?.let(::FormDraftStrings) }
+    // 「送る」で届いたファイルも落とした物と同じ所へ(#3209)
+    if (sendTo != null) {
+        LaunchedEffect(sendTo.requests) {
+            val files = sendTo.take(windowId, isActive)
+            if (files.isNotEmpty()) io.dropFiles(files, topComponents(), topDraft())
+        }
+    }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
