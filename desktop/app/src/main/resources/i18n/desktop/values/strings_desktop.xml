@@ -158,6 +158,9 @@
     <string name="desktop_unknown_component">知らない部品: %1$s</string>
     <string name="desktop_unsupported_component">デスクトップ版ではまだ使えない部品: %1$s</string>
     <string name="desktop_untitled">(無題)</string>
+    <string name="desktop_update_no_download_url">ダウンロードの場所は、Tailor It を入れた所(配布のページ)で確かめてください。</string>
+    <string name="desktop_update_open_download">ダウンロードの場所を開く</string>
+    <string name="desktop_update_required_body">この版の Tailor It は使えなくなりました。最新の版をダウンロードして入れ直してください。</string>
     <string name="desktop_url_failed">URL を開けませんでした</string>
     <string name="desktop_url_unsupported">このパソコンでは URL を開けません: %1$s</string>
     <string name="desktop_voice_busy">文字にしています。少し待ってください</string>

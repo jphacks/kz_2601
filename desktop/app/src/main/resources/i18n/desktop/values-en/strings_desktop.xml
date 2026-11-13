@@ -157,6 +157,9 @@
     <string name="desktop_unknown_component">Unknown component: %1$s</string>
     <string name="desktop_unsupported_component">Not available on desktop yet: %1$s</string>
     <string name="desktop_untitled">(Untitled)</string>
+    <string name="desktop_update_no_download_url">Check where you got Tailor It (the download page) for the latest version.</string>
+    <string name="desktop_update_open_download">Open the download page</string>
+    <string name="desktop_update_required_body">This version of Tailor It can no longer be used. Download and install the latest version.</string>
     <string name="desktop_url_failed">Couldn\'t open the URL</string>
     <string name="desktop_url_unsupported">This computer can\'t open URLs: %1$s</string>
     <string name="desktop_voice_busy">Still transcribing. Please wait a moment</string>
