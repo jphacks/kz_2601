@@ -73,6 +73,8 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
+| `MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD` | o | - | `GET /v1/client-config` の Linux の最低の版 / 最新の版(未設定 = 出さない・最新 < 最低なら最低に揃える・#2131)。詳しくは `docs/infra/runtime-config.md` |
+| `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD` | o | - | 同じく Windows(#2131) |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` | o | o | AI の 1 人 1 日の単位(既定 30 / 60 / 300)。他の `RATE_LIMIT_*` と理由は [docs/backend/rate-limit.md](../docs/backend/rate-limit.md) |
 | `RATE_LIMIT_ANON_DAILY_<OS>` / `_USER_DAILY_<OS>` / `_PRO_DAILY_<OS>` | o | o | 上の 3 つを OS ごとに上書き(#2133)。`<OS>` は `IOS` / `ANDROID` / `MACOS` / `WINDOWS` / `LINUX` / `OTHER`(ヘッダ `X-Client-Platform` をそろえた値・ヘッダ無しや未知は `OTHER`)。例 `RATE_LIMIT_USER_DAILY_WINDOWS=20`。未設定 = 上書きなし(今と同じ)。ai と appconfig に同じ値を入れる |
 | `FEEDBACK_DAILY_LIMIT` | o | - | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
