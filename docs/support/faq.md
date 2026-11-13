@@ -11,6 +11,8 @@
 1. [公開の前に(人の作業)](#1-公開の前に人の作業)
 2. [日本語](#2-日本語)
 3. [English](#3-english)
+4. [答えの根拠](#4-答えの根拠)
+5. [オーナーに聞くこと(要確認)](#5-オーナーに聞くこと要確認)
 
 ## 1. 公開の前に(人の作業)
 
@@ -41,6 +43,20 @@ A. はい。一覧から切り替えて使えます。持てる数は、無料�
 
 **Q. AI を使う回数に上限はありますか?**
 A. 1 日あたりの上限があります。上限に達した時はアプリの中でお知らせします。上限は運営の状況で変わることがあります。
+
+### できないこと
+
+**Q. どんな記録帳でも用意できますか?**
+A. アプリが用意した部品(入力欄・一覧・集計・グラフなど)を組み合わせた画面を用意します。プログラムを動かすものは作れません。
+
+**Q. 用意できない依頼はありますか?**
+A. 法令や公序良俗に反する内容、他人の権利を侵す内容、他人を傷つける・性的な・差別的な内容は、用意・共有できません。
+
+**Q. AI が作った内容は正しいですか?**
+A. 正しさは保証できません。健康・お金・法律など大切な判断に使う時は、ご自身で確かめてください。
+
+**Q. 天気や災害の情報は信頼できますか?**
+A. 国や行政機関が公開している情報を表示用に加工して出すもので、正しさ・新しさは保証できません。災害・避難の判断は、気象庁・自治体などの公式の情報で確かめてください。
 
 ### 共有・参加(利用できる版のみ)
 
@@ -128,6 +144,20 @@ A. Yes, switch between them from the list. You can keep up to 2 on the free plan
 **Q. Is there a limit on AI use?**
 A. Yes, there is a daily limit. The app tells you when you reach it. The limit may change.
 
+### What it cannot do
+
+**Q. Can it set up any kind of tracker?**
+A. It combines parts the app provides (inputs, lists, totals, charts and so on) into screens. It cannot create programs that run code.
+
+**Q. Are there requests it will not handle?**
+A. Content that is illegal, infringes others' rights, or is harmful, sexual or discriminatory cannot be set up or shared.
+
+**Q. Is AI-generated content accurate?**
+A. We cannot guarantee it. Please check for yourself before using it for important decisions such as health, money or legal matters.
+
+**Q. Can I rely on weather and disaster information?**
+A. It is public data from government sources, processed for display, and may be inaccurate or out of date. For disasters and evacuation, check official sources such as the Japan Meteorological Agency and your local government.
+
 ### Sharing and joining (where available)
 
 **Q. Can I use a tracker with other people?**
@@ -191,3 +221,50 @@ A. Email support@tailor-it.app. Including the text from Settings > "Details (for
 
 **Q. I found inappropriate shared content or notifications.**
 A. Use "Report" in the app or email support@tailor-it.app. We will review it.
+
+## 4. 答えの根拠
+
+日本語と英語は同じ問いの順。答えを直す時は、ここの元の文書に合わせる。元の文書と食い違ったら、元の文書が正しい。
+
+| 問い | 元の文書 |
+|---|---|
+| 何ができるアプリですか | [legal/terms.md 1 章](../legal/terms.md#1-本アプリでできること) |
+| 声を使わずに使えますか | [legal/privacy-policy.md 1.2](../legal/privacy-policy.md#12-話した内容入力した文音声) |
+| 用意した記録帳を変えたい時は | [ios/architecture.md 6 章](../ios/architecture.md#6-音声入力画面とホットリロード) |
+| 変更を取り消したい時は | [ios/architecture.md の「復元・元に戻す・新規作成」](../ios/architecture.md#復元元に戻す新規作成-の状態遷移appconfig-接続2026-10-24-夕) |
+| いくつも記録帳を使えますか | [backend/rate-limit.md](../backend/rate-limit.md)(持てる数は無料 2・Pro 5。1 章のとおり本番に入ってから載せる) |
+| AI を使う回数に上限はありますか | [legal/terms.md 4 章](../legal/terms.md#4-料金) |
+| どんな記録帳でも用意できますか | [legal/terms.md 1 章](../legal/terms.md#1-本アプリでできること) |
+| 用意できない依頼はありますか | [legal/terms.md 5 章](../legal/terms.md#5-禁止事項) |
+| AI が作った内容は正しいですか | [legal/terms.md 2 章](../legal/terms.md#2-ai-による生成) |
+| 天気や災害の情報は信頼できますか | [legal/terms.md 7 章](../legal/terms.md#7-免責) |
+| 記録帳をほかの人と使えますか | [ios/architecture.md の「シェアと探す」](../ios/architecture.md#シェアと探す49-502026-10-24-夜)・[backend/features/sharing.md](../backend/features/sharing.md) |
+| 参加するのにお金はかかりますか | [legal/terms.md 4 章](../legal/terms.md#4-料金)・[backend/features/pro.md](../backend/features/pro.md) |
+| 参加した記録帳から通知が来ます | [legal/terms.md 6 章](../legal/terms.md#6-共有したコンテンツと自動の動き)・[backend/features/notifications.md](../backend/features/notifications.md) |
+| Tailor It Pro で何が変わりますか | [legal/terms.md 4 章](../legal/terms.md#4-料金)・[backend/features/pro.md](../backend/features/pro.md) |
+| Pro が切れたら、記録は消えますか | [legal/terms.md 4 章](../legal/terms.md#4-料金) |
+| 解約したい | [legal/terms.md 4 章](../legal/terms.md#4-料金)・[legal/privacy-policy.md 4 章](../legal/privacy-policy.md#4-アカウントと情報の削除) |
+| 返金してほしい | [legal/terms.md 4 章](../legal/terms.md#4-料金)・[operations.md 5 章](operations.md#5-返金) |
+| コインとは何ですか | まだ公開の文書が無い(1 章のとおり始めるまで「準備中」) |
+| 「自動の動き」とは | [legal/terms.md 1 章](../legal/terms.md#1-本アプリでできること)・[backend/features/automations.md](../backend/features/automations.md) |
+| 自動の動きが止まりました | [legal/terms.md 6 章](../legal/terms.md#6-共有したコンテンツと自動の動き) |
+| リマインダーが届きません | [legal/terms.md 7 章](../legal/terms.md#7-免責) |
+| 声はどこかに送られますか | [legal/privacy-policy.md 1.2](../legal/privacy-policy.md#12-話した内容入力した文音声) |
+| AI には何が送られますか | [legal/privacy-policy.md 1.3](../legal/privacy-policy.md#13-第三者の-aianthropicへ送る情報) |
+| 送った内容は AI の学習に使われますか | [legal/privacy-policy.md 1.3](../legal/privacy-policy.md#13-第三者の-aianthropicへ送る情報) |
+| アカウントとデータを消したい | [legal/privacy-policy.md 4 章](../legal/privacy-policy.md#4-アカウントと情報の削除)・[backend/features/account-deletion.md](../backend/features/account-deletion.md) |
+| 機種変更したら記録は残りますか | [legal/terms.md 3 章](../legal/terms.md#3-アカウント)・[ios/architecture.md 7 章](../ios/architecture.md#7-認証実装済み)。匿名の引き継ぎは 5 章で確かめる |
+| 問い合わせ先は | [legal/terms.md 10 章](../legal/terms.md#10-お問い合わせ)・[operations.md 1 章](operations.md#1-窓口) |
+| 不適切な共有や通知を見つけた | [legal/terms.md 6 章](../legal/terms.md#6-共有したコンテンツと自動の動き)・[infra/moderation.md](../infra/moderation.md) |
+
+## 5. オーナーに聞くこと(要確認)
+
+今の文書に答えが無いので、FAQ に載せていない問い。答えが決まったら文書に書いてから FAQ に足す。
+
+| 問い | 今わかっていること | 答え(オーナーが書く) |
+|---|---|---|
+| iPhone 以外(Android・Mac・Windows)で使えますか | 各 OS の版は作っている途中。公開の時期と、同じアカウントで入れるか(#361)は決まっていない | |
+| 記録をまとめて書き出せますか | 記録帳の中に書き出し(CSV など)のボタンを置くことはできる。アカウントのデータ全部を書き出す手段は文書に無い | |
+| 匿名で使っていた記録を、Sign in with Apple に引き継げますか | 文書には「引き継げないことがある」までしか無い(#276) | |
+| AI の 1 日の上限はいくつですか | 規約は「上限がある・変わることがある」まで。数を載せるかを決める | |
+| 問い合わせへの返事はいつ来ますか | 中の目安は「2 営業日以内(提案)」で未確定([operations.md 2 章](operations.md#2-返答の目安と担当))。FAQ に約束として載せるかを決める | |
