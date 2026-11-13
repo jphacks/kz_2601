@@ -319,7 +319,7 @@ fun initials(name: String?): String {
     return if (words.size >= 2 && words[0].first().isLetter() && words[0].first().code < 128) {
         "${words[0].first()}${words[1].first()}".uppercase()
     } else {
-        words[0].take(1).uppercase()
+        words[0].let { it.substring(0, it.offsetByCodePoints(0, 1)) }.uppercase() // 絵文字(サロゲートペア)を割らない
     }
 }
 
@@ -419,7 +419,9 @@ fun ChartLeaf(c: Component, data: LeafData) {
     }
 }
 
-private fun axisLabel(s: String): String = if (s.codePointCount(0, s.length) > 6) s.take(5) + "…" else s
+/** 7 文字(コードポイント)以上は先頭 5 文字 + 「…」。絵文字(サロゲートペア)を途中で切らない。 */
+internal fun axisLabel(s: String): String =
+    if (s.codePointCount(0, s.length) > 6) s.substring(0, s.offsetByCodePoints(0, 5)) + "…" else s
 
 @Composable
 private fun BarChart(buckets: List<Aggregator.Bucket>) {
