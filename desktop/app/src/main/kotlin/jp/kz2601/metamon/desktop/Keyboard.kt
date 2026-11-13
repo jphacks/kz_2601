@@ -370,6 +370,7 @@ class DesktopKeyboard(
         override val canWipe: Boolean get() = wipeLocalData != null
         override fun showInfo(title: String, lines: List<String>) { devInfo = title to lines }
         override fun askWipe() { wipeConfirmOpen = true }
+        override fun message(text: String) { session.message = text }
     }
     /** アカウントの画面(AccountScreen.kt・#2374・#2505)。パレット・トレイから開く。開いている間のキーは画面が自分で受ける。 */
     var accountOpen by mutableStateOf(false)
