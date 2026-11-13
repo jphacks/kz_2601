@@ -4,12 +4,50 @@
 # 使い方:
 #   ローカル(AUTH_MODE=dev): scripts/realtime-smoke.sh http://localhost:8080
 #   staging(Firebase):      U1_TOKEN=<idToken> U2_TOKEN=<idToken> scripts/realtime-smoke.sh https://appconfig-stg-...run.app
+#   呼ぶ順だけ確かめる(通信しない): scripts/realtime-smoke.sh --dry-run [<URL>]
+# 終了コード: 0 成功 / 1 通知が来ない / 2 引数・環境変数の誤り
 set -euo pipefail
 
-BASE="${1:-http://localhost:8080}"
+usage() { echo "usage: $0 [--dry-run] [<base-url>]   (default: http://localhost:8080)" >&2; exit 2; }
+
+DRY=0
+BASE=""
+for a in "$@"; do
+  case "$a" in
+    -h | --help) usage ;;
+    --dry-run) DRY=1 ;;
+    -*) echo "error: 不明な引数: $a" >&2; usage ;;
+    *) [ -z "$BASE" ] || { echo "error: URL が 2 つ有る: $BASE $a" >&2; usage; }; BASE="$a" ;;
+  esac
+done
+BASE="${BASE:-http://localhost:8080}"
+BASE="${BASE%/}"
+case "$BASE" in http://* | https://*) ;; *) echo "error: URL は http:// か https:// で始める: $BASE" >&2; exit 2 ;; esac
+
+# ローカル以外(stg など)は dev の認証が効かないので、Firebase の idToken が要る
+case "$BASE" in
+  http://localhost | http://localhost:* | http://127.0.0.1 | http://127.0.0.1:* | http://\[::1\] | http://\[::1\]:*) LOCAL=1 ;;
+  *) LOCAL=0 ;;
+esac
+if [ "$LOCAL" = 0 ]; then
+  [ -n "${U1_TOKEN:-}" ] || { echo "error: $BASE はローカルでないので U1_TOKEN(u1 の Firebase idToken)が要る" >&2; exit 2; }
+  [ -n "${U2_TOKEN:-}" ] || { echo "error: $BASE はローカルでないので U2_TOKEN(u2 の Firebase idToken)が要る" >&2; exit 2; }
+fi
 U1="${U1_TOKEN:-rt-user-1}"
 U2="${U2_TOKEN:-rt-user-2}"
 APP="RT-SMOKE-$(date +%s)"
+
+if [ "$DRY" = 1 ]; then
+  echo "dry-run: base=$BASE app=$APP (通信しない・トークンは出さない)"
+  echo "1. u1  GET  $BASE/v1/apps/$APP/dsl"
+  echo "2. u1  PUT  $BASE/v1/apps/$APP/dsl  (kakeibo の expense を public にした DSL)"
+  echo "3. u2  GET  $BASE/v1/apps/$APP/dsl  (共有アプリを入れる)"
+  echo "4. u2  GET  $BASE/v1/apps/$APP/events  (購読・event: hello を待つ)"
+  echo "5. u1  POST $BASE/v1/apps/$APP/entities/expense/records"
+  echo "6. u2 の購読に event: records が届くまでの秒数を出す"
+  exit 0
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$(mktemp -d)"
 
