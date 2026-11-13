@@ -21,6 +21,7 @@ import java.io.File
  *   queue/queue.json  送信待ちの列(通信が切れても消えない・再起動後に送る)
  *   documents/        取得した DSL の封筒(オフライン起動)
  *   chat_history/<appId>.json   アプリごとの会話の履歴(直近 200 件)
+ *   thumbnails/<appId>.png  アプリの最後に見た画面の写し(#3203)
  * ```
  *
  * @param root null ならメモリだけ(テスト用)
@@ -35,6 +36,7 @@ class DesktopStore(val root: File?) {
     val records = RecordStore(root?.resolve("records"))
     val documents = DocumentCache(root?.resolve("documents"))
     val chatHistory = ChatHistoryStore(root?.resolve("chat_history"))
+    val thumbnails = ThumbnailStore(root?.resolve(ThumbnailStore.DIR_NAME))
 
     private val queueDir: File? = root?.resolve("queue")
     private var queue: SyncQueue? = null
@@ -51,7 +53,7 @@ class DesktopStore(val root: File?) {
 
     /**
      * サインアウト・アカウント削除・別の人のサインイン(Android の後片付けと同じ範囲)。
-     * 記録・送信待ち・DSL・会話の履歴・設定・AI の同意(人ごと)を消す。クラッシュ報告の設定(端末ごと)とウィンドウの位置は残す。
+     * 記録・送信待ち・DSL・会話の履歴・画面の写し・設定・AI の同意(人ごと)を消す。クラッシュ報告の設定(端末ごと)とウィンドウの位置は残す。
      */
     suspend fun wipe() {
         queue?.discardAll() ?: queueDir?.deleteRecursively()
@@ -59,6 +61,7 @@ class DesktopStore(val root: File?) {
         documents.removeAll()
         authorProfile.clear()
         chatHistory.removeAll()
+        thumbnails.removeAll()
         settings.clear()
         aiConsent.forget()
         sweepTempFiles(root)
