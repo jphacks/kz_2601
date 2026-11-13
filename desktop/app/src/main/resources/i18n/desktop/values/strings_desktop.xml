@@ -6,6 +6,11 @@
     <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
     <string name="desktop_already_running">Tailor It はもう起動しています</string>
+    <string name="desktop_app_badge_published">公開中</string>
+    <string name="desktop_app_badge_requested">申請中</string>
+    <string name="desktop_app_badge_shared">共有中</string>
+    <string name="desktop_app_badges_a11y">%1$s(%2$s)</string>
+    <string name="desktop_app_badges_separator">・</string>
     <string name="desktop_book_searching">本の情報を探しています…</string>
     <string name="desktop_calendar_month_pattern">y年M月</string>
     <string name="desktop_calendar_opened">予定を開きました(%1$s)</string>
@@ -40,6 +45,8 @@
     <string name="desktop_input_qr_unavailable">カメラでの読み取りは このパソコンでは使えません。画像ファイルかクリップボードの画像から読めます</string>
     <string name="desktop_input_required">%1$s を入力してください</string>
     <string name="desktop_input_today">今日</string>
+    <string name="desktop_input_transcribe_speak">話して入れる</string>
+    <string name="desktop_input_transcribe_stop">止めて文字にする</string>
     <string name="desktop_input_transcribe_unavailable">話して入力は このパソコンでは使えません。キーボードで入力してください</string>
     <string name="desktop_input_video_capture_unavailable">動画の撮影は このパソコンでは使えません</string>
     <string name="desktop_io_added_rows">%1$d 件を追加しました</string>
@@ -73,6 +80,9 @@
     <string name="desktop_io_unreadable_encoding">文字コードが読めません</string>
     <string name="desktop_io_unsupported_file">このファイルは取り込めません</string>
     <string name="desktop_io_video_hint">動画を落とせます</string>
+    <string name="desktop_keyring_no_service">この PC には鍵の保管庫(Secret Service)が無いため、サインインを保存しません。次に開く時にもう一度サインインしてください</string>
+    <string name="desktop_keyring_no_session_bus">デスクトップのセッションの外で動いているため、サインインを保存しません。次に開く時にもう一度サインインしてください</string>
+    <string name="desktop_keyring_probe_failed">鍵の保管庫(Secret Service)を調べられなかったため、サインインを保存しません。次に開く時にもう一度サインインしてください</string>
     <string name="desktop_keys_close">閉じる / 戻る</string>
     <string name="desktop_keys_delete">削除</string>
     <string name="desktop_keys_delete_confirm">削除しますか？</string>
@@ -157,6 +167,7 @@
     <string name="desktop_untitled">(無題)</string>
     <string name="desktop_url_failed">URL を開けませんでした</string>
     <string name="desktop_url_unsupported">このパソコンでは URL を開けません: %1$s</string>
+    <string name="desktop_usage_reset_pattern">M月d日 H:mm</string>
     <string name="desktop_voice_busy">文字にしています。少し待ってください</string>
     <string name="desktop_voice_downloading">音声モデル(%1$d MB)を初回だけ落としてから文字にします。音もモデルもこの PC の外には出しません</string>
     <string name="desktop_voice_failed">文字にできませんでした。もう一度お試しください</string>

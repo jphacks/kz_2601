@@ -8,7 +8,7 @@
 #   scripts/runner-usage.sh prod --days 30          # 30 日(月ごとの合計・期間の上位)
 #   scripts/runner-usage.sh prod --day 2026-11-01   # 見る日を指定
 #   scripts/runner-usage.sh prod --threshold 500    # 1 アプリ 1 日の実行回数の閾値。超えたら終了コード 3
-#   scripts/runner-usage.sh prod --dry-run          # 実行せずにフィルタだけ出す
+#   scripts/runner-usage.sh prod --dry-run          # 実行せずにフィルタと gcloud のコマンドだけ出す
 #   scripts/runner-usage.sh --input usage.json --day 2026-11-01
 #                                                   # gcloud の JSON を読む(オフライン・テスト用)
 #
@@ -71,16 +71,25 @@ else
   [[ "$DAY" < "$SINCE_DAY" ]] && SINCE_DAY="$DAY"
   SINCE="${SINCE_DAY}T00:00:00+09:00"
   FILTER="resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${RUNNER_SERVICE}\" AND timestamp>=\"${SINCE}\" AND jsonPayload.event=\"runner.usage\""
-  if [ "$DRY" = 1 ]; then
-    printf 'project=%s service=%s since=%s day=%s threshold=%s executions/app/day\n\n' "$PROJECT_ID" "$RUNNER_SERVICE" "$SINCE" "$DAY" "$THRESHOLD"
-    printf '[runner.usage]\n%s\n' "$FILTER"
-    exit 0
-  fi
-  command -v gcloud >/dev/null || { echo "gcloud が必要です" >&2; exit 2; }
   P="timestamp,jsonPayload.app_id,jsonPayload.creator_uid_hash,jsonPayload.trigger,jsonPayload.outcome,jsonPayload.limit"
   P="$P,jsonPayload.reads,jsonPayload.writes,jsonPayload.writes_dropped,jsonPayload.notify_recipients"
   P="$P,jsonPayload.recipients_dropped,jsonPayload.est_cost_usd"
-  gcloud logging read "$FILTER" --project="$PROJECT_ID" --limit="$LIMIT" --order=desc --format="json($P)" >"$TMP/usage.json"
+  GCLOUD=(gcloud logging read "$FILTER" --project="$PROJECT_ID" --limit="$LIMIT" --order=desc --format="json($P)")
+  if [ "$DRY" = 1 ]; then
+    # 実行するコマンドを出すだけ(gcloud は呼ばない)
+    printf 'project=%s service=%s since=%s day=%s threshold=%s executions/app/day\n\n' "$PROJECT_ID" "$RUNNER_SERVICE" "$SINCE" "$DAY" "$THRESHOLD"
+    printf '[runner.usage]\n%s\n\n[command]\n' "$FILTER"
+    sep=""
+    for a in "${GCLOUD[@]}"; do # 貼ってそのまま動く形。記号を含む引数だけ ' で囲む
+      if [[ "$a" =~ ^[A-Za-z0-9_./=:,-]+$ ]]; then printf '%s%s' "$sep" "$a"
+      else printf "%s'%s'" "$sep" "${a//\'/\'\\\'\'}"; fi
+      sep=" "
+    done
+    printf '\n'
+    exit 0
+  fi
+  command -v gcloud >/dev/null || { echo "gcloud が必要です" >&2; exit 2; }
+  "${GCLOUD[@]}" >"$TMP/usage.json"
   if [ "$(jq length "$TMP/usage.json")" -ge "$LIMIT" ]; then
     echo "warning: LIMIT($LIMIT 行)に達した。数字が少なく出ている。LIMIT を上げてやり直す" >&2
   fi
