@@ -54,6 +54,9 @@
     <string name="desktop_input_transcribe_unavailable">話して入力は このパソコンでは使えません。キーボードで入力してください</string>
     <string name="desktop_input_video_capture_unavailable">動画の撮影は このパソコンでは使えません</string>
     <string name="desktop_io_added_rows">%1$d 件を追加しました</string>
+    <string name="desktop_io_audio_off">音声の文字起こしが off です(音声入力を有効にしてください)</string>
+    <string name="desktop_io_audio_unreadable">録音ファイルが読めません</string>
+    <string name="desktop_io_audio_wav_only">wav だけ読めます(m4a・mp3 は wav に変えてください)</string>
     <string name="desktop_io_cancel">やめる</string>
     <string name="desktop_io_choose_file">ファイルを選ぶ</string>
     <string name="desktop_io_copied_rows">%1$d 件をコピーしました</string>
