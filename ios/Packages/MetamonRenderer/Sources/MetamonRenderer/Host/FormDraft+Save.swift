@@ -12,9 +12,11 @@ public enum FormSaveResult: Equatable, Sendable {
 
 extension FormDraft {
     /// ホストが実際に書き込んだ後に呼ぶ。閉じても破棄の確認を出さず、保存バーに結果を伝える。
-    public func markSaved(queuedOffline: Bool) {
+    /// `sent` は書き込んだ値(await の前の `payload`)。保存の間に入れ直した値は未保存のまま残す(閉じる前に破棄の確認が出る)。
+    /// nil なら今の値を保存済みとみなす。
+    public func markSaved(queuedOffline: Bool, sent: [String: JSONValue]? = nil) {
         baselineBeforeSave = baseline
-        markClean()
+        if let sent { baseline = sent } else { markClean() }
         lastSaveResult = queuedOffline ? .queuedOffline : .saved
         saveCount += 1
     }

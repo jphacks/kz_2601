@@ -433,6 +433,7 @@ func TestRecipeSelector_DropsUnknownIDs(t *testing.T) {
 // A selector slower than RecipeTimeout (or failing) leaves the keywords alone;
 // the generation still runs.
 func TestRecipeSelector_TimeoutAndErrorFallBackToKeywords(t *testing.T) {
+	t.Parallel() // waits out the real selector timeout
 	for _, c := range []struct {
 		sel  *selectorFake
 		want string

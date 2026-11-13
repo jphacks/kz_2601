@@ -1,0 +1,13 @@
+[
+ {"timestamp":"2026-11-01T01:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":1,"outcome":"ok","uid_hash":"u1","cache_read_input_tokens":0,"cache_creation_input_tokens":4000,"est_cost_usd":0.04}},
+ {"timestamp":"2026-11-01T02:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":1,"outcome":"ok","uid_hash":"u2","cache_read_input_tokens":0,"cache_creation_input_tokens":0,"est_cost_usd":0.06}},
+ {"timestamp":"2026-11-02T03:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":2,"outcome":"error","uid_hash":"u2","cache_read_input_tokens":"0","cache_creation_input_tokens":"0"}},
+ {"timestamp":"2026-11-02T04:00:00Z","jsonPayload":{"event":"ai.usage","operation":"chat_first","attempt":1,"outcome":"ok","uid_hash":"u1","cache_read_input_tokens":3000,"cache_creation_input_tokens":0,"est_cost_usd":0.01}},
+ {"timestamp":"2026-11-07T14:59:59Z","jsonPayload":{"event":"ai.usage","operation":"patch","attempt":1,"outcome":"ok","uid_hash":"u3","cache_read_input_tokens":0,"cache_creation_input_tokens":0,"est_cost_usd":0.02}},
+ {"timestamp":"2026-11-07T15:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":1,"outcome":"ok","uid_hash":"u1","cache_read_input_tokens":4000,"cache_creation_input_tokens":0,"est_cost_usd":0.02}},
+ {"timestamp":"2026-11-08T01:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":1,"outcome":"ok","uid_hash":"u2","cache_read_input_tokens":4000,"cache_creation_input_tokens":0,"est_cost_usd":"0.03"}},
+ {"timestamp":"2026-11-09T01:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":1,"outcome":"ok","uid_hash":"u3","cache_read_input_tokens":0,"cache_creation_input_tokens":4000,"est_cost_usd":0.05}},
+ {"timestamp":"2026-11-09T02:00:00Z","jsonPayload":{"event":"ai.generate","mode":"create","uid_hash":"u3","est_cost_usd":0.05}},
+ {"timestamp":"2026-11-09T03:00:00Z","jsonPayload":{"event":"http.request","path":"/v1/generate","status":200,"uid_hash":"u3"}},
+ {"timestamp":"2026-11-20T01:00:00Z","jsonPayload":{"event":"ai.usage","operation":"generate","attempt":1,"outcome":"ok","uid_hash":"u3","est_cost_usd":9}}
+]

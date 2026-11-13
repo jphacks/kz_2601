@@ -155,7 +155,11 @@ private struct ComposeChat: View {
                                 .accessibilityLabel("考えています")
                         }
                         if !session.sending { offerView }
-                        if let failure = session.failure {
+                        if session.heldBuild != nil, let failure = session.failure {
+                            MacHeldBuildCard(presentation: failure, busy: session.phase != .chatting,
+                                             onContinue: session.continueHeldBuild, onDismiss: session.dismissHeldBuild)
+                                .id(failure.id)
+                        } else if let failure = session.failure {
                             MacErrorCard(presentation: failure, retry: session.retryFailure, dismiss: session.dismissFailure)
                                 .id(failure.id)
                         }

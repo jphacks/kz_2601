@@ -177,7 +177,7 @@ final class AppGlanceStore {
         #if DEBUG
         if ProcessInfo.processInfo.environment["METAMON_MOCK_GLANCE"] == "1" { // スクリーンショット用(METAMON_MOCK_SHARING の 2 件に数字)
             seed(["uitest-kakeibo": .init(statId: "month_total", label: "今月", value: "¥38,200", at: .now),
-                  "uitest-shopping": .init(statId: "open_count", label: "未購入", value: "4件", at: .now.addingTimeInterval(-3 * 60 * 60))])
+                  "uitest-shopping": .init(statId: "open_count", label: "未購入", value: "4件", at: .now.addingTimeInterval(TimeInterval(-3 * 60 * 60)))])
         }
         #endif
     }

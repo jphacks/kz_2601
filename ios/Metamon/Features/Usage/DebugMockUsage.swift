@@ -1,11 +1,11 @@
-#if DEBUG
+#if DEBUG || METAMON_STG
 import Foundation
 import MetamonServices
 
-/// 手元の確認用の DEBUG フック `METAMON_MOCK_USAGE=apps:9/10,records:4200/5000,photos:10/500[,pro][,participant]`。
+/// 手元の確認用の DEBUG・stg フック(stg の版は開発用メニューでも・#2080) `METAMON_MOCK_USAGE=apps:9/10,records:4200/5000,photos:10/500[,pro][,participant]`。
 /// サーバー無しで「使っている量」とお知らせを出す。
 enum DebugMockUsage {
-    static var spec: String? { ProcessInfo.processInfo.environment["METAMON_MOCK_USAGE"] }
+    static var spec: String? { DebugPlanKnobs.string(DebugPlanKnobs.mockUsage).flatMap { $0.isEmpty ? nil : $0 } }
     static var source: (any PlanUsageSource)? { spec.map(Source.init) }
 
     struct Source: PlanUsageSource {

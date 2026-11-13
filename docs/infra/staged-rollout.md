@@ -87,10 +87,11 @@ scripts/rollout.sh --summarize logs.json --new ai-stg-00002-abc --old ai-stg-000
 | リクエスト数・5xx 率 | `jsonPayload.event="http.request"`(`/health` は除く) | `status >= 500` の割合 |
 | p95 の待ち時間 | 同じ | `duration`(ns → ms)の 95 パーセンタイル |
 | Claude の失敗率(ai) | `jsonPayload.event="ai.usage"` | `outcome="error"` の割合 |
+| 1 回あたりの費用(ai) | 同じ | `est_cost_usd`(#298)がある行の平均。単価の無いモデルの行は数えない |
 
 **なぜ Cloud Monitoring の `request_count` / `request_latencies` でなくログか**: 監視のアラート([observability.md](observability.md)・`infra/monitoring.tf`)は Cloud Run の組み込みの指標を使っていますが、`gcloud monitoring` には時系列を読むコマンドが無く、Monitoring API を `curl` で叩くことになります。ログなら `scripts/ai-cost.sh` と同じ `gcloud logging read` + `jq` で済み、判定の入力をそのままテストの固定データにできます。ログベースの指標 `ai_claude_calls` / `backend_panics` もログが元なので、見ているものは同じです。違いは、Cloud Run 自身が返した 503(コンテナに届かなかったもの)がログの `http.request` に入らないこと。これが要るなら、`decide` の入力(JSON)はそのままで、`fetch_metrics` を Monitoring API の `timeSeries.list`(`run.googleapis.com/request_count` を `resource.labels.revision_name` で分ける)に替えられます。
 
-費用(#298)はまだ比べていません。`ai.usage` の `est_cost_usd` を同じ形で足せます(下の「限界」)。
+費用は新旧の 1 回あたりを比べます。プロンプトやモデルの変更で 1 回の費用が跳ねた版を、5xx や待ち時間が変わらなくても戻すためです。
 
 ## 閾値の選び方
 
@@ -104,6 +105,8 @@ scripts/rollout.sh --summarize logs.json --new ai-stg-00002-abc --old ai-stg-000
 | `ROLLOUT_P95_SLACK_MS` | `100` | 差がこれ以下なら比が大きくても通す | appconfig の p95 は数十 ms なので、比だけだと 20ms → 40ms で落ちる。ユーザーが気づかない差 |
 | `ROLLOUT_MAX_CLAUDE_FAILURE_RATE` | `0.2` | 新の Claude の失敗率の上限 | 監視の `claude_failure_rate_threshold`(20%)と揃える |
 | `ROLLOUT_CLAUDE_FAILURE_MIN_COUNT` | `3` | 失敗がこの件数未満なら率は見ない | 監視の `claude_failure_min_count` と揃える。5% の段階では呼び出しが数件なので、1 件の失敗で戻さないため |
+| `ROLLOUT_MAX_COST_RATIO`(`--max-cost-ratio`) | `2` | 新の 1 回あたりの費用 / 旧の上限 | 緩めにしている。キャッシュの読みの割合や依頼の中身で 1 回の費用は揺れるので、普段の揺れ(`scripts/ai-cost.sh` で数日分)より大きく取る。費用を上げる変更を意図して出す時は引数で上げる |
+| `ROLLOUT_COST_MIN_CALLS` | `5` | 新旧どちらかの費用つきの呼び出しがこれ未満なら費用は見ない | 5% の段階では呼び出しが数件なので、1 件の重い依頼で戻さないため。旧が 0 件(100% の段階)なら比べない |
 | `ROLLOUT_MIN_REQUESTS` | `20` | 新がこれ未満なら判定しない | 5% の 1 窓に 20 件来るには、全体で 5 分に 400 件。**stg は足りないことが多い**ので、stg は `--on-insufficient promote` か、ジョブの中で負荷(スモーク)を流す |
 
 段階と窓: 5% の窓で 20 件を超える程度のトラフィックがあること、が段階と `--wait` を決める目安です。prod の今のトラフィックなら、5% の段階は `--wait 600` 以上を勧めます。段階を細かくするほど、悪い版を受けるユーザーは減るがリリースは遅くなります。
@@ -162,6 +165,6 @@ Issue の完了の条件「stg でわざと悪い版を出すと、自動で前�
 - **判定のログが読めない時**(権限・API の失敗)は、悪い版かどうか分からないので **旧に 100% 戻します**(終了コード 3)。権限の付け忘れでも毎回戻るので、組み込んだ最初の deploy で気づけます
 - `update-traffic` 自体が失敗した時は、その場で止まり(`set -e`)、トラフィックはその時の割合のままです。ジョブの失敗で気づき、手で戻すか、もう一度実行してください
 - ログに出ない 5xx(Cloud Run 自身の 503 など)は数えません(上の「比べる指標」)
-- 費用(#298 の `est_cost_usd`)はまだ比べていません。プロンプト・モデルの版は記録する(上)が、判定には使っていません(新旧はリビジョンで分けている)。`summarize` に足せば `decide` に同じ形で入ります
+- 費用は 1 回あたりの平均で比べます。依頼の中身(長い会話・大きなアプリ)が窓によって偏ると、版が同じでも平均が動きます。倍率を緩め(既定 2)にしているのはこのため。プロンプト・モデルの版は記録する(上)が、判定には使っていません(新旧はリビジョンで分けている)
 - 1 窓で読むログは `LIMIT` 行まで。超えると古い行が落ちて指標が偏ります(prod のトラフィックが増えたら Monitoring API に替える)
 - ai と appconfig は同じイメージなので、片方だけ戻すと版がずれます(ai は appconfig を HTTP で呼ぶだけなので、API の互換が保たれていれば動く)

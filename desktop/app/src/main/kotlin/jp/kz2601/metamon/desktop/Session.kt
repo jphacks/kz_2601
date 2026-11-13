@@ -1,8 +1,11 @@
 package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.KeyValueRetentionConsent
+import jp.kz2601.metamon.desktop.store.RetentionRunner
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +22,8 @@ import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.expr.DSLClock
+import java.time.Instant
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.dsl.records.RecordQuery
@@ -26,6 +31,9 @@ import jp.kz2601.metamon.dsl.records.SingleRecord
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.services.http.ApiError
+import jp.kz2601.metamon.services.http.RecordWriteDenial
+import jp.kz2601.metamon.services.http.SharedAccessDenial
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
@@ -68,12 +76,43 @@ class DesktopSession(
     shared: SharedRecords? = null,
     /** 記録の詳細のウィンドウ(#1763): [startScreen] をこの記録で開き、そこから戻るとウィンドウを閉じる。 */
     startRecordId: String? = null,
+    /** 記録の保存期間(#482)。既定は端末の設定に確認を覚える(端末に残さない時は使わない)。 */
+    retention: RetentionRunner? = null,
 ) {
     val models: List<Entity> = dsl.entityModels()
 
     /** 記録(同じアプリのウィンドウで共有)。 */
     val records: SharedRecords = shared ?: SharedRecords(initialStore, persistence)
     val persistence: SessionPersistence? get() = records.persistence
+
+    val retention: RetentionRunner? = retention ?: records.persistence?.let { RetentionRunner(KeyValueRetentionConsent(it.store.settings)) }
+
+    /** 保存した回数(#482)。DesktopApp が見て、保存の後に [purgeExpired] を呼ぶ。 */
+    var saves: Int by mutableIntStateOf(0)
+        private set
+
+    /**
+     * 保存期間を過ぎた記録を消す(#482): 端末の記録を読み終えた時(DSL を当てた時)・ウィンドウが前に来た時・保存の後に DesktopApp が呼ぶ。
+     * 確認済みの entity だけ。画面の記録から消すので、通常の削除と同じく端末と送信待ちに積む。端末に残さない時・読み込み中・消している最中は何もしない。消した件数。
+     */
+    suspend fun purgeExpired(): Int {
+        val runner = retention ?: return 0
+        val p = persistence ?: return 0
+        if (records.loading || records.wiping) return 0
+        val gone = runner.expired(p.appId, models, p.retentionRows(), uid)
+        if (gone.isEmpty() || records.loading || records.wiping) return 0
+        var next = store
+        var count = 0
+        for ((entity, ids) in gone) {
+            for (id in ids) {
+                if (next.find(entity, id) == null) continue
+                next = next.delete(entity, id)
+                count++
+            }
+        }
+        if (count > 0) store = next
+        return count
+    }
 
     /** 画面が見る記録。書き換えると前後の差を [persistence] に渡す。 */
     var store: MockStore
@@ -99,6 +138,34 @@ class DesktopSession(
 
     /** 画面に出す一言(保存できない理由・OS の機能の結果)。 */
     var message: String? by mutableStateOf(null)
+
+    /**
+     * 共有のアプリの保存・削除をサーバーが断った時(403 / 409)の一言を [message] に出す。下書き([drafts])には触らない。
+     * 断りに当たらない失敗なら何もせず false([entity] は項目の表示名を引く)。
+     */
+    fun showWriteDenial(error: Throwable, entity: String? = null): Boolean {
+        val text = WriteDenialMessage.of(error) { id -> models.firstOrNull { it.id == entity }?.storedFields?.firstOrNull { it.id == id }?.name } ?: return false
+        message = text
+        return true
+    }
+
+    /** 一覧・表の行を消した直後の「元に戻す」(#3351)。null は帯を出さない。 */
+    var recordUndo: DeletionTicket? by mutableStateOf(null)
+        private set
+    private var undoSeq = 0L
+
+    /** 最後に消した行を戻す(帯の「元に戻す」・Ctrl+Z)。戻せたら true。 */
+    fun undoDelete(): Boolean {
+        val t = recordUndo ?: return false
+        recordUndo = null
+        store = RecordUndo.restore(store, t) ?: return false
+        return true
+    }
+
+    /** 帯を閉じる(時間切れ・×)。[ticket] が今の物の時だけ(後から消した分の帯を消さない)。 */
+    fun dismissRecordUndo(ticket: DeletionTicket? = recordUndo) {
+        if (recordUndo == ticket) recordUndo = null
+    }
 
     /** 起きたこと(適合テストの effects と同じ形)。 */
     val effects = mutableListOf<JsonElement>()
@@ -141,7 +208,13 @@ class DesktopSession(
     fun followWipe() {
         if (records.wipes == seenWipes) return
         seenWipes = records.wipes
+        returnToStart()
+    }
+
+    /** 下書きを捨てて最初の画面へ。詳細のウィンドウは閉じる(端末のデータを消した後・サインアウトの後 #2375)。 */
+    fun returnToStart() {
         drafts.clear()
+        recordUndo = null
         go(NavigationState.initial(dsl))
         if (detailRoot != null) {
             detailRoot = null
@@ -226,6 +299,9 @@ class DesktopSession(
     /** 下書きを持っている route の id(テスト用)。 */
     internal val draftRouteIds: Set<String> get() = drafts.keys.toSet()
 
+    /** 保存していないフォームがある(入力中)。この間はアプリの DSL を差し替えない(#2809)。 */
+    val hasUnsavedForms: Boolean get() = drafts.values.any { it.draft.hasUnsavedChanges }
+
     /**
      * 一覧のチェックなど、1 件の記録の field を書き換える。フォームと同じ記録の規則(作った人だけ・membersCanEdit)を通す。
      * 書けたら true。書けない時は理由を [message] に出す。
@@ -238,6 +314,16 @@ class DesktopSession(
         }
         store = store.save(entity, id, row.data + patch)
         return true
+    }
+
+    /**
+     * 会話(chatThread・#2214)に 1 通足す。フォームの保存と同じ道(端末に残し、送り先があれば送り待ちに積む)。
+     * 並びが崩れないよう作った時刻を付ける。足した行の id を返す。
+     */
+    fun postMessage(entity: String, data: Map<String, JSONValue>, now: Instant = DSLClock.now()): String {
+        val id = persistence?.newRecordId() ?: "new-${store.nextId}"
+        store = store.save(entity, null, data.mapValues { MockStore.cell(it.value) }, newId = id, createdAt = now.toString())
+        return id
     }
 
     /** 1 件書き換えられるか(フォームの読み取りだけと同じ規則)。 */
@@ -337,7 +423,10 @@ class DesktopSession(
                     message = Strings["desktop_delete_not_allowed"]
                     return
                 }
+                // 一覧・表の行から消した時だけ戻せる(フォームの削除ボタンは画面ごと閉じる)
+                val ticket = ctx.recordId?.let { RecordUndo.ticket(store, entity, it, ++undoSeq) }
                 store = store.delete(entity, id)
+                if (ticket != null) recordUndo = ticket
                 effects += obj("deleted" to obj("entity" to JsonPrimitive(entity), "recordId" to JsonPrimitive(id)))
                 if (ctx.recordId == null) {
                     drafts.entries.removeAll { it.value.draft === ctx.form }
@@ -348,7 +437,8 @@ class DesktopSession(
                 // OS の機能を呼ぶもの(URL・通知・書き出し・ライブアクティビティ・音声)は「何を頼んだか」を残し、ホストに渡す
                 effects += obj("request" to actionJson(action))
                 if (action.type == ActionType.RESET_FORM) ctx.form?.reset()
-                message = host?.request(action, ctx, this) ?: message
+                // null は「一言を変えない」(ホストが先に出した一言を、別スレッドの答えごと上書きしない)
+                host?.request(action, ctx, this)?.let { message = it }
             }
         }
     }
@@ -397,6 +487,7 @@ class DesktopSession(
         val to = action.screen
         if (to != null) navigate(to, action, null, ctx.route) else back(ctx.route)
         if (overwrote) message = Strings["desktop_window_conflict"]
+        saves++
     }
 
     /** 適合テストの操作 1 つ(case.json の operations)。対象が無い・見えていないなら false。 */
@@ -549,4 +640,30 @@ fun isButtonVisible(action: Action?, form: FormDraft?): Boolean = when (action?.
     ActionType.DELETE_RECORD -> form?.isEditing == true && form.canDelete
     ActionType.SAVE_RECORD -> !(form?.isReadOnly ?: false)
     else -> true
+}
+
+/** サーバーの書き込みの断り(#272 #273 #254)の一言。知らない理由は汎用の文言。 */
+object WriteDenialMessage {
+    /** 断りでなければ null。[fieldName] は項目 id → 表示名(分からなければ null で id のまま)。 */
+    fun of(error: Throwable, fieldName: (String) -> String? = { null }): String? {
+        SharedAccessDenial.from(error)?.let {
+            return Strings[
+                when (it) {
+                    SharedAccessDenial.NOT_MEMBER -> "desktop_denial_not_member"
+                    SharedAccessDenial.INVITER_LEFT -> "desktop_denial_inviter_left"
+                    SharedAccessDenial.MEMBERS_FULL -> "desktop_denial_members_full"
+                },
+            ]
+        }
+        return when (val d = RecordWriteDenial.from(error)) {
+            is RecordWriteDenial.AdminsOnly -> d.field?.let { Strings.format("desktop_denial_admins_only_field", fieldName(it) ?: it) } ?: Strings["desktop_denial_admins_only"]
+            is RecordWriteDenial.Duplicate ->
+                if (d.fields.isEmpty()) {
+                    Strings["desktop_denial_duplicate"]
+                } else {
+                    Strings.format("desktop_denial_duplicate_fields", d.fields.joinToString(Strings["desktop_list_separator"]) { fieldName(it) ?: it })
+                }
+            null -> if ((error as? ApiError)?.status == 403) Strings["desktop_denial_generic"] else null
+        }
+    }
 }
