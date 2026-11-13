@@ -7,7 +7,7 @@
 // Operations, environment and the order of the steps:
 // docs/backend/features/feedback-loop.md.
 //
-//	feedback-loop ingest [-source in_app|app_store_review|testflight|gen_failure]
+//	feedback-loop ingest [-source in_app|app_store_review|testflight|gen_failure|all]
 //	feedback-loop ingest-crash -issue ID -type T -count N -version V
 //	feedback-loop inbox [-source S] [-status S] [-limit N]
 //	feedback-loop triage [-max 200] [-batch 20]
@@ -91,7 +91,7 @@ func main() {
 }
 
 const usageText = `usage: feedback-loop <command> [flags]
-  ingest [-source in_app|app_store_review|testflight|gen_failure]   copy new feedback into the inbox (masked)
+  ingest [-source in_app|app_store_review|testflight|gen_failure|all]   copy new feedback into the inbox (masked); all = every source that is on, keep going past a failure
   ingest-crash -issue ID -type T -count N -version V   record one crash spike
   inbox [-source S] [-status S] [-limit N]   every source in one list (metadata only, never the text)
   triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
@@ -212,29 +212,27 @@ func ingestEvent(it loop.Item) loop.Event {
 	return e
 }
 
+// sourceAll is the -source value that runs every source that is on and
+// keeps going past a failing one (one scheduled job for all of them).
+const sourceAll = "all"
+
 func (a *app) ingest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
-	only := fs.String("source", "", "only this source (in_app / app_store_review / testflight / gen_failure); default all that are on")
+	only := fs.String("source", "", "only this source (in_app / app_store_review / testflight / gen_failure), or all (keep going past a failure); default all that are on")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if err := a.allow(ctx, loop.StageIntake); err != nil {
 		return err
 	}
+	if *only == sourceAll {
+		return a.ingestAll(ctx)
+	}
 	var fetchers []ingest.Fetcher
 	if *only == "" || *only == string(loop.SourceInApp) {
 		fetchers = append(fetchers, ingest.InApp{Reader: a.feedback})
 	}
-	optional := []struct {
-		src   loop.Source
-		off   error
-		fetch func() (ingest.Fetcher, error)
-	}{
-		{loop.SourceStoreReview, ingest.ErrAppStoreOff, a.appStoreFetcher},
-		{loop.SourceTestFlight, ingest.ErrTestFlightOff, a.testFlightFetcher},
-		{loop.SourceGenFailure, ingest.ErrGenFailOff, a.genFailFetcher},
-	}
-	for _, o := range optional {
+	for _, o := range a.optionalSources() {
 		if *only != "" && *only != string(o.src) {
 			continue
 		}
@@ -260,6 +258,67 @@ func (a *app) ingest(ctx context.Context, args []string) error {
 			return err
 		}
 		fmt.Fprintf(a.out, "ingest %s: fetched %d, new %d (held from AI %d), skipped %d\n", f.Source(), st.Fetched, st.Created, st.Held, st.Skipped)
+	}
+	return nil
+}
+
+type optionalSource struct {
+	src   loop.Source
+	off   error
+	fetch func() (ingest.Fetcher, error)
+}
+
+// optionalSources are the sources behind LOOP_SOURCE_*=on (in_app is always on).
+func (a *app) optionalSources() []optionalSource {
+	return []optionalSource{
+		{loop.SourceStoreReview, ingest.ErrAppStoreOff, a.appStoreFetcher},
+		{loop.SourceTestFlight, ingest.ErrTestFlightOff, a.testFlightFetcher},
+		{loop.SourceGenFailure, ingest.ErrGenFailOff, a.genFailFetcher},
+	}
+}
+
+// ingestAll runs in_app and every source that is on. A failing source (bad
+// config or fetch error) is recorded and skipped; the failures come back
+// together at the end so the job still exits non-zero.
+func (a *app) ingestAll(ctx context.Context) error {
+	g := a.gate()
+	r := a.runner()
+	var failed []string
+	var errs []error
+	fail := func(src loop.Source, err error) error {
+		failed = append(failed, string(src))
+		errs = append(errs, fmt.Errorf("%s: %w", src, err))
+		fmt.Fprintf(a.out, "ingest %s: failed: %v\n", src, err)
+		return g.Record(ctx, loop.Event{Stage: loop.StageIntake, Action: "source_failed", Reason: string(src)})
+	}
+	run := func(f ingest.Fetcher) error {
+		st, err := r.Run(ctx, f)
+		if err != nil {
+			return fail(f.Source(), err)
+		}
+		fmt.Fprintf(a.out, "ingest %s: fetched %d, new %d (held from AI %d), skipped %d\n", f.Source(), st.Fetched, st.Created, st.Held, st.Skipped)
+		return g.Record(ctx, loop.Event{Stage: loop.StageIntake, Action: "source_done",
+			Reason: fmt.Sprintf("%s fetched=%d new=%d held=%d skipped=%d", f.Source(), st.Fetched, st.Created, st.Held, st.Skipped)})
+	}
+	if err := run(ingest.InApp{Reader: a.feedback}); err != nil {
+		return err
+	}
+	for _, o := range a.optionalSources() {
+		f, err := o.fetch()
+		switch {
+		case errors.Is(err, o.off):
+			continue
+		case err != nil:
+			err = fail(o.src, err)
+		default:
+			err = run(f)
+		}
+		if err != nil { // the audit log itself failed: stop
+			return err
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("ingest all: %d source(s) failed (%s): %w", len(failed), strings.Join(failed, ", "), errors.Join(errs...))
 	}
 	return nil
 }

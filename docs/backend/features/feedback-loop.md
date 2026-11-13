@@ -79,6 +79,7 @@ flowchart LR
 | コマンド | 段 | すること |
 |---|---|---|
 | `ingest [-source in_app\|app_store_review\|testflight\|gen_failure]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on` の時だけ |
+| `ingest -source all` | intake | アプリ内と `LOOP_SOURCE_*=on` の出どころを順に全部回す(定期の実行の 1 ジョブ用)。1 つが失敗しても次へ進み、最後に失敗した出どころをまとめて非 0 で終わる。監査ログに出どころごとの件数(`source_done`)と失敗(`source_failed`)を残す。`-source` 無しの既定は今のまま(最初の失敗で止まる) |
 | `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・クラッシュ・TestFlight・生成の失敗)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `crash` / `testflight` / `gen_failure`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
