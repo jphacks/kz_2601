@@ -69,6 +69,47 @@ gh pr create --base main --title "release: Day2 デモ版"
 
 scope は `ios` / `appconfig` / `ai` / `dsl` / `infra` あたり。1コミット1意図。`WIP` コミットは squash 前提なら可。
 
+## backend-ci(Go のビルド・lint・テスト・5 分以内)
+
+`.github/workflows/backend-ci.yml`。発火は PR(opened・synchronize・reopened・ready_for_review)と `develop` / `main` への push。同じ PR(push ならブランチ)の古い実行は取り消す(`concurrency`)。
+
+workflow の `paths:` は使わない。required check にした時、backend を触らない PR では check が "Expected" のまま待ち続けてマージできなくなるため。代わりに ubuntu の `backend-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、本体の `backend-ci` を `if:` でスキップする(スキップは required check 上は成功扱い)。required check の名前はジョブ名 `backend-ci`(`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` と一致させる)。
+
+| ジョブ | 走る時 | 上限 | 中身 |
+|---|---|---|---|
+| `backend-changes` | push・非 Draft の PR | 2 分 | PR では下の場所が変わったかを見る。push は常に「回す」 |
+| `backend-ci` | `backend-changes` が「回す」と出した時 | **5 分** | 下の step |
+
+`backend-changes` が「回す」とする場所(PR の時):
+
+| 変わった場所 | 理由 |
+|---|---|
+| `backend/**` | 本体 |
+| `docs/dsl/conformance/expr/**`・`docs/dsl/examples/**` | backend のテストが読む |
+| `android/dsl/src/main/kotlin/**/generated/**` | `cmd/dslgen` の生成物(`TestGeneratedKotlinIsUpToDate` が古さを見る・#1006) |
+| `.github/workflows/backend-ci.yml` | この workflow 自身 |
+
+`backend-ci` の step(`backend/` で動く):
+
+| step | すること |
+|---|---|
+| `actions/setup-go` | `backend/go.mod` の版。キャッシュの鍵は `go.sum` と `go.mod` |
+| `go mod download` | 依存を落とす |
+| `go vet` | `go vet ./...` |
+| `golangci-lint` | `golangci-lint-action`(`version: latest`・`--timeout=3m`・設定は `backend/.golangci.yml`)。1 回目は `continue-on-error` |
+| `golangci-lint(再試行)` | 1 回目が失敗した時だけもう 1 回。2 回目の結果がジョブの成否(バイナリの取得の 5xx を拾うため。本当の指摘なら 2 回目も落ちる) |
+| `go build` | `go build ./...` |
+| `ai-eval cases (offline)` | `go run ./cmd/ai-eval -check-all internal/ai/eval`。評価ケース・編集の土台の JSON を形に合った読み方で検証する(API は呼ばない)。形の分からないファイルは失敗にする |
+| `go test (-race)` | `go test ./... -race -count=1` |
+
+- **5 分を超えたら**(`timeout-minutes: 5` でジョブが止まる)、lint の対象やテストを削らずに遅い原因を直す。Firestore エミュレータの試験は 5 分に収まらないので別の workflow(下の backend-emulator)。
+- 落ちた時の見方:
+  - `go vet`・`go build`: ログの `file:line` をそのまま直す
+  - `golangci-lint`: 1 回目だけ赤で 2 回目が緑ならジョブは成功(取得の一時的な失敗)。2 回目も赤なら指摘を直す。手元は `cd backend && golangci-lint run --timeout=3m`
+  - `ai-eval cases (offline)`: `internal/ai/eval` の JSON の形の誤り。手元は `cd backend && go run ./cmd/ai-eval -check-all internal/ai/eval`
+  - `go test (-race)`: `WARNING: DATA RACE` があればデータ競合。手元は `cd backend && go test ./... -race -count=1`
+  - backend を触っていないのに走った時は、上の表の場所(`docs/dsl/examples/**` など)を触っていないか見る
+
 ## ios-ci の仕組み(変更のあったモジュールだけテスト)
 
 macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、必要なテストだけ macOS で回す。required check は ubuntu の集約ジョブ `ios-ci`(macOS ジョブがスキップでも成功で終わる)。
@@ -109,15 +150,61 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`(`ios/scripts/mac-package-test.sh <パッケージ名>`)。署名しない・秘密を使わない。
 - 手元で回す時、repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。repo(clone)と DerivedData(`MAC_DERIVED_DATA`)の両方を保護の外(例: `~/src`)に置く。CI では起きない。
 
+## android-ci(Android アプリの JVM テスト・ビルド)
+
+`.github/workflows/android-ci.yml`(#837)。PR が Open(非 Draft)の時と、`develop` / `main` への push で回る。**ubuntu だけ**で、エミュレータは使わない。ios-ci と同じく `android-changes` で変わった場所を見て、関係ない PR では Gradle を起動しない(workflow の `paths:` は使わない。required check が永遠に待ちになるため)。
+
+| ジョブ | いつ回るか | 回すもの |
+|---|---|---|
+| `android-build` | mode が `full`(`android/dsl/**` 以外の `android/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**`・`docs/dsl/dsl.schema.json`・この workflow。push では `android/dsl/**` も) | `./gradlew test assembleStgDebug` → `:app:compileStgDebugAndroidTestKotlin`(androidTest はコンパイルだけ)→ lint(非ブロッキング) |
+| `android-changes` | 毎回 | `dorny/paths-filter` で mode(`none` / `light` / `full`)と light で回す Gradle のタスクを決める |
+| `android-ci` | 毎回(集約) | ほかの 3 つの結果をまとめる。スキップは成功、失敗・キャンセルは失敗 |
+| `android-light` | mode が `light`(PR で `android/dsl/**` だけ・`docs/dsl/conformance/expr/**`・`docs/dsl/icon-map.json` と backend の `*.go`・iOS の `ClientCapabilities.swift` / `Localizable.xcstrings`) | 変わった物に関係する単体テストだけ(`:dsl:test`・`SymbolIconTableTest`・`DeviceCapabilitiesTest`・`RuntimeCopyIosEnglishTest`) |
+
+- 変わった場所と回すテストの細かい対応は [`docs/android/ci.md`](android/ci.md#形)。
+- 集約ジョブ `android-ci` は required check にできる形だが、`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` にはまだ入っていない。**必須にするかはオーナーが判断する**。
+- `google-services.json` は CI に置かない。無くてもビルドは通り、認証はモックになる。
+
+落ちた時の見方:
+
+- **unit(`test`・`android-light` の `gradle`)**: 成果物 `android-test-reports`(full)/ `android-light-test-reports`(light)に Gradle のテストのレポート(HTML)がある。手元では `cd android && ./gradlew test` か、落ちたタスクだけ(例: `./gradlew :dsl:test`)。
+- **androidTest のコンパイル**: 本番コードの変更で `androidTest` のコードが壊れた印。`./gradlew :app:compileStgDebugAndroidTestKotlin` で再現する。実行はしていないので、端末での確認は [`docs/android/ci.md`](android/ci.md#ci-で検証されるもの--手元で確かめるもの) の手順で手元で行う。
+- **lint**: 非ブロッキング(`continue-on-error`)なので `android-ci` は落ちない。結果は job summary と警告に出て、レポートは成果物 `android-lint-reports`。手元では `./gradlew :app:lintStgDebug :renderer:lintDebug :services:lintDebug`。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
 
-- 発火: `backend/**` かこの workflow を触る PR(非 Draft)と、`develop` / `main` への push。
-- gcloud SDK の `cloud-firestore-emulator` を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、`t.Skip("FIRESTORE_EMULATOR_HOST not set")` を持つパッケージに `go test` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
-- Firestore 系テスト(`TestFirestore*` / `*/firestore`)が 1 件でもスキップされたら失敗(黙ってスキップさせない)。通った件数は job summary に出る。
-- **required check にはまだしていない**(マージ条件は上の 3 本のまま)。必須にするかはオーナーが判断する。必須にするなら `paths:` をやめて `backend-ci` と同じ paths-filter 方式に変える。
-- 起動・試験の中身は `scripts/firestore-emulator.sh`。手元で同じことをするには `make -C backend test-emulator`(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+**何を回すか**: エミュレータが無いと `t.Skip("FIRESTORE_EMULATOR_HOST not set")` で飛ばされる store まわりのテスト。対象のパッケージは決め打ちせず、`scripts/firestore-emulator.sh test` がその文字列を持つ `*_test.go` を grep して集める(今は `internal/store`・`internal/appconfig`・`internal/runner` とその下の `queue` / `quota`・`internal/ai`・`internal/coins` など)。
+
+**いつ回るか**:
+
+| きっかけ | 試験ジョブ `backend-emulator-test` |
+|---|---|
+| PR(opened / synchronize / reopened / ready_for_review・Draft は除く)で `backend/**`・`.github/workflows/backend-emulator.yml`・`scripts/firestore-emulator.sh` のどれかが変わった | 回る |
+| 上の 3 つのどれも変わっていない PR | 飛ばす(集約ジョブは成功) |
+| `develop` / `main` への push(push 前との差分に上の 3 つのどれかがある) | 回る |
+
+- workflow の `paths:` は使わず、`backend-emulator-changes`(`dorny/paths-filter`)で判定する(`backend-ci` と同じ理由: required にした時に check が待ちのままにならないように)。
+- ジョブは 3 つ: `backend-emulator-changes`(判定)→ `backend-emulator-test`(試験・上限 15 分)→ `backend-emulator`(集約。試験を飛ばしたら成功、回したらその結果)。
+- 時間の目安: 試験ジョブが回った時で 3〜4 分(gcloud とエミュレータの取得込み)。回らない時は判定と集約で数十秒。
+
+**中身**: gcloud SDK の `cloud-firestore-emulator`(版は固定)を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、集めたパッケージに `go test -count=1 -json` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
+
+**skip されていないかの確かめ方**(`scripts/firestore-emulator.sh` の `test` が見る):
+
+- 出力に `FIRESTORE_EMULATOR_HOST not set` が 1 回でも出たら失敗(`::error::emulator tests were skipped`)。
+- Firestore 系テスト(名前が `TestFirestore*` か、サブテストが `*/firestore`)が 1 件でもスキップされたら失敗し、その名前を並べる。
+- 通った Firestore 系テストの件数を job summary に `Firestore emulator tests passed: <件数>` で出す。0 件なら失敗。件数が前より急に減っていたら、テストが別の理由でスキップされていないかを見る。
+
+**落ちた時の見方**:
+
+1. `backend-emulator` が赤 → 中身は `backend-emulator-test` の方。そちらを開く。
+2. `Firestore エミュレータ起動` の step で落ちた → 90 秒で応答しなかった。ログ(`emulator.log`)はその step の中と、最後の `エミュレータログ(失敗時)` に出る。gcloud・Java の取得の失敗なら Re-run でよいことが多い。
+3. `go test` の step で落ちた → 上の `::error::` 行(スキップ・件数 0)か、普通のテストの失敗。手元で `make -C backend test-emulator` で再現する(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+4. `backend-emulator-changes` が赤 → paths-filter の失敗。Re-run。
+
+**required check にはまだしていない**(`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` は `backend-ci` / `ios-ci` / `secrets-scan` の 3 本)。必須にするかはオーナーが判断する(決めること)。必須にする時に登録する名前は集約ジョブの `backend-emulator`。
 
 ## CI が落ちた時の見方
 
