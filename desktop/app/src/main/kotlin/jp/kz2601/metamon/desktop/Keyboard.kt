@@ -41,6 +41,9 @@ import jp.kz2601.metamon.desktop.usage.UsageDialog
 import jp.kz2601.metamon.desktop.usage.UsageLoader
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
+import jp.kz2601.metamon.desktop.io.ExportClipboard
+import jp.kz2601.metamon.desktop.voice.PromptTipsDialog
+import jp.kz2601.metamon.desktop.voice.PromptTipsText
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Presentation
@@ -294,6 +297,9 @@ class DesktopKeyboard(
     var usage: UsageLoader? = null
     var usageOpen by mutableStateOf(false)
 
+    /** 頼み方のコツ(voice/PromptTipsDialog.kt)。F1 の一覧とパレットから開く。 */
+    var tipsOpen by mutableStateOf(false)
+
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -400,7 +406,11 @@ class DesktopKeyboard(
         val usage = usage?.let {
             listOf(PaletteCommand("account:usage", Strings["settings_usage_header"], PaletteCommand.Kind.ACTION, keywords = listOf("usage", "plan", "limit")) { usageOpen = true })
         }.orEmpty()
-        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + licenses
+        val tips = PaletteCommand(
+            "help:prompt_tips", PromptTipsText.TITLE, PaletteCommand.Kind.ACTION,
+            keywords = listOf("tips", "prompt", "examples", "help"),
+        ) { tipsOpen = true }
+        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + tips + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -431,7 +441,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -452,10 +462,20 @@ class DesktopKeyboard(
             }
         }
         if (helpOpen) {
-            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }) {
+            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onTips = { helpOpen = false; tipsOpen = true }) {
                 helpOpen = false
                 runCatching { root.requestFocus() }
             }
+        }
+        if (tipsOpen) {
+            PromptTipsDialog(
+                onCopy = { ExportClipboard.put(it) },
+                onMessage = { session.message = it },
+                onDismiss = {
+                    tipsOpen = false
+                    runCatching { root.requestFocus() }
+                },
+            )
         }
         if (licensesOpen) {
             LicensesDialog {
