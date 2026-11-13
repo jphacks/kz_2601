@@ -8807,6 +8807,23 @@
         }
       }
     },
+    "メッセージ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージ"
+          }
+        }
+      }
+    },
     "メッセージ・メールなどでリンクを送る" : {
       "localizations" : {
         "en" : {
@@ -16094,6 +16111,23 @@
         }
       }
     },
+    "記録する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録する"
+          }
+        }
+      }
+    },
     "記録に写真を付けられるようにして" : {
       "localizations" : {
         "en" : {
@@ -16421,6 +16455,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "試してほしい依頼"
+          }
+        }
+      }
+    },
+    "試験用の通知" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試験用の通知"
           }
         }
       }
@@ -16949,6 +17000,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)"
+          }
+        }
+      }
+    },
+    "返信" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信"
           }
         }
       }
@@ -17969,6 +18037,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください"
+          }
+        }
+      }
+    },
+    "長押しして「記録する」か「返信」を押してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold, then tap Record or Reply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しして「記録する」か「返信」を押してください"
           }
         }
       }
