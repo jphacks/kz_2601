@@ -52,6 +52,23 @@
         }
       }
     },
+    "NSHomeKitUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read your Home data so the apps you build can show the names, power, brightness, temperature, and humidity of the rooms and accessories in your home. It never controls your accessories, and accessory names are never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、家の部屋と機器の名前・電源・明るさ・温度・湿度を表示するために、ホームのデータを読み取ります。機器の操作はしません。機器の名前は端末の外に送りません。"
+          }
+        }
+      }
+    },
     "NSRemindersFullAccessUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
