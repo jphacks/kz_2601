@@ -69,6 +69,8 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 
 op の `Check` は引数の値を確かめる(appconfig と runner の両方で、数える前に。だめなら 400)。`CacheTTL` は同じ引数の答えを持つ時間(下の「キャッシュ」)。
 
+provider ごとの規約の条項の場所(課金・出典・保存・人が確かめる欄)は [external-api-terms.md](external-api-terms.md)(#2313)。
+
 ### 入っている provider
 
 | provider | 種類 | op | 出口 | キャッシュ | 入れ方 |
