@@ -345,6 +345,10 @@ targets:
       - path: Metamon/Features/Share/PublishCopy.swift
       # 設定の「つないだサービス」(#1714): 一覧の並べ方・戻り先の読み方・つなぐ / 切るの状態は iOS のファイルをそのまま使う
       - path: Metamon/Features/Connections/ConnectedServices.swift
+      # 外の API の断り(#3078): コインの断りの文言は iOS のファイルをそのまま使う(判定は Shared/Connections/ExtDenialRoute.swift)
+      - path: Metamon/Features/Coins/CoinCopy.swift
+      # Pro が要る断りの文言(外の API の断りで使う)も iOS のファイルをそのまま使う
+      - path: Metamon/Features/Purchase/ProRequiredCopy.swift
       # 近くの人に送る(#964): MultipeerConnectivity の通信は iOS のファイルをそのまま使う(iPhone・iPad と送り合える)。
       # すれ違い通信(passby)は NearbyInteraction・持ち歩く前提なので Mac には入れない(「この Mac では使えません」)
       - path: Metamon/Features/Nearby/NearbyService.swift
