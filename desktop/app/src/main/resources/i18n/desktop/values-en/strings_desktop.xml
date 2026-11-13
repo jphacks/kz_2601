@@ -189,6 +189,9 @@
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_question_progress_spoken">Question %1$d, out of %2$d</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
+    <string name="desktop_retention_confirmed">Confirmed</string>
+    <string name="desktop_retention_review">Records deleted automatically</string>
+    <string name="desktop_retention_unconfirmed">Not confirmed</string>
     <string name="desktop_sync_blocker_offline">Couldn\'t send. Check your network, then choose Send now</string>
     <string name="desktop_sync_blocker_signed_out">Can\'t send because you\'re not signed in</string>
     <string name="desktop_sync_last_sent">Last sent: %1$s</string>

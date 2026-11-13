@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +43,8 @@ import jp.kz2601.metamon.desktop.usage.UsageLoader
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.desktop.io.ExportClipboard
+import jp.kz2601.metamon.desktop.store.RetentionPrompts
+import jp.kz2601.metamon.desktop.store.RetentionReviewDialog
 import jp.kz2601.metamon.desktop.voice.PromptTipsDialog
 import jp.kz2601.metamon.desktop.voice.PromptTipsText
 import jp.kz2601.metamon.dsl.AppDSL
@@ -300,6 +303,10 @@ class DesktopKeyboard(
     /** 頼み方のコツ(voice/PromptTipsDialog.kt)。F1 の一覧とパレットから開く。 */
     var tipsOpen by mutableStateOf(false)
 
+    /** 設定の「自動で消える記録」の見直しの一覧(store/RetentionPrompt.kt)。パレットから開く。 */
+    var retentionReviewOpen by mutableStateOf(false)
+    private var retentionTick by mutableIntStateOf(0)
+
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -410,7 +417,22 @@ class DesktopKeyboard(
             "help:prompt_tips", PromptTipsText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("tips", "prompt", "examples", "help"),
         ) { tipsOpen = true }
-        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + tips + licenses
+        val retention = session.takeIf { retentionRows().isNotEmpty() }?.let {
+            listOf(
+                PaletteCommand(
+                    "retention:review", Strings["desktop_retention_review"], PaletteCommand.Kind.ACTION,
+                    keywords = listOf("retention", "auto delete", Strings["retention_settings_header"]),
+                ) { retentionReviewOpen = true },
+            )
+        }.orEmpty()
+        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + retention + tips + licenses
+    }
+
+    /** 今のアプリの保存期間のある entity(アプリ・entity・日数・確認済みか)。端末に残さない時は空。 */
+    fun retentionRows(): List<RetentionPrompts.Row> {
+        val runner = session.retention ?: return emptyList()
+        val appId = session.records.persistence?.appId ?: return emptyList()
+        return RetentionPrompts.rows(appId, dsl.app.name, runner, session.models)
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -441,7 +463,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -473,6 +495,25 @@ class DesktopKeyboard(
                 onMessage = { session.message = it },
                 onDismiss = {
                     tipsOpen = false
+                    runCatching { root.requestFocus() }
+                },
+            )
+        }
+        if (retentionReviewOpen) {
+            val runner = session.retention
+            val appId = session.records.persistence?.appId
+            val rows = remember(retentionTick, session.store) { retentionRows() }
+            RetentionReviewDialog(
+                rows,
+                onConfirm = { r ->
+                    val entity = session.entityModel(r.entityId)
+                    if (runner != null && appId != null && entity != null) {
+                        RetentionPrompts.confirm(runner, appId, entity)
+                        retentionTick++
+                    }
+                },
+                onDismiss = {
+                    retentionReviewOpen = false
                     runCatching { root.requestFocus() }
                 },
             )
