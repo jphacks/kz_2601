@@ -130,6 +130,8 @@ fun DesktopApp(
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    // トレイの「アカウント」(#2374): 前にあるウィンドウで開く
+    LocalTray.current?.let { tray -> LaunchedEffect(tray.accountRequests) { if (tray.takeAccount(isActive)) keyboard.accountOpen = true } }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

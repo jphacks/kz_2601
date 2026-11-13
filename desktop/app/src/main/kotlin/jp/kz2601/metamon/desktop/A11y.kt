@@ -42,6 +42,9 @@ object A11y {
     /** 写真のプレビュー(PhotoPreview.kt)のダイアログの名前。項目名を付ける。 */
     fun previewTitle(name: String): String = Strings.format("desktop_a11y_preview", name.ifBlank { Strings["desktop_a11y_image"] })
 
+    /** アカウントの画面の状態の行(#2374)をまとめて読む。 */
+    fun accountStatus(lines: List<String>): String = Strings.format("desktop_a11y_account", lines.joinToString(Strings["desktop_list_separator"]))
+
     private fun join(label: String?, value: String): String = listOfNotNull(label?.takeIf { it.isNotBlank() }, value).joinToString(" ")
 }
 

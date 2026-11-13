@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- デスクトップ版にしか無い文言(#1759)。Android と同じ形。Android にある文言は Android のキーをそのまま使う -->
 <resources>
+    <string name="desktop_a11y_account">アカウント: %1$s</string>
     <string name="desktop_a11y_chart">グラフ: %1$s</string>
     <string name="desktop_a11y_image">画像</string>
     <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
+    <string name="desktop_account_signed_in">サインインしています</string>
+    <string name="desktop_account_signed_out">サインインしていません</string>
     <string name="desktop_already_running">Tailor It はもう起動しています</string>
     <string name="desktop_book_searching">本の情報を探しています…</string>
     <string name="desktop_calendar_month_pattern">y年M月</string>

@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="desktop_a11y_account">Account: %1$s</string>
     <string name="desktop_a11y_chart">Chart: %1$s</string>
     <string name="desktop_a11y_image">Image</string>
     <string name="desktop_a11y_preview">Photo preview: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d of %3$d</string>
+    <string name="desktop_account_signed_in">Signed in</string>
+    <string name="desktop_account_signed_out">Not signed in</string>
     <string name="desktop_already_running">Tailor It is already running</string>
     <string name="desktop_book_searching">Looking up the book…</string>
     <string name="desktop_calendar_month_pattern">MMMM y</string>

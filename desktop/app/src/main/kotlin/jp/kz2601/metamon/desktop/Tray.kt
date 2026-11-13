@@ -61,7 +61,7 @@ sealed interface TrayItem {
     data class OpenApp(val appId: String, val label: String) : TrayItem
 }
 
-enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, OPEN_AT_LOGIN, QUIT }
+enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, ACCOUNT, CLOSE_TO_TRAY, OPEN_AT_LOGIN, QUIT }
 
 /** 走っている(または止めてある)timerDisplay 1 つ。seconds は countdown なら残り、他は経過。 */
 data class TimerStatus(val key: String, val name: String, val seconds: Int, val countdown: Boolean, val running: Boolean)
@@ -100,6 +100,7 @@ object TrayMenu {
      * [openAtLogin] は「ログイン時に開く」の今の状態。null(この OS・この動かし方では使えない)なら出さない。
      * [openAtLoginBusy] の間(読み込み・切り替え中)は押せない。[openAtLoginRevision] は [TrayItem.Toggle.revision] に入れる。
      * [stats] は前にあるアプリの集計。先頭に押せない行で出す(Mac のメニューバーと同じく上に)。
+     * [account] なら「アカウント」(#2374)を設定の行の前に出す。
      */
     fun items(
         appName: String,
@@ -111,6 +112,7 @@ object TrayMenu {
         stats: List<TrayStat> = emptyList(),
         openAtLoginBusy: Boolean = false,
         openAtLoginRevision: Int = 0,
+        account: Boolean = false,
     ): List<TrayItem> = buildList {
         if (stats.isNotEmpty()) {
             stats.forEach { add(TrayItem.Info(it.text)) }
@@ -126,6 +128,7 @@ object TrayMenu {
             timers.forEach { add(TrayItem.Info(timerLabel(it))) }
         }
         add(TrayItem.Separator)
+        if (account) add(TrayItem.Command(TrayCommand.ACCOUNT, Strings["account_menu"]))
         add(TrayItem.Toggle(TrayCommand.CLOSE_TO_TRAY, Strings["desktop_tray_close_to_tray"], closeToTray))
         if (openAtLogin != null) {
             add(TrayItem.Toggle(TrayCommand.OPEN_AT_LOGIN, Strings["desktop_tray_open_at_login"], openAtLogin, !openAtLoginBusy, openAtLoginRevision))
@@ -205,6 +208,8 @@ class TrayController(
     private val loginItem: LoginItem? = null,
     /** [loginItem] を動かす所(レジストリ・ファイルを触るので UI のスレッドでは動かさない)。 */
     private val loginItemDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** メニューに「アカウント」(#2374)を出す。 */
+    private val accountMenu: Boolean = false,
 ) {
     /** 「ログイン時に開く」の状態。OS 側から読むまでは off。null は使えない。 */
     var openAtLogin: Boolean? by mutableStateOf(if (loginItem != null) false else null)
@@ -332,6 +337,25 @@ class TrayController(
         return true
     }
 
+    /** 増えたら前にあるウィンドウがアカウントの画面を開く([takeAccount])。 */
+    var accountRequests by mutableIntStateOf(0)
+        private set
+    private var accountPending = false
+
+    /** トレイの「アカウント」: ウィンドウを出し、前にある 1 枚でアカウントの画面を開く。 */
+    fun openAccount() {
+        accountPending = true
+        open()
+        accountRequests++
+    }
+
+    /** 前にあるウィンドウが受け取る。1 回だけ true。 */
+    fun takeAccount(isActive: () -> Boolean): Boolean {
+        if (!accountPending || !isActive()) return false
+        accountPending = false
+        return true
+    }
+
     fun updateCloseToTray(on: Boolean) {
         closeSetting.set(on)
         closeToTray = on
@@ -352,14 +376,14 @@ class TrayController(
         }
 
     fun items(timers: List<TimerStatus>, stats: List<TrayStat> = stats()): List<TrayItem> =
-        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats, openAtLoginBusy, openAtLoginRevision)
+        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats, openAtLoginBusy, openAtLoginRevision, accountMenu)
 
     companion object {
         fun create(dsl: AppDSL): TrayController {
             val traySupported = runCatching { isTraySupported }.getOrDefault(false)
             // トレイが無いとメニューから切り替えられないので出さない
             val loginItem = if (traySupported) Autostart.forCurrentOs() else null
-            return TrayController(dsl, traySupported, apps = BundledApps.all(), loginItem = loginItem)
+            return TrayController(dsl, traySupported, apps = BundledApps.all(), loginItem = loginItem, accountMenu = true)
         }
     }
 }
@@ -406,6 +430,7 @@ private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, scope:
                 when (item.command) {
                     TrayCommand.OPEN -> c.open()
                     TrayCommand.QUICK_RECORD -> c.quickRecord()
+                    TrayCommand.ACCOUNT -> c.openAccount()
                     TrayCommand.QUIT -> quit()
                     else -> Unit
                 }
