@@ -102,6 +102,13 @@
     <string name="desktop_picker_empty">No candidates</string>
     <string name="desktop_picker_hint">Press the button to pick one</string>
     <string name="desktop_picker_pick">Pick</string>
+    <string name="desktop_plan_cached">Last known (can\'t load right now)</string>
+    <string name="desktop_plan_date_pattern">MMM d, yyyy</string>
+    <string name="desktop_plan_expired">Pro ended (%1$s)</string>
+    <string name="desktop_plan_store_app_store">Purchased on the App Store</string>
+    <string name="desktop_plan_store_google_play">Purchased on Google Play</string>
+    <string name="desktop_plan_unknown">Couldn\'t load</string>
+    <string name="desktop_plan_until">Until %1$s</string>
     <string name="desktop_preview_count">%1$s (%2$d of %3$d)</string>
     <string name="desktop_preview_failed">Couldn\'t read this photo</string>
     <string name="desktop_preview_hint">← → to browse · Esc / Space to close</string>

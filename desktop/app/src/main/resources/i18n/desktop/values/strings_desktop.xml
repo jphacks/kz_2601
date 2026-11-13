@@ -103,6 +103,13 @@
     <string name="desktop_picker_empty">候補がありません</string>
     <string name="desktop_picker_hint">ボタンを押すと 1 つ選びます</string>
     <string name="desktop_picker_pick">選ぶ</string>
+    <string name="desktop_plan_cached">前回読んだ内容です(今は読めません)</string>
+    <string name="desktop_plan_date_pattern">yyyy年M月d日</string>
+    <string name="desktop_plan_expired">Pro の期限が切れました(%1$s)</string>
+    <string name="desktop_plan_store_app_store">App Store で購入</string>
+    <string name="desktop_plan_store_google_play">Google Play で購入</string>
+    <string name="desktop_plan_unknown">読めませんでした</string>
+    <string name="desktop_plan_until">%1$s まで</string>
     <string name="desktop_preview_count">%1$s(%2$d / %3$d)</string>
     <string name="desktop_preview_failed">この写真は読めません</string>
     <string name="desktop_preview_hint">← → で送る・Esc / Space で閉じる</string>
