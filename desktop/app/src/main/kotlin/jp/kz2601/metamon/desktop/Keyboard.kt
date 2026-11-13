@@ -256,6 +256,9 @@ class DesktopKeyboard(
     var print: () -> Unit = {}
     var openApp: ((String) -> Unit)? = null
 
+    /** サーバーのアプリ(#2379)。並びの順でパレットの同梱のアプリの後に出す。 */
+    var serverApps: () -> List<PaletteCommand> = { emptyList() }
+
     /** 記録の詳細を別のウィンドウで開く(#1763)。(画面, recordId)。 */
     var openRecord: ((String, String) -> Unit)? = null
 
@@ -367,7 +370,7 @@ class DesktopKeyboard(
             BundledApps.all().map { (id, name) ->
                 PaletteCommand("app:$id", name, PaletteCommand.Kind.APP, keywords = listOf(id, KeyboardText.NEW_WINDOW)) { open(id) }
             }
-        }.orEmpty()
+        }.orEmpty() + serverApps()
         // 今開いている記録を別のウィンドウに(詳細のウィンドウの根では出さない)
         val top = session.top
         val record = openRecord?.takeIf { top.recordId != null && top != session.detailRoot }?.let { open ->

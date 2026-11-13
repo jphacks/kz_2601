@@ -28,6 +28,9 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.net.DesktopApi
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.desktop.net.ServerApps
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
@@ -100,7 +103,31 @@ private fun runApp(args: Array<String>) = application {
             loadScope.cancel()
         }
     }
-    val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
+    // サーバーのアプリ(#2379)。MOCK・サインインしていない時は何も出さない(サインイン #2151 までは TAILORIT_DEV_TOKEN をサインインと見る)
+    val apiConfig = remember { DesktopApiConfig.fromEnvironment() }
+    val appConfig = remember { DesktopApi.appConfig(apiConfig, desktopStore.documents) }
+    val serverApps = remember {
+        ServerAppsModel(appConfig?.let { ServerApps(it, desktopStore.documents) { apiConfig.devToken != null } }) { id ->
+            desktopStore.documents.load(id)?.document?.dsl?.app?.icon
+        }
+    }
+    LaunchedEffect(serverApps) { serverApps.refresh() }
+    val opener = remember { appConfig?.let { ServerAppOpener(it, desktopStore.documents) } }
+    // 最後に開いた同梱のアプリが無く、サーバーの一覧があればホームから(引数で選んだ時は選んだアプリ)
+    val home = remember {
+        args.isEmpty() && System.getProperty("tailorit.example") == null && serverApps.available &&
+            desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } == null
+    }
+    val registry = remember { WindowRegistry().also { it.open(if (home) WindowKey.home() else WindowKey.app(first)) } }
+    // 一覧で選んだ: DSL を読み、アプリのウィンドウで開く(開いていれば前に出す)
+    val openServerApp: suspend (ServerAppRow) -> Boolean = { row ->
+        val dsl = opener?.load(row.id)
+        if (dsl != null) {
+            hub.put(row.id, dsl)
+            registry.open(WindowKey.app(row.id))
+        }
+        dsl != null
+    }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
     val tray = remember { TrayController.create(hub.dsl(first)) }
@@ -109,7 +136,7 @@ private fun runApp(args: Array<String>) = application {
     remember {
         SingleInstance.onHandoff { a ->
             SwingUtilities.invokeLater {
-                val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.takeUnless { it.isHome }?.appId ?: first
                 tray.openApp(id)
             }
         }
@@ -119,13 +146,17 @@ private fun runApp(args: Array<String>) = application {
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
     val active = registry.active
     LaunchedEffect(active?.id) {
-        val appId = active?.key?.appId ?: return@LaunchedEffect
+        val appId = active?.key?.takeUnless { it.isHome }?.appId ?: return@LaunchedEffect
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
     }
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            if (w.key.isHome) {
+                HomeWindow(w, registry, tray, serverApps, openServerApp)
+            } else {
+                DesktopWindow(w, registry, hub, tray, serverApps, openServerApp, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            }
         }
     }
 }
@@ -133,7 +164,15 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    hub: AppHub,
+    tray: TrayController,
+    serverApps: ServerAppsModel,
+    openServerApp: suspend (ServerAppRow) -> Boolean,
+    startScreen: String?,
+) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -206,8 +245,42 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        serverApps = serverApps.takeIf { it.available },
+                        onOpenServerApp = openServerApp,
                     )
                 }
+            }
+        }
+    }
+}
+
+/** ホーム(#2379): サーバーのアプリの一覧。選んだらそのアプリのウィンドウを開き、ホームは閉じる。 */
+@Composable
+private fun ApplicationScope.HomeWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    tray: TrayController,
+    serverApps: ServerAppsModel,
+    openServerApp: suspend (ServerAppRow) -> Boolean,
+) {
+    val state = rememberWindowState(size = WindowBounds.defaultSize(WindowKind.APP))
+    Window(
+        onCloseRequest = { if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication() },
+        visible = tray.windowVisible,
+        title = Strings.format("desktop_window_title", Strings["settings_usage_apps"]),
+        state = state,
+    ) {
+        LaunchedEffect(Unit) { window.minimumSize = Dimension(360, 560) }
+        DisposableEffect(window) {
+            val l = object : WindowAdapter() {
+                override fun windowGainedFocus(e: WindowEvent?) = registry.activate(w.id)
+            }
+            window.addWindowFocusListener(l)
+            onDispose { window.removeWindowFocusListener(l) }
+        }
+        CompositionLocalProvider(LocalTray provides tray) {
+            TailorItTheme {
+                ServerAppsHome(serverApps) { row -> openServerApp(row).also { if (it) registry.close(w.id) } }
             }
         }
     }

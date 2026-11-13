@@ -132,6 +132,8 @@
     <string name="desktop_print_value">値</string>
     <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
+    <string name="desktop_server_app_open_failed">アプリを開けませんでした。通信できる所でもう一度お試しください</string>
+    <string name="desktop_server_apps_cached">前回の一覧</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>
     <string name="desktop_timer_done">時間になりました</string>
     <string name="desktop_timer_name">タイマー</string>

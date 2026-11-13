@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +73,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import kotlinx.coroutines.launch
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -105,6 +107,9 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** サーバーのアプリの一覧(#2379)と、選んだ時に DSL を読んで開く口(開けなければ false)。 */
+    serverApps: ServerAppsModel? = null,
+    onOpenServerApp: (suspend (ServerAppRow) -> Boolean)? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -130,6 +135,15 @@ fun DesktopApp(
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    // パレットにサーバーのアプリ(#2379)。選んだら DSL を読んでアプリのウィンドウで開く
+    val serverScope = rememberCoroutineScope()
+    if (serverApps != null && onOpenServerApp != null) {
+        keyboard.serverApps = {
+            ServerAppPalette.commands(serverApps.rows, serverApps.fromCache) { row ->
+                serverScope.launch { if (!onOpenServerApp(row)) session.message = Strings["desktop_server_app_open_failed"] }
+            }
+        }
+    }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない
