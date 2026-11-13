@@ -64,6 +64,11 @@ val sharedIncludes = listOf(
     "jp/kz2601/metamon/services/social/AuthorProfile.kt",
     "jp/kz2601/metamon/services/social/MatchingClient.kt",
     "jp/kz2601/metamon/services/social/ModerationClient.kt",
+    // 変化の通知(SSE `GET /v1/apps/{appId}/events`)とホットリロード(#2807)
+    "jp/kz2601/metamon/services/sync/ChangeEvents.kt",
+    "jp/kz2601/metamon/services/sync/DocumentSync.kt",
+    "jp/kz2601/metamon/services/sync/HotReload.kt",
+    "jp/kz2601/metamon/services/sync/RealtimeDocumentSync.kt",
     // client-config の notice(#333)。ServiceNotice の読み方の関数は ClientConfig.kt にある
     "jp/kz2601/metamon/services/update/ClientConfig.kt",
     "jp/kz2601/metamon/services/update/ServiceNotice.kt",
