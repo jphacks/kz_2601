@@ -98,7 +98,7 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 ### 読み上げ
 
-- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows はナレーターで読む(Java Access Bridge を通すので `jabswitch -enable` が要る)。Linux の読み上げ(Orca)は対象外にする。Compose Desktop が Linux の読み上げに対応していないため([JetBrains のドキュメント](https://kotlinlang.org/docs/multiplatform/compose-desktop-accessibility.html))。
+- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows はナレーターで読む(Java Access Bridge を通すので `jabswitch -enable` が要る)。ナレーターが動いていて Access Bridge が無効な時は、起動時に 1 回だけ手順の案内を出す(コマンドパレットの「読み上げの案内」で再表示・`AccessBridgeAdvice.kt`)。配布物は jlink で作る実行環境の `conf/accessibility.properties` を有効にして作る(Windows の JDK で作った時だけ働く)。Linux の読み上げ(Orca)は対象外にする。Compose Desktop が Linux の読み上げに対応していないため([JetBrains のドキュメント](https://kotlinlang.org/docs/multiplatform/compose-desktop-accessibility.html))。
 
 ### ファイルとクリップボード
 

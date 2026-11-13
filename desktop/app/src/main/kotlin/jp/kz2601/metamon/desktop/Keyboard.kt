@@ -342,6 +342,7 @@ class DesktopKeyboard(
 
     /** サードパーティのライセンス(Licenses.kt)。F1 の一覧とパレットから開く。 */
     var licensesOpen by mutableStateOf(false)
+    var a11yBridgeOpen by mutableStateOf(false)
 
     /** 共有のリンク(share/ShareLink.kt・#2503)。サーバーのアプリを開いている時に入れる。null ならパレットに出さない。 */
     var share: ShareLinkEntry? = null
@@ -367,7 +368,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || shareOpen || devInfo != null) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || shareOpen || a11yBridgeOpen || devInfo != null) return false // パレット・一覧・確認が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -467,9 +468,15 @@ class DesktopKeyboard(
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
         val shareLink = share?.let { listOf(it.command()) }.orEmpty()
+        // Windows でナレーターが動いていて Access Bridge が無効の時だけ出す(#2209)
+        val bridge = if (AccessBridgeAdvice.needed()) {
+            listOf(PaletteCommand("about:a11y-bridge", Strings["desktop_a11y_bridge_command"], PaletteCommand.Kind.ACTION, keywords = listOf("narrator", "screen reader", "jabswitch")) { a11yBridgeOpen = true })
+        } else {
+            emptyList()
+        }
         // stg の時だけ・配布物では出ない
         val dev = DevMenu.commands(devHost)
-        return shortcuts + buttons + record + screens + apps + wipe + shareLink + diagnostics + licenses + dev
+        return shortcuts + buttons + record + screens + apps + wipe + shareLink + diagnostics + licenses + bridge + dev
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -525,6 +532,15 @@ class DesktopKeyboard(
                 helpOpen = false
                 runCatching { root.requestFocus() }
             }
+        }
+        LaunchedEffect(Unit) { if (AccessBridgeAdvice.shouldAutoShow()) a11yBridgeOpen = true }
+        if (a11yBridgeOpen) {
+            AlertDialog(
+                onDismissRequest = { a11yBridgeOpen = false },
+                title = { Text(Strings["desktop_a11y_bridge_title"]) },
+                text = { Text(Strings["desktop_a11y_bridge_body"]) },
+                confirmButton = { TextButton(onClick = { a11yBridgeOpen = false }) { Text(KeyboardText.HELP_CLOSE) } },
+            )
         }
         if (licensesOpen) {
             LicensesDialog {
