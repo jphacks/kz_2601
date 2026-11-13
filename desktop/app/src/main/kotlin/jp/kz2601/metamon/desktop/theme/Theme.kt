@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.desktop.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -10,19 +11,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-/** 明暗の決め方。既定は OS に従う。`-Dtailorit.theme` / `TAILORIT_THEME` に light・dark で固定できる。 */
+/** 明暗の決め方。既定は OS に従う。`-Dtailorit.theme` / `TAILORIT_THEME` に light・dark・contrast で固定できる。 */
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK;
+    SYSTEM, LIGHT, DARK, CONTRAST;
 
     companion object {
         fun parse(raw: String?): ThemeMode = when (raw?.trim()?.lowercase()) {
             "light" -> LIGHT
             "dark" -> DARK
+            "contrast" -> CONTRAST
             else -> SYSTEM
         }
 
@@ -70,11 +73,22 @@ object OsTheme {
             ?: parseGtkTheme(System.getenv("GTK_THEME"))
     }
 
-    /** 明暗を決める。固定があればそれ、無ければ OS、OS が読めなければ Compose の判定。 */
+    /** 明暗を決める。固定があればそれ、無ければ OS、OS が読めなければ Compose の判定。コントラストの固定は明暗を OS に任せる。 */
     fun isDark(mode: ThemeMode, os: Boolean?, composeFallback: Boolean): Boolean = when (mode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> os ?: composeFallback
+        ThemeMode.SYSTEM, ThemeMode.CONTRAST -> os ?: composeFallback
+    }
+
+    /** GNOME の `gsettings get org.gnome.desktop.a11y.interface high-contrast` の出力。`true` / `false`。 */
+    fun parseGnomeHighContrast(out: String): Boolean? = out.trim().toBooleanStrictOrNull()
+
+    /** OS のコントラストのテーマを読む。Windows は JNA、Linux は GNOME の設定、他は読まない(null)。 */
+    fun detectHighContrast(os: String = System.getProperty("os.name").orEmpty().lowercase()): HighContrastState? = when {
+        os.startsWith("windows") -> WindowsHighContrast.read()
+        os.contains("mac") -> null
+        else -> run("gsettings", "get", "org.gnome.desktop.a11y.interface", "high-contrast")
+            ?.let(::parseGnomeHighContrast)?.let { HighContrastState(on = it) }
     }
 
     private fun run(vararg cmd: String): String? = runCatching {
@@ -88,22 +102,83 @@ object OsTheme {
     }.getOrNull()
 }
 
-/** 起動中に OS の明暗が変わっても追いかける間隔。 */
+/** 使う配色。 */
+enum class Palette { LIGHT, DARK, CONTRAST }
+
+/** 配色の選び方とコントラストの配色の作り方(#2207)。 */
+object ThemePalette {
+    /** 明 / 暗の固定 > コントラストの固定 > OS のコントラスト > OS の明暗 > Compose の判定。 */
+    fun choose(mode: ThemeMode, osDark: Boolean?, osContrast: HighContrastState?, composeFallback: Boolean): Palette = when {
+        mode == ThemeMode.LIGHT -> Palette.LIGHT
+        mode == ThemeMode.DARK -> Palette.DARK
+        mode == ThemeMode.CONTRAST || osContrast?.on == true -> Palette.CONTRAST
+        OsTheme.isDark(mode, osDark, composeFallback) -> Palette.DARK
+        else -> Palette.LIGHT
+    }
+
+    /** OS の色が読めない時の配色。暗い側ならハイコントラスト黒、明るい側ならハイコントラスト白。 */
+    fun contrastColors(sys: SystemColors?, dark: Boolean): SystemColors =
+        sys ?: if (dark) SystemColors.ContrastBlack else SystemColors.ContrastWhite
+
+    /** 背景・文字・枠・選択を OS の色から作る。枠は文字の色にして、灰色の薄い線を残さない。 */
+    fun contrastScheme(c: SystemColors): ColorScheme {
+        val bg = rgb(c.window)
+        val fg = rgb(c.windowText)
+        val sel = rgb(c.highlight)
+        val onSel = rgb(c.highlightText)
+        val link = rgb(c.hotlight)
+        val base = if (luminance(c.window) < 0.5) darkColorScheme() else lightColorScheme()
+        return base.copy(
+            primary = sel, onPrimary = onSel, primaryContainer = sel, onPrimaryContainer = onSel, inversePrimary = link,
+            secondary = link, onSecondary = bg, secondaryContainer = sel, onSecondaryContainer = onSel,
+            tertiary = link, onTertiary = bg, tertiaryContainer = sel, onTertiaryContainer = onSel,
+            background = bg, onBackground = fg,
+            surface = bg, onSurface = fg, surfaceVariant = bg, onSurfaceVariant = fg, surfaceTint = bg,
+            inverseSurface = fg, inverseOnSurface = bg,
+            surfaceBright = bg, surfaceDim = bg,
+            surfaceContainer = bg, surfaceContainerHigh = bg, surfaceContainerHighest = bg,
+            surfaceContainerLow = bg, surfaceContainerLowest = bg,
+            outline = fg, outlineVariant = fg, scrim = Color.Black,
+        )
+    }
+
+    fun scheme(palette: Palette, osContrast: HighContrastState?, osDark: Boolean): ColorScheme = when (palette) {
+        Palette.LIGHT -> lightColorScheme()
+        Palette.DARK -> darkColorScheme()
+        Palette.CONTRAST -> contrastScheme(contrastColors(osContrast?.colors, osDark))
+    }
+
+    private fun rgb(v: Int) = Color(0xFF000000.toInt() or (v and 0xFFFFFF))
+
+    /** 0〜1 のおおよその明るさ。 */
+    internal fun luminance(v: Int): Double {
+        val r = (v shr 16) and 0xFF
+        val g = (v shr 8) and 0xFF
+        val b = v and 0xFF
+        return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+    }
+}
+
+/** 起動中に OS の明暗・コントラストが変わっても追いかける間隔。 */
 private const val POLL_MS = 5_000L
 
-/** アプリの Material テーマ。OS のダークモードに従う(#1759)。 */
+/** アプリの Material テーマ。OS のダークモードとコントラストのテーマに従う(#1759・#2207)。 */
 @Composable
 fun TailorItTheme(mode: ThemeMode = ThemeMode.fromEnv(), content: @Composable () -> Unit) {
     val fallback = isSystemInDarkTheme()
     var os by remember { mutableStateOf<Boolean?>(null) }
-    if (mode == ThemeMode.SYSTEM) {
+    var contrast by remember { mutableStateOf<HighContrastState?>(null) }
+    if (mode == ThemeMode.SYSTEM || mode == ThemeMode.CONTRAST) {
         LaunchedEffect(Unit) {
             while (true) {
-                os = withContext(Dispatchers.IO) { OsTheme.detect() }
+                val (d, c) = withContext(Dispatchers.IO) { OsTheme.detect() to OsTheme.detectHighContrast() }
+                os = d
+                contrast = c
                 delay(POLL_MS)
             }
         }
     }
     val dark = OsTheme.isDark(mode, os, fallback)
-    MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme(), content = content)
+    val palette = ThemePalette.choose(mode, os, contrast, fallback)
+    MaterialTheme(colorScheme = ThemePalette.scheme(palette, contrast, dark), content = content)
 }
