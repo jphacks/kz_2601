@@ -168,6 +168,10 @@ struct MacReleaseRequestSheet: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
+            Text("状況が変わるとサイドバーのアプリの行に表示されます")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             HStack {
                 Spacer()
                 Button("閉じる", action: onClose)
