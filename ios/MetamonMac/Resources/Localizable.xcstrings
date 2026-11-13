@@ -5666,6 +5666,23 @@
         }
       }
     },
+    "みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Apple ID の名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you post to an app everyone uses, this name is shown to others. If empty, it shows as Anonymous. Your Apple ID name and email are never shown. Changing it does not affect earlier posts."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Apple ID の名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。"
+          }
+        }
+      }
+    },
     "みんなで共有するデータ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12584,6 +12601,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "承認待ちです。承認されると自動で Pro になります。"
+          }
+        }
+      }
+    },
+    "投稿に表示する名前" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name shown on posts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投稿に表示する名前"
           }
         }
       }
