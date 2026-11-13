@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -11,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -20,7 +22,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import jp.kz2601.metamon.desktop.auth.TokenStore
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.SignOutCleanup
+import jp.kz2601.metamon.desktop.store.SignOutChoice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -113,6 +118,46 @@ object AccountScreenModel {
 object DesktopAccount {
     var state: AccountState by mutableStateOf(AccountState.SignedOut)
     var actions: AccountActions by mutableStateOf(AccountActions())
+
+    /** 保存したトークンの置き場(サインイン #2151 が入れる)。null はまだ無い。 */
+    @Volatile
+    var tokens: TokenStore? = null
+
+    /** サインアウトした回数。増えたら各ウィンドウが最初の画面に戻る。 */
+    var signOuts: Int by mutableIntStateOf(0)
+        private set
+
+    /** 確認で選んだ物に合わせて片付け、未サインインに戻す(#2375)。戻り値はサインアウトしたか。 */
+    suspend fun signOut(choice: SignOutChoice, wipeLocalData: suspend () -> Unit): Boolean {
+        if (!SignOutCleanup.run(choice, wipeLocalData, tokens)) return false
+        state = AccountState.SignedOut
+        signOuts++
+        return true
+    }
+}
+
+/** サインアウトの確認(消す / 残す / やめる)。[anonymous] なら匿名に戻れないことも添える。 */
+@Composable
+fun SignOutConfirmDialog(anonymous: Boolean, onChoice: (SignOutChoice) -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onChoice(SignOutChoice.CANCEL) },
+        title = { Text(Strings["account_sign_out_title"], modifier = Modifier.semantics { heading() }) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(Strings["desktop_sign_out_message"])
+                if (anonymous) Text(Strings["desktop_sign_out_anonymous_note"], color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onChoice(SignOutChoice.KEEP) }) { Text(Strings["desktop_sign_out_keep"]) }
+                TextButton(onClick = { onChoice(SignOutChoice.WIPE) }) {
+                    Text(Strings["desktop_sign_out_wipe"], color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = { onChoice(SignOutChoice.CANCEL) }) { Text(Strings["account_cancel"]) } },
+    )
 }
 
 /**

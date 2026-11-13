@@ -131,6 +131,10 @@
     <string name="desktop_print_value">Value</string>
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
+    <string name="desktop_sign_out_anonymous_note">You can\'t return to an anonymous account. To keep the apps you made, choose \"Continue with Google\" first.</string>
+    <string name="desktop_sign_out_keep">Keep data</string>
+    <string name="desktop_sign_out_message">Also erase the records, unsent changes and settings saved on this device? If you keep them, the next person who signs in on this computer can see them.</string>
+    <string name="desktop_sign_out_wipe">Erase data</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>

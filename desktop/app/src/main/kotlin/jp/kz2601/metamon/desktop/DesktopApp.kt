@@ -132,6 +132,10 @@ fun DesktopApp(
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
     // トレイの「アカウント」(#2374): 前にあるウィンドウで開く
     LocalTray.current?.let { tray -> LaunchedEffect(tray.accountRequests) { if (tray.takeAccount(isActive)) keyboard.accountOpen = true } }
+    // サインアウトした(#2375): どのウィンドウも下書きを捨てて最初の画面へ。開いた時点の回数は見ない
+    val signOuts = DesktopAccount.signOuts
+    val seenSignOuts = remember { signOuts }
+    LaunchedEffect(signOuts) { if (signOuts != seenSignOuts) session.returnToStart() }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

@@ -132,6 +132,10 @@
     <string name="desktop_print_value">値</string>
     <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
+    <string name="desktop_sign_out_anonymous_note">匿名のアカウントには戻れません。作ったアプリを残したい時は、先に「Google で続ける」で引き継いでください。</string>
+    <string name="desktop_sign_out_keep">データを残す</string>
+    <string name="desktop_sign_out_message">この端末に残した記録・送信待ち・設定も消しますか？ 残すと、次にこのパソコンでサインインした人にも見えます。</string>
+    <string name="desktop_sign_out_wipe">データも消す</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>
     <string name="desktop_timer_done">時間になりました</string>
     <string name="desktop_timer_name">タイマー</string>
