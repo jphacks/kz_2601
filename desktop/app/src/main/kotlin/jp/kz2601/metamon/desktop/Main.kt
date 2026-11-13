@@ -9,6 +9,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -32,9 +33,18 @@ import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.consent.DesktopAiButtonMetrics
 import jp.kz2601.metamon.desktop.consent.LocalAiButtonMetrics
 import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
-import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
+import jp.kz2601.metamon.desktop.debug.DevOnboardingItems
+import jp.kz2601.metamon.desktop.debug.SeenFlagsOnboardingReplay
+import jp.kz2601.metamon.desktop.hotkey.HotkeyRunner
+import jp.kz2601.metamon.desktop.hotkey.HotkeySettings
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatEntry
+import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.desktop.create.AppCreator
+import jp.kz2601.metamon.desktop.create.CreateWindow
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
@@ -66,7 +76,6 @@ import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 import java.util.prefs.Preferences
 import javax.swing.SwingUtilities
 
@@ -105,7 +114,7 @@ fun main(rawArgs: Array<String>) {
 
 private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null, sent: List<File>? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
-    val desktopStore = remember { DesktopStore.open() }
+    val desktopStore = remember { DesktopStore.open().also { DevOnboardingItems.hook = SeenFlagsOnboardingReplay(it.settings) } }
     // 並びを直した分(#3207)。同梱の DSL に当て直して開く
     val layouts = remember { LayoutEditStore(desktopStore.root?.resolve("layouts")) }
     val first = remember {
@@ -128,35 +137,6 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     val aiButtonMetrics = remember {
         DesktopAiButtonMetrics(desktopStore.aiButtonMetrics, desktopStore.aiConsent, DesktopApi.aiButtonMetricsSender(DesktopApiConfig.fromEnvironment()))
             .also { m -> loadScope.launch { m.flush() } }
-    }
-    val hub = remember {
-        // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
-        val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
-        AppHub(
-            load = { id -> layouts.applyTo(id, Examples.load(id)) },
-            openRecords = { id, dsl ->
-                if (fixture != null && id == first) {
-                    SharedRecords(fixture)
-                } else {
-                    val p = SessionPersistence.create(desktopStore, id)
-                    val models = dsl.entityModels()
-                    // 記録は Swing の画面のスレッドでだけ書き換える(断られた分を混ぜる時も)
-                    SharedRecords.opening(p, loadScope, post = { SwingUtilities.invokeLater(it) }) { p.load(models) }
-                }
-            },
-            wipeStore = {
-                desktopStore.wipe()
-                layouts.removeAll()
-                DeviceWipe.run(desktopStore.root)
-            },
-        )
-    }
-    DisposableEffect(hub) {
-        onDispose {
-            // 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ってから(3 秒まで)閉じる
-            hub.close()
-            loadScope.cancel()
-        }
     }
     // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
     // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
@@ -183,6 +163,54 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
             desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } == null
     }
     val registry = remember { WindowRegistry().also { it.open(if (home) WindowKey.home() else WindowKey.app(first)) } }
+    // 会話・作る(#2160・#2163): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
+    val uiScope = rememberCoroutineScope()
+    val chat = remember {
+        val config = DesktopApiConfig.fromEnvironment()
+        val granted = { desktopStore.aiConsent.isGranted }
+        val creator = DesktopApi.generate(config, granted)?.let { source ->
+            AppCreator(
+                source,
+                uiScope,
+                locale = { Strings.locale.language },
+                cache = { desktopStore.documents.store(it.document.appId, it.envelopeJson) },
+                onOpen = { id -> registry.open(WindowKey.app(id)) },
+            )
+        }
+        ChatWiring(ChatEntry.factory(DesktopApi.ai(config, granted, desktopStore.documents)), desktopStore.aiConsent, creator)
+    }
+    val hub = remember {
+        // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
+        val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
+        AppHub(
+            // 作ったアプリ(#2163)はこの起動の間だけ一覧に出す。同梱のアプリは並びを直した分(#3207)を当てる
+            load = { id -> chat.creator?.created?.dsl(id) ?: layouts.applyTo(id, Examples.load(id)) },
+            openRecords = { id, dsl ->
+                if (fixture != null && id == first) {
+                    SharedRecords(fixture)
+                } else {
+                    val p = SessionPersistence.create(desktopStore, id)
+                    val models = dsl.entityModels()
+                    // 記録は Swing の画面のスレッドでだけ書き換える(断られた分を混ぜる時も)
+                    SharedRecords.opening(p, loadScope, post = { SwingUtilities.invokeLater(it) }) { p.load(models) }
+                }
+            },
+            wipeStore = {
+                desktopStore.wipe()
+                layouts.removeAll()
+                DeviceWipe.run(desktopStore.root)
+            },
+            // DSL の差し替え(#2809)は画面のスレッドで
+            post = { SwingUtilities.invokeLater(it) },
+        )
+    }
+    DisposableEffect(hub) {
+        onDispose {
+            // 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ってから(3 秒まで)閉じる
+            hub.close()
+            loadScope.cancel()
+        }
+    }
     // 一覧で選んだ: DSL を読み、アプリのウィンドウで開く(開いていれば前に出す)
     val openServerApp: suspend (ServerAppRow) -> Boolean = { row ->
         val dsl = opener?.load(row.id)
@@ -192,6 +220,8 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
         }
         dsl != null
     }
+    // 作っている間のウィンドウ(#2163)
+    chat.creator?.let { c -> c.current?.let { CreateWindow(c, it) } }
     val firstWindowId = remember { registry.windows.first().id }
     // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
     val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
@@ -252,19 +282,23 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     }
     DesktopTray(tray)
     // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
+    // 設定の画面でキーを変えたら HotkeyRunner.restartShared で登録し直す(#2204)
     DisposableEffect(tray) {
-        val hotkey = AtomicReference<GlobalHotkey?>(null)
-        val job = loadScope.launch {
-            hotkey.set(GlobalHotkeys.startFromSettings(
+        val runner = HotkeyRunner { raw ->
+            GlobalHotkeys.startFromSettings(
+                raw = raw,
                 voiceEnabled = { VoiceFlag.enabled() },
                 bringToFront = { tray.open() },
                 notify = Notifier.Tray::notify,
                 post = { SwingUtilities.invokeLater(it) },
-            ))
+            )
         }
+        HotkeyRunner.shared = runner
+        val job = loadScope.launch { runner.restart(HotkeySettings.raw()) }
         onDispose {
             job.cancel()
-            hotkey.getAndSet(null)?.close()
+            HotkeyRunner.shared = null
+            runner.close()
         }
     }
     // 版の確認(#2377): 起動時と 6 時間ごと。MOCK(通信しない)では読まない
@@ -279,7 +313,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
                     HomeWindow(w, registry, tray, serverApps, openServerApp)
                 } else {
                     DesktopWindow(
-                        w, registry, hub, tray, updates, layouts, sendTo,
+                        w, registry, hub, tray, updates, layouts, sendTo, chat,
                         startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
                         autoNav = autoNav?.takeIf { w.id == firstWindowId },
                         onboarding = onboarding,
@@ -305,6 +339,7 @@ private fun ApplicationScope.DesktopWindow(
     updates: UpdateState,
     layouts: LayoutEditStore,
     sendTo: SendToInbox,
+    chat: ChatWiring,
     startScreen: String?,
     autoNav: AutoNavPlan?,
     onboarding: OnboardingStore,
@@ -384,6 +419,7 @@ private fun ApplicationScope.DesktopWindow(
                     LoadingSkeleton()
                 } else key(app.dsl) {
                     // 並びを直して保存したら DSL が替わるので作り直し、編集していた画面から開く(#3207)
+                    // アプリの版が変わって DSL を差し替えたら(#2809)も画面を新しい DSL で作り直して一言出す
                     DesktopApp(
                         app.dsl,
                         startScreen = reopenScreen ?: w.key.screen ?: startScreen,
@@ -409,6 +445,11 @@ private fun ApplicationScope.DesktopWindow(
                         thumbnailAppId = w.key.appId.takeIf { kind == WindowKind.APP },
                         serverApps = serverApps.takeIf { it.available },
                         onOpenServerApp = openServerApp,
+                        hotSwapNotice = if (app.reloads > 0) Strings["runtime_hot_reloaded"] else null,
+                        newChat = chat.newChat,
+                        buildFromChat = chat.build,
+                        aiConsent = chat.consent,
+                        createdApps = chat.createdApps,
                     )
                 }
                 }
@@ -525,4 +566,14 @@ internal object WindowBounds {
             prefs.putFloat("${k}y", pos.y.value)
         }
     }
+}
+
+/** 会話の入口(#2160)と作る流れ(#2163)。[newChat] が null ならパレットに出さない。 */
+private class ChatWiring(
+    val newChat: (() -> ChatSession)?,
+    val consent: AiConsentStore,
+    val creator: AppCreator? = null,
+) {
+    val build: (ChatBuild) -> Unit = { b -> creator?.start(b) }
+    val createdApps: () -> List<Pair<String, String>> = { creator?.created?.all?.toList().orEmpty() }
 }

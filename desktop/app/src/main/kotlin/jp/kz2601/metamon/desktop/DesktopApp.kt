@@ -29,7 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -90,6 +92,9 @@ import kotlinx.coroutines.launch
 import jp.kz2601.metamon.services.update.ServiceNotice
 import kotlinx.coroutines.Dispatchers
 import java.net.URI
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.services.consent.AiConsentStore
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -144,6 +149,16 @@ fun DesktopApp(
     /** サーバーのアプリの一覧(#2379)と、選んだ時に DSL を読んで開く口(開けなければ false)。 */
     serverApps: ServerAppsModel? = null,
     onOpenServerApp: (suspend (ServerAppRow) -> Boolean)? = null,
+    /** 開いた時に出す一言(DSL を差し替えて作り直した時の「最新の内容に更新しました」・#2809) */
+    hotSwapNotice: String? = null,
+    /** パレットの「新しいアプリを作る」(#2160)。AI の接続先がある時だけ渡す。null なら出さない。 */
+    newChat: (() -> ChatSession)? = null,
+    /** 会話の ready・案から作る(#2163)。 */
+    buildFromChat: (ChatBuild) -> Unit = {},
+    /** 会話の前に確かめる同意。 */
+    aiConsent: AiConsentStore? = null,
+    /** この起動で作ったアプリ(#2163)。パレットのアプリの一覧に足す。 */
+    createdApps: () -> List<Pair<String, String>> = { emptyList() },
 ) {
     val noticeScope = rememberCoroutineScope()
     val openNoticeLink: (String) -> Unit = onOpenNoticeLink ?: { url ->
@@ -152,8 +167,23 @@ fun DesktopApp(
     }
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
+            .also { it.message = hotSwapNotice }
     }
     if (autoNav != null) LaunchedEffect(session) { runAutoNav(autoNav, session) }
+    // 入力中は DSL の差し替えを待つ(#2809): 入力中かを見せ、入力が終わったら(保存・閉じた)待っている差し替えを当てる
+    DisposableEffect(session) {
+        val untrack = session.records.trackEdits { session.hasUnsavedForms }
+        onDispose { untrack() }
+    }
+    // 下書きの一覧は Compose の状態ではないので、捨てる時に変わる遷移(閉じた)と記録(保存した)も読んで見直す
+    val unsaved by remember(session) {
+        derivedStateOf {
+            session.nav
+            session.store
+            session.hasUnsavedForms
+        }
+    }
+    LaunchedEffect(unsaved) { if (!unsaved) session.records.editsSettled() }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
     HotkeyVoiceHook(session, isActive)
@@ -201,7 +231,11 @@ fun DesktopApp(
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, usage = session.persistence?.usage, saveLayout = onSaveLayout)
+    val keyboard = rememberDesktopKeyboard(
+        dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData,
+        usage = session.persistence?.usage, saveLayout = onSaveLayout,
+        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent, createdApps = createdApps,
+    )
     // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
     keyboard.onOnboardingFinished = { onboarding?.markSeen() }
     LaunchedEffect(Unit) { if (showOnboardingAtLaunch && onboarding?.hasSeen != true) keyboard.onboardingOpen = true }
@@ -230,6 +264,10 @@ fun DesktopApp(
             }
         }
     }
+    // サインアウトした(#2375): どのウィンドウも下書きを捨てて最初の画面へ。開いた時点の回数は見ない
+    val signOuts = DesktopAccount.signOuts
+    val seenSignOuts = remember { signOuts }
+    LaunchedEffect(signOuts) { if (signOuts != seenSignOuts) session.returnToStart() }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

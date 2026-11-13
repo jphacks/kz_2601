@@ -28,6 +28,9 @@ interface DevMenuHost {
 
     /** 消す前の確認を出す(すぐには消さない)。 */
     fun askWipe()
+
+    /** 下に短く知らせる。 */
+    fun message(text: String) = Unit
 }
 
 /**
@@ -38,6 +41,8 @@ object DevMenu {
     /** 項目を作るところ。足す時は 1 行ずつ・名前順。 */
     private val providers: List<(DevMenuHost) -> List<DevMenuItem>> = listOf(
         DevEnvironmentItems::items,
+        DevOnboardingItems::items,
+        DevPowerItems::items,
     )
 
     fun isEnabled(config: DesktopApiConfig, packaged: Boolean = isPackaged()): Boolean =

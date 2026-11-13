@@ -29,6 +29,8 @@ class HardcodedJapaneseTest {
         "$pkg/DataLeaves.kt" to setOf("全員", "参加者", "件数", "%sの合計", "%sの平均", "%sの最小", "%sの最大"),
         // 追加のキーの聞き取りの辞書(表示しない)
         "$pkg/Keyboard.kt" to setOf("追加", "新規", "作る"),
+        // 生成の要約の位置の言葉の辞書(表示しない。Android の voice/stage/PositionHint.kt と同じ語・#2983)
+        "$pkg/voice/PositionHint.kt" to setOf("右下", "左下", "右上", "左上", "一番下", "一番上", "下部", "上部", "中央", "右", "左"),
         // METAMON_MOCK の本の検索の見本(相手のデータ)
         "$pkg/Actions.kt" to setOf("見本の本", "見本 太郎", "見本書房", "モック"),
         // 既定値はテスト用。画面は strings から渡す

@@ -41,6 +41,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import jp.kz2601.metamon.desktop.debug.DevMenu
 import jp.kz2601.metamon.desktop.debug.DevMenuHost
+import jp.kz2601.metamon.desktop.chat.AiConsentDialog
+import jp.kz2601.metamon.desktop.chat.AiConsentGate
 import jp.kz2601.metamon.desktop.chat.ChatBuild
 import jp.kz2601.metamon.desktop.chat.ChatOverlay
 import jp.kz2601.metamon.desktop.chat.ChatSession
@@ -55,6 +57,7 @@ import jp.kz2601.metamon.desktop.gridedit.GridEditLayer
 import jp.kz2601.metamon.desktop.gridedit.gridEditDraft
 import jp.kz2601.metamon.desktop.usage.UsageDialog
 import jp.kz2601.metamon.desktop.usage.UsageLoader
+import jp.kz2601.metamon.desktop.store.SignOutChoice
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.desktop.io.ExportClipboard
@@ -70,6 +73,7 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.desktop.onboarding.OnboardingDialog
 import jp.kz2601.metamon.services.PlanUsageSource
+import jp.kz2601.metamon.services.consent.AiConsentStore
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -344,14 +348,36 @@ class DesktopKeyboard(
     /** 会話の ready・案から作る(作る流れは #2163)。 */
     var buildFromChat: (ChatBuild) -> Unit = {}
 
+    /** この起動で作ったアプリ(#2163)。(id, アプリ名)。パレットのアプリの一覧に足す。 */
+    var createdApps: () -> List<Pair<String, String>> = { emptyList() }
+
+    /** AI へ送ることの同意(#2160)。null なら確かめない(テスト・同意の要らない入口)。 */
+    var aiConsent: AiConsentStore? = null
+
     /** 開いている会話。 */
     var chat by mutableStateOf<ChatSession?>(null)
 
-    /** 会話を開く。接続先が無ければ false。 */
+    /** 会話の前に同意の説明を出している(#2160)。 */
+    var consentOpen by mutableStateOf(false)
+
+    /** 会話を開く。接続先が無ければ false。同意がまだ無ければ先に説明を出す(同意したら会話を開く)。 */
     fun openChat(): Boolean {
         val make = newChat ?: return false
-        if (chat == null) chat = make()
+        if (chat != null) return true
+        if (AiConsentGate.needsPrompt(aiConsent)) {
+            consentOpen = true
+            return true
+        }
+        chat = make()
         return true
+    }
+
+    /** 同意の説明で「同意して使う」/「あとで」。同意したら会話を開く。 */
+    fun answerConsent(agreed: Boolean) {
+        consentOpen = false
+        val store = aiConsent
+        if (agreed) store?.grant() else store?.markPrompted()
+        if (agreed) openChat() else runCatching { root.requestFocus() }
     }
 
     /** 消す前の確認を出している。 */
@@ -370,9 +396,24 @@ class DesktopKeyboard(
         override val canWipe: Boolean get() = wipeLocalData != null
         override fun showInfo(title: String, lines: List<String>) { devInfo = title to lines }
         override fun askWipe() { wipeConfirmOpen = true }
+        override fun message(text: String) { session.message = text }
     }
     /** アカウントの画面(AccountScreen.kt・#2374・#2505)。パレット・トレイから開く。開いている間のキーは画面が自分で受ける。 */
     var accountOpen by mutableStateOf(false)
+
+    /** サインアウトの確認(#2375)を出している。 */
+    var signOutConfirmOpen by mutableStateOf(false)
+
+    /** 確認で選んだ(#2375)。消す・残すならサインアウトして未サインインに戻す(アカウントの画面は開いたまま)。 */
+    suspend fun chooseSignOut(choice: SignOutChoice) {
+        signOutConfirmOpen = false
+        val wipe = wipeLocalData ?: return
+        if (DesktopAccount.signOut(choice, wipe) && choice == SignOutChoice.WIPE) session.message = KeyboardText.WIPE_DONE
+    }
+
+    /** アカウントの画面のボタン。サインアウトは確認を出す(消す口が無ければ差し込まれた物のまま)。 */
+    fun accountActions(base: AccountActions = DesktopAccount.actions): AccountActions =
+        if (wipeLocalData == null) base else base.copy(signOut = { signOutConfirmOpen = true })
 
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
@@ -436,7 +477,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null || chat != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null || chat != null || consentOpen) return false // パレット・一覧・確認・並びの編集が自分で受ける
         // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
         if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
@@ -551,7 +592,7 @@ class DesktopKeyboard(
         }
         // アプリは別のウィンドウで開く(開いていればそれを前に出す)
         val apps = openApp?.let { open ->
-            BundledApps.all().map { (id, name) ->
+            (BundledApps.all() + createdApps()).map { (id, name) ->
                 PaletteCommand("app:$id", name, PaletteCommand.Kind.APP, keywords = listOf(id, KeyboardText.NEW_WINDOW)) { open(id) }
             }
         }.orEmpty() + serverApps()
@@ -647,7 +688,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null || chat != null) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null || chat != null || consentOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -757,12 +798,15 @@ class DesktopKeyboard(
                 runCatching { root.requestFocus() }
             }
         }
+        aiConsent?.takeIf { consentOpen }?.let { store ->
+            AiConsentDialog(store, onAgree = { answerConsent(true) }, onLater = { answerConsent(false) })
+        }
         chat?.let { c ->
             val close = {
                 chat = null
                 runCatching { root.requestFocus() }
             }
-            ChatOverlay(c, onBuild = { b -> close(); buildFromChat(b) }, onClose = { close() })
+            ChatOverlay(c, onBuild = { b -> close(); buildFromChat(b.copy(appId = c.appId)) }, onClose = { close() })
         }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()
@@ -779,9 +823,15 @@ class DesktopKeyboard(
             )
         }
         if (accountOpen) {
-            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }) {
+            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }, actions = accountActions()) {
                 accountOpen = false
                 runCatching { root.requestFocus() }
+            }
+        }
+        if (signOutConfirmOpen) {
+            val scope = rememberCoroutineScope()
+            SignOutConfirmDialog(anonymous = (DesktopAccount.state as? AccountState.SignedIn)?.anonymous == true) { choice ->
+                scope.launch { chooseSignOut(choice) }
             }
         }
     }
@@ -800,6 +850,8 @@ fun rememberDesktopKeyboard(
     saveLayout: ((GridEditDraft) -> Unit)? = null,
     newChat: (() -> ChatSession)? = null,
     buildFromChat: (ChatBuild) -> Unit = {},
+    aiConsent: AiConsentStore? = null,
+    createdApps: () -> List<Pair<String, String>> = { emptyList() },
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
@@ -810,4 +862,6 @@ fun rememberDesktopKeyboard(
     it.saveLayout = saveLayout
     it.newChat = newChat
     it.buildFromChat = buildFromChat
+    it.aiConsent = aiConsent
+    it.createdApps = createdApps
 }
