@@ -149,10 +149,7 @@ struct MacConnectedServicesSection: View {
         }
     }
 
-    static var paidFeature: PaidFeature {
-        PaidFeature(id: "externalServices", title: L10n.tr("つないだサービス"),
-                    reason: L10n.tr("外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"))
-    }
+    static var paidFeature: PaidFeature { ExtDenialCopy.externalServicesFeature }
 }
 
 /// 行の状態の文言(iOS の `ConnectedServicesCopy` と同じ)

@@ -5,8 +5,11 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 // In-app notice (#333): one line shown as a dismissible banner on iOS during
@@ -35,6 +38,27 @@ type Notice struct {
 	// Shown only to builds (CFBundleVersion) in [MinIOSBuild, MaxIOSBuild]; 0 = open end.
 	MinIOSBuild int `json:"minIOSBuild,omitempty"`
 	MaxIOSBuild int `json:"maxIOSBuild,omitempty"`
+	// Platforms limits the notice to these OSes (X-Client-Platform, #2964).
+	// Empty = every OS (today's behaviour). It is applied on the server and not
+	// sent to clients.
+	Platforms []string `json:"platforms,omitempty"`
+}
+
+// noticePlatforms is the vocabulary allowed in Notice.Platforms.
+var noticePlatforms = []string{httpx.PlatformIOS, httpx.PlatformAndroid, httpx.PlatformMacOS, httpx.PlatformWindows, httpx.PlatformLinux}
+
+// forPlatform returns the notice to serve to the (normalised) platform, or nil
+// when it targets other OSes. The returned copy has no Platforms.
+func (n *Notice) forPlatform(platform string) *Notice {
+	if n == nil {
+		return nil
+	}
+	if len(n.Platforms) > 0 && !slices.Contains(n.Platforms, platform) {
+		return nil
+	}
+	c := *n
+	c.Platforms = nil
+	return &c
 }
 
 // NoticeText holds the line per language. iOS falls back to ja.
@@ -89,6 +113,19 @@ func (n *Notice) normalize() string {
 			return "linkUrl must be https"
 		}
 	}
+	seen := map[string]bool{}
+	var plats []string
+	for _, p := range n.Platforms {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if !slices.Contains(noticePlatforms, p) {
+			return "platforms must be one of " + strings.Join(noticePlatforms, ", ")
+		}
+		if !seen[p] {
+			seen[p] = true
+			plats = append(plats, p)
+		}
+	}
+	n.Platforms = plats
 	if n.MinIOSBuild < 0 || n.MaxIOSBuild < 0 {
 		return "build bounds must not be negative"
 	}
