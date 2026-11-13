@@ -343,7 +343,7 @@ Cloud Run: ai は `min-instances=1`(コールドスタート回避・デモ中�
 ### ローカル
 
 ```sh
-# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.24
+# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.26(版は backend/go.mod の go 行を見る)
 cd backend
 make emulator        # Firestore :8089(CI と同じ gcloud のエミュレータ・demo-kz2601)
 make test-emulator   # エミュレータ試験を CI と同じ判定で回す
