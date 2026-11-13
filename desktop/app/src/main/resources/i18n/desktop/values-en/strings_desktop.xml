@@ -89,6 +89,7 @@
     <string name="desktop_keys_preview">Preview photo</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_language_restart_note">The language change takes effect the next time you start the app</string>
     <string name="desktop_licenses">Third-party notices</string>
     <string name="desktop_licenses_browse_failed">Couldn\'t open the browser. %1$s</string>
     <string name="desktop_list_empty">Nothing yet</string>

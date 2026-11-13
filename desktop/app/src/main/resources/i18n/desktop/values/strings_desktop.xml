@@ -90,6 +90,7 @@
     <string name="desktop_keys_preview">写真を大きく見る</string>
     <string name="desktop_keys_save">保存</string>
     <string name="desktop_keys_search">検索</string>
+    <string name="desktop_language_restart_note">言語の変更は次の起動から反映されます</string>
     <string name="desktop_licenses">サードパーティのライセンス</string>
     <string name="desktop_licenses_browse_failed">ブラウザで開けませんでした。%1$s</string>
     <string name="desktop_list_empty">まだありません</string>
