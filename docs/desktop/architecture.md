@@ -14,6 +14,7 @@
 - [適合テストと許可リスト](#適合テストと許可リスト)
 - [CI が回る条件](#ci-が回る条件)
 - [早見表: Android のこれを直したら](#早見表-android-のこれを直したら)
+- [OS に頼る口](#os-に頼る口)
 
 ## 全体
 
@@ -112,3 +113,16 @@ Gradle のビルドは Android とは別(`desktop/settings.gradle.kts`)。Androi
 | `android/gradle/libs.versions.toml` | Kotlin・ライブラリの版が変わる | 同上 |
 | `docs/dsl/conformance`・`docs/dsl/examples` | 適合テストの期待値・同梱の例が変わる | 同上 |
 | `android/app` のコード | 影響しない | 要らない |
+
+## OS に頼る口
+
+OS ごとに実装が分かれる所は、インターフェースを 1 つ置いて OS ごとの実体を後ろに付ける。コードは `desktop/app/src/main/kotlin/jp/kz2601/metamon/desktop/` の下。**未** は、まだ入っていない物(Issue の番号だけ書く)。
+
+| 口 | インターフェース | Windows | Linux | 使えない時の落ち方 |
+|---|---|---|---|---|
+| 電池・充電・省電力 | `power/DevicePowerSource` | `power/WindowsPowerReader`(`GetSystemPowerStatus`) | `power/LinuxSysfsPowerReader`(`/sys/class/power_supply`・`/sys/firmware/acpi/platform_profile`) | 読めない・電池が無い時は「不明」(`DevicePowerState.Unknown`)を返す。macOS も不明。60 秒ごとに読み直し、変わった時だけ流す。`METAMON_MOCK=1` は偽物。画面・式にはまだつないでいない |
+| 通知を出す | `notify/Notifier`(予約と取り消しは `Actions.kt` の `Notifier.Tray`) | トレイの吹き出し(`notify/TrayNotifier`)。トースト: 未(#2186) | トレイの吹き出し(`notify/TrayNotifier`)。D-Bus: 未(#2185) | `available` が false(画面が無い・トレイが使えない)なら予約は「使えない」の文言を返し、`show` は何も出さず false。予約はアプリが起動している間だけ(OS には預けない) |
+| 認証情報の置き場 | `auth/TokenStore` | 資格情報マネージャー: 未(#2152) | Secret Service: 未(#2153) | 今はメモリだけの `InMemoryTokenStore`(再起動で消える)。平文のファイルには書かない。サインインはまだ画面につないでいない |
+| どこからでも話しかけるキー | 未(#2201) | 未(#2201) | 未(#2201) | まだ無い。ショートカットはウィンドウの中だけ(`Keyboard.kt`・`CommandPalette.kt`) |
+
+- Mac 版は Swift(`ios/`)で別に作る。上の表の「不明」は、デスクトップ版を macOS で動かした時の落ち方(`DevicePowerSources.make` が OS 名で分ける)。
