@@ -318,7 +318,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	if p.Billing == BillingPaid && s.Coins != nil {
 		billing = "coins"
 		hold, err = s.Coins.Reserve(ctx, coins.ReserveRequest{UID: who, Anonymous: anon, Op: coins.OpExt, AppID: r.AppID,
-			RequestID: r.RequestID, Kind: p.ID, Max: s.cfg.Reserve[p.ID]})
+			RequestID: r.RequestID, Kind: p.ID, Provider: p.ID, Max: s.cfg.Reserve[p.ID]})
 		if err != nil {
 			refundRuns()
 			if errors.Is(err, coins.ErrUnknownOp) {
@@ -418,6 +418,9 @@ func (s *Service) check(r CallRequest) (Provider, OpSpec, error) {
 	}
 	if !s.Enabled(p.ID) {
 		return p, spec, ErrUnavailable
+	}
+	if s.ops[p.ID][spec.Name] == nil {
+		return p, spec, ErrUnavailable // an op switched off on its own (openWeather nowcast)
 	}
 	if p.Billing == BillingPaid && s.Coins != nil && s.Coins.Mode() == coins.ModeEnforce && s.cfg.Reserve[p.ID] <= 0 {
 		return p, spec, ErrUnavailable // would run free under enforce (like coins.CheckReserves)
