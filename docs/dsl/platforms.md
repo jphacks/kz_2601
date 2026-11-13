@@ -181,6 +181,7 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 | `field.encrypted` | 使える | 使える |  |  | 送らない |
 | `openUrlButton.app` | 使える | 使える |  |  |  |
 | `fieldHealth` | 使える | 使えない(`disabledFeatures`) |  |  | 外す |
+| `nearbyShare.passby` | 使える | 使えない(`disabledFeatures`) |  |  |  |
 | `cameraCapture` | 使える | 使える |  |  | 外す |
 | `sharedData` | 使える | 使える |  |  | 外す |
 <!-- platform-table:end -->
