@@ -60,6 +60,8 @@ struct MacCommands: Commands {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
         }
 
+        pasteboardCommands
+
         // サイドバーの検索欄に入る(#1282)
         CommandGroup(after: .pasteboard) {
             Divider()
@@ -140,6 +142,32 @@ struct MacCommands: Commands {
             #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
             Button("フィードバックを送る…") { MacFeedbackCenter.shared.open(openWindow) } // #983
             #endif
+        }
+    }
+
+    /// 編集のカット・コピー・ペースト(#2251)。ペーストだけ、入力欄にフォーカスが無くフォームが開いていてクリップボードに記録があれば
+    /// 記録の貼り付けにする(別の生成アプリの記録の合う項目を入れる・保存はしない)。それ以外は今まで通りレスポンダチェーンに送る
+    @CommandsBuilder private var pasteboardCommands: some Commands {
+        CommandGroup(replacing: .pasteboard) {
+            Button("カット") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }
+                .keyboardShortcut("x", modifiers: .command)
+            Button("コピー") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }
+                .keyboardShortcut("c", modifiers: .command)
+            Button("ペースト") {
+                if canUseCanvas, let runtime, runtime.pastesRecord(textInputActive: MacRecordPaste.textInputActive) {
+                    runtime.pasteRecordFromMenu()
+                } else {
+                    NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+                }
+            }
+            .keyboardShortcut("v", modifiers: .command)
+            Button("ペーストしてスタイルを合わせる") {
+                NSApp.sendAction(#selector(NSTextView.pasteAsPlainText(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("v", modifiers: [.command, .option, .shift])
+            Button("削除") { NSApp.sendAction(#selector(NSText.delete(_:)), to: nil, from: nil) }
+            Button("すべてを選択") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
+                .keyboardShortcut("a", modifiers: .command)
         }
     }
 

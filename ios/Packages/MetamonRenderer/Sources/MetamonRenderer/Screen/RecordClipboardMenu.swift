@@ -21,7 +21,7 @@ struct RecordClipboardMenu: View {
     }
 
     static func canPaste(form: FormDraft, hasRecord: Bool) -> Bool {
-        hasRecord && !form.isReadOnly && !RecordClipboard.copyableFields(of: form.entity).isEmpty
+        RecordPasteboard.canPaste(into: form, hasRecord: hasRecord)
     }
 
     var body: some View {

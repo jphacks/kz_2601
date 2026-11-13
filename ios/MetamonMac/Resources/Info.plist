@@ -83,6 +83,23 @@
 		<string>jp.kz2601.metamon.view</string>
 	</array>
 
+	<!-- 記録のコピー・貼り付け(#2251)のクリップボードの型。iOS の Info.plist・RecordClipboard.typeIdentifier と同じ -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>app.tailorit.record</string>
+			<key>UTTypeDescription</key>
+			<string>Tailor It Record</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+	</array>
+
 	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
 	<key>MetamonAIBaseURL</key>
 	<string>$(METAMON_AI_BASE_URL)</string>
