@@ -32,11 +32,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Screen
@@ -73,9 +77,16 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import jp.kz2601.metamon.desktop.crash.Diagnostics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.io.ExportClipboard
 import jp.kz2601.metamon.desktop.os.NotificationsOffBar
+import jp.kz2601.metamon.desktop.store.RetentionPromptDialog
+import jp.kz2601.metamon.desktop.store.RetentionPrompts
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.whisper.WhisperEngine
+import jp.kz2601.metamon.desktop.onboarding.OnboardingStore
+import kotlinx.coroutines.launch
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -113,6 +124,14 @@ fun DesktopApp(
     autoNav: AutoNavPlan? = null,
     /** アプリの id。Windows で通知がオフの時の帯を閉じた覚えに使う。null なら帯を出さない。 */
     appId: String? = null,
+    /** 初回の流れを見たかの保存(#3201)。null なら見たことを残さない(テスト・開発)。 */
+    onboarding: OnboardingStore? = null,
+    /** 開いた時に初回の流れを出す(起動時の最初のウィンドウだけ)。 */
+    showOnboardingAtLaunch: Boolean = false,
+    /** パレットの「並びを直す」の保存(#3207)。null なら出さない。 */
+    onSaveLayout: ((jp.kz2601.metamon.desktop.gridedit.GridEditDraft) -> Unit)? = null,
+    /** Windows の「送る」で届いたファイル(#3209)。ドラッグ & ドロップと同じ振り分けに渡す。 */
+    sendTo: jp.kz2601.metamon.desktop.platform.SendToInbox? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -131,6 +150,16 @@ fun DesktopApp(
     val focused = LocalWindowInfo.current.isWindowFocused
     val loaded = !session.records.loading
     LaunchedEffect(focused, loaded, session.saves) { if (focused && loaded) session.purgeExpired() }
+    // 保存期間のある entity を初めて開いた時の確認。確認するまで上の purgeExpired は消さない。前に来ているウィンドウだけが聞く
+    val retentionScope = rememberCoroutineScope()
+    var retentionTick by remember { mutableIntStateOf(0) }
+    val retentionRunner = session.retention
+    val retentionAppId = session.records.persistence?.appId
+    val retentionPrompt = if (focused && loaded && retentionRunner != null && retentionAppId != null) {
+        remember(retentionTick, session.store) { RetentionPrompts.pending(retentionAppId, retentionRunner, session.models) }
+    } else {
+        null
+    }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
@@ -144,11 +173,35 @@ fun DesktopApp(
     LaunchedEffect(openWithRevision) {
         if (openWithRevision > 0 && isActive()) OpenWithInbox.take().takeIf { it.isNotEmpty() }?.let { io.dropFiles(it, topComponents(), topDraft()) }
     }
+    // 「送る」で届いたファイルも落とした物と同じ所へ(#3209)
+    if (sendTo != null) {
+        LaunchedEffect(sendTo.requests) {
+            val files = sendTo.take(windowId, isActive)
+            if (files.isNotEmpty()) io.dropFiles(files, topComponents(), topDraft())
+        }
+    }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, usage = session.persistence?.usage, saveLayout = onSaveLayout)
+    // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
+    keyboard.onOnboardingFinished = { onboarding?.markSeen() }
+    LaunchedEffect(Unit) { if (showOnboardingAtLaunch && onboarding?.hasSeen != true) keyboard.onboardingOpen = true }
+    // 問い合わせ用の「診断の情報をコピー」(#2200)。明暗は今の配色から、トレイは Main から
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val traySupported = LocalTray.current?.traySupported
+    keyboard.copyDiagnostics = {
+        val text = Diagnostics.format(
+            Diagnostics.collect(
+                dark = dark,
+                traySupported = traySupported,
+                pending = session.persistence?.pending,
+                voiceLibrary = { WhisperEngine.isSupported },
+            ),
+        )
+        session.message = Strings[if (ExportClipboard.put(text)) "desktop_diagnostics_copied" else "desktop_diagnostics_copy_failed"]
+    }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない
@@ -165,7 +218,9 @@ fun DesktopApp(
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
                 appId?.let { NotificationsOffBar(it, dsl) }
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord, isActive) }
+                // 一覧・表の行を消した直後だけ「削除しました・元に戻す」(#3351)
+                RecordUndoBar(session)
                 // 送り待ちがある時だけ小さく出す(#1887)
                 session.persistence?.pending?.takeIf { it > 0 }?.let { n ->
                     Text(
@@ -206,13 +261,28 @@ fun DesktopApp(
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
                     val pane = dsl.screen(top.screen)?.title?.ifEmpty { null } ?: dsl.app.name
                     Surface(m.then(keyboard.modalModifier).semantics { paneTitle = pane; isTraversalGroup = true }, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
-                        ScreenView(dsl, session, top, io, dispatch, openPrint, onOpenRecord)
+                        ScreenView(dsl, session, top, io, dispatch, openPrint, onOpenRecord, isActive)
                     }
                 }
             }
             keyboard.Overlay()
         }
     }
+    }
+
+    if (retentionPrompt != null && retentionRunner != null) {
+        RetentionPromptDialog(
+            retentionPrompt,
+            onConfirm = {
+                RetentionPrompts.confirm(retentionRunner, retentionPrompt)
+                retentionTick++
+                retentionScope.launch { session.purgeExpired() }
+            },
+            onLater = {
+                RetentionPrompts.defer(retentionPrompt)
+                retentionTick++
+            },
+        )
     }
 
     printing?.let { doc -> PrintPreview(doc, onDismiss = { printing = null }, onResult = { io.notice = it }) }
@@ -257,6 +327,7 @@ private fun ScreenView(
     dispatch: (Action, ActionContext) -> Unit,
     print: () -> Unit,
     openRecord: ((String, String) -> Unit)?,
+    isActive: () -> Boolean = { true },
 ) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
@@ -275,6 +346,12 @@ private fun ScreenView(
         dragRows = io::rowsTransferable,
         openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
         marks = session.persistence?.marks,
+        // 共有の会話は送り先がある時だけ開いている間取り直す(#2214)。サインインの uid はまだ無いので null
+        chat = ChatEnv(
+            send = { e, d -> session.postMessage(e, d) },
+            poll = session.persistence?.takeIf { it.isLive }?.let { p -> { e: String -> ChatSync.pull(PersistenceChatRemote(p), session.records, e, selfUid = null) } },
+            isActive = isActive,
+        ),
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {
@@ -302,6 +379,9 @@ private fun ScreenView(
 private val GAP = 8.dp
 private val INSET = 16.dp
 
+/** Container 内グリッドの 1 行(文字の倍率を掛けて使う)。 */
+private val LOCAL_ROW = 40.dp
+
 /**
  * 画面グリッド(iOS の GridScreenLayout・Android の screen/GridScreenLayout.kt)。
  * area のある部品は 6 列 × 行の矩形に絶対配置、area の無い部品はその下に全幅で積む。フォーム画面は段ごとに中身の高さで積む。
@@ -310,7 +390,7 @@ private val INSET = 16.dp
 @Composable
 private fun GridScreen(screen: Screen, s: ScreenScope) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val m = DesktopGridMetrics.resolve(maxWidth.value, maxHeight.value, INSET.value)
+        val m = DesktopGridMetrics.resolve(maxWidth.value, maxHeight.value, INSET.value, LocalDensity.current.fontScale)
         val cellW = m.cellW.dp
         val cellH = m.cellH.dp
         val placement = screen.gridPlacement
@@ -377,7 +457,7 @@ private fun LocalGridOrChildren(c: Component, s: ScreenScope, modifier: Modifier
         val cellW = maxWidth / GridArea.COLUMNS
         Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
             c.title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-            FormBands(local, cellW, 40.dp, s)
+            FormBands(local, cellW, LOCAL_ROW * LocalDensity.current.fontScale, s)
         }
     }
 }
