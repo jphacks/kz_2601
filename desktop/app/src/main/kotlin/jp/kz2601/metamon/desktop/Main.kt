@@ -32,10 +32,11 @@ import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.consent.DesktopAiButtonMetrics
 import jp.kz2601.metamon.desktop.consent.LocalAiButtonMetrics
 import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
-import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
 import jp.kz2601.metamon.desktop.debug.DevOnboardingItems
 import jp.kz2601.metamon.desktop.debug.SeenFlagsOnboardingReplay
+import jp.kz2601.metamon.desktop.hotkey.HotkeyRunner
+import jp.kz2601.metamon.desktop.hotkey.HotkeySettings
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
@@ -68,7 +69,6 @@ import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 import java.util.prefs.Preferences
 import javax.swing.SwingUtilities
 
@@ -256,19 +256,23 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     }
     DesktopTray(tray)
     // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
+    // 設定の画面でキーを変えたら HotkeyRunner.restartShared で登録し直す(#2204)
     DisposableEffect(tray) {
-        val hotkey = AtomicReference<GlobalHotkey?>(null)
-        val job = loadScope.launch {
-            hotkey.set(GlobalHotkeys.startFromSettings(
+        val runner = HotkeyRunner { raw ->
+            GlobalHotkeys.startFromSettings(
+                raw = raw,
                 voiceEnabled = { VoiceFlag.enabled() },
                 bringToFront = { tray.open() },
                 notify = Notifier.Tray::notify,
                 post = { SwingUtilities.invokeLater(it) },
-            ))
+            )
         }
+        HotkeyRunner.shared = runner
+        val job = loadScope.launch { runner.restart(HotkeySettings.raw()) }
         onDispose {
             job.cancel()
-            hotkey.getAndSet(null)?.close()
+            HotkeyRunner.shared = null
+            runner.close()
         }
     }
     // 版の確認(#2377): 起動時と 6 時間ごと。MOCK(通信しない)では読まない
