@@ -126,6 +126,27 @@ func TestIngestTestFlight(t *testing.T) {
 	}
 }
 
+func TestIngestGooglePlay(t *testing.T) {
+	ta := newTestApp(t, env{ingest.EnvAppStoreOn: "on"})
+	ta.appStore = fakeFetcher{src: loop.SourceStoreReview}
+	ta.googlePlay = fakeFetcher{src: loop.SourceGooglePlayReview, raws: []ingest.Raw{{Source: loop.SourceGooglePlayReview, SourceID: "gp1", Text: "同期が遅い", CreatedAt: time.Now()}}}
+	if out := ta.must(t, "ingest"); strings.Contains(out, "google_play_review") { // off by default
+		t.Fatalf("google play ran while off: %s", out)
+	}
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "google_play_review"}); err == nil {
+		t.Fatal("explicit source while off should fail")
+	}
+	ta.env[ingest.EnvGooglePlayOn] = "on"
+	if out := ta.must(t, "ingest", "-source", "google_play_review"); !strings.Contains(out, "ingest google_play_review: fetched 1, new 1 (held from AI 1)") { // not in LOOP_AI_SOURCES by default
+		t.Fatalf("out:\n%s", out)
+	}
+	// on without a package fails loudly instead of skipping
+	ta.googlePlay = nil
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "google_play_review"}); err == nil || !strings.Contains(err.Error(), ingest.EnvGooglePlayPackage) {
+		t.Fatalf("missing package: %v", err)
+	}
+}
+
 func TestIngestGenFailure(t *testing.T) {
 	ta := newTestApp(t, env{})
 	// hand-written export: 20 ai.generate lines in the last day, 6 failed
