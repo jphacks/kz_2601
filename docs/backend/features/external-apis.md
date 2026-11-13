@@ -317,6 +317,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 - 数えるのは provider を呼んだ時だけ。キャッシュから返した時は数えない。トークンが無い・コインが足りない・同じ request id・枠で止まった時(provider を呼ばなかった)は戻す。provider が失敗した時(5xx・時間切れ・429)は呼んだので戻さない。
 - op が provider を呼ぶ前に引数を拒んだ時(`ErrBadArgs`)は戻す。provider を呼んだ後の 400 `bad_request`(無い id・無いチャンネル・無い列など)は呼んだので戻さない。
 - 文書は `rateLimits/{APP_ENV}_{日 or 日T時}_ext_{provider}_{uid_… / app_… / global}`(TTL `expireAt`)。全体の数えは `ratelimit.GlobalShards` に分ける。Firestore が落ちた時は台のメモリで数える(開けっぱなしにしない)。
+- 今月の回数(#2144): 上の枠を通った呼び出しは、`rateLimits/{APP_ENV}_{年-月}_ext_{provider}_uid_{uid}`(scope `user_monthly`・止めない・TTL は月末の 1 日後)にも 1 足す。枠と同じ 1 回の取引の最後の数えとして足す(Limit は MaxInt32・枠と一緒に足すか足さないか・戻す時は一緒に戻す・保存先が落ちた時は枠と一緒にメモリで数える)。取引が同じなので、そろって書く文書の TTL も月末の 1 日後になる。`GET /v1/me/connections` は各つなぎの `monthCalls` として、つなぎの数だけの文書を 1 回のまとめ読みで返す(書かない)。読めない時は `monthCalls` を省き、一覧は返す。上限の値は返さない(#1882)。
 - runner の答えは `{"reason": "rate_limited", "scope": "<scope>", "retryAfterSec": <秒>}`(429)。appconfig は 429 `rate_limited`・`Retry-After`・`details`(`scope`・`provider`・`retryAfterSec`)にする。
 - 偽の provider は `fail=429` で 1 分止めを試せる。
 - appconfig の `EXT_USER_PER_HOUR`(provider をまたいだ 1 人 1 時間)はそのまま残る。
@@ -329,7 +330,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | state / PKCE | `oauthStates/{state}`: uid・provider・`code_verifier`・scope・`expireAt`(10 分)・`createdAt`。1 回だけ使える(取り出しと削除を 1 つのトランザクションで) |
 
 - **暗号化**: `Sealer` が暗号化する。本番は Cloud KMS の対称鍵(`KMSSealer`・`EXT_TOKEN_KMS_KEY`)で、鍵の encrypt / decrypt は runner の SA だけに渡す。uid と provider を追加の認証データにするので、別の人・別の provider の文書に写しても開けない。エミュレータでは起動ごとの使い捨ての鍵(`LocalSealer`)。鍵が無い時は OAuth の provider が動かない(暗号化しないで保存する道は無い)。
-- **クライアントから見えない**: Firestore のルールで許していない(サーバーだけ)。`GET /v1/me/connections` には provider・状態・scope・日付だけを返す(`ConnectionView`)。トークンの型(`Token`・`Secrets`)はログ・`%v`・JSON に出すと `[redacted]` になる。
+- **クライアントから見えない**: Firestore のルールで許していない(サーバーだけ)。`GET /v1/me/connections` には provider・状態・scope・日付・今月の回数だけを返す(`ConnectionView`)。トークンの型(`Token`・`Secrets`)はログ・`%v`・JSON に出すと `[redacted]` になる。
 - **切る(取り消し)**: provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消して `revoked` の印だけ残す(決定 7)。印はその時の文書に 1 つのトランザクションで書く。印は 90 日で消える。切る時はトークンの更新と同じ鍵(uid + provider・台ごと)を取り、更新の途中なら終わるのを待って更新後のトークンを取り消す。取り消しの前の更新で provider がリフレッシュトークンを拒んだ時(`ErrInvalidGrant`)は保存を 1 回読み直し、別の台が入れ替えていれば新しい方を取り消す。同じなら取り消し済みとする。
 - **切った後に戻った同意**: callback は、state を作った時刻(`createdAt`)より後の `revokedAt` がある時は保存しない(`ErrCutSinceStart`・受け取ったトークンは provider 側でも取り消す)。切った後に始めた接続はふつうに保存する。
 - **Google は 1 つの許可**: カレンダー・ToDo・スプレッドシートは同じ OAuth クライアント(`Provider.ClientFrom`)で `include_granted_scopes=true` なので、Google 側では 1 つの許可にまとまる。どれか 1 つのトークンを取り消すと全部が切れる。だから 1 つを切る時は、同じクライアントのほかの provider がまだつながっていれば Google の取り消しの口を呼ばない(トークンはすぐ消す)。最後の 1 つを切る時に取り消す。引き換え: ほかがつながっている間は、切った provider の scope も Google のアカウントの「接続したアプリ」に残る(こちらはトークンを持たない)。`EXT_GOOGLE_TASKS_CLIENT_ID` などで別のクライアントにした時も、同じグループとして扱う(取り消しが最後まで遅れるだけ)。接続の一覧が読めない時も取り消さない(ほかを壊さない方を取る)。
