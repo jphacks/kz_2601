@@ -10,10 +10,12 @@ PB=/usr/libexec/PlistBuddy
 # 審査用ビルドで消すキー(1 行 1 つ・名前順)。Info.plist と訳(*.lproj/InfoPlist.strings)の両方をこの一覧で消す。
 # HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour・UWB の距離 #425)/ モーション(healthStat の歩数計・sensorValue の気圧計)/ 共有リンクの URL スキーム
 # / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)
+# / Bluetooth の心拍ベルト(#2237。使う部品がまだ無い。コードも APP_STORE_REVIEW で外す)
 # / 端末のカレンダー・リマインダーを読む(#1987。使う部品がまだ無い。説明文が無いと LiveDeviceCalendar は許可を求めず restricted を返す)
 REVIEW_REMOVED_KEYS="
 CFBundleURLTypes
 NSAlarmKitUsageDescription
+NSBluetoothAlwaysUsageDescription
 NSBonjourServices
 NSCalendarsFullAccessUsageDescription
 NSHealthClinicalHealthRecordsShareUsageDescription

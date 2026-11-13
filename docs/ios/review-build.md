@@ -30,6 +30,7 @@
 | 通報・ブロック(#321) | `ModerationClient` / `HTTPSharingClient+Moderation` / `AppRuntime+Moderation`(`ModerationDialogs`・設定の「ブロック中のユーザー」)。Renderer の長押しメニュー(`ModerationMenuItems`)は残るが、ホストが `canReport` を実装しないので出ない | 共有と一緒に外す(共有が無ければ通報する対象も無い)。共有を戻す時に一緒に戻る |
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | 端末のカレンダー・リマインダーを読む口(`DeviceCalendarSource`・#1987) | `NSCalendarsFullAccessUsageDescription` / `NSRemindersFullAccessUsageDescription`(`strip-review-plist.sh`)。口のコードは残るが、説明文の無いビルドでは `LiveDeviceCalendar` が許可を求めずに `.restricted` を返す。`addToCalendar`(OS の画面で入れる)は残る | 使う部品がまだ無いため。部品を足す時に残すかを決め直す |
+| Bluetooth の心拍ベルトを読む口(`BLEHeartRate`・#2237) | `BLEHeartRate`(`#if !APP_STORE_REVIEW`)、`NSBluetoothAlwaysUsageDescription`(`strip-review-plist.sh`)。測定値のバイト列を読む `HeartRateMeasurement` は残る | 使う部品がまだ無いため。部品を足す時に残すかを決め直す |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |
 | 止めるまで鳴るアラーム(`Notification.alarm`・AlarmKit) | `AlarmKitAlarms`(`AlarmBackend.make()` が nil を返す)、`NSAlarmKitUsageDescription`。`alarm: true` の通知は同じ時刻の普通のローカル通知で届く(DSL・AI はそのまま) | 新しい許可の画面が増え、審査メモに説明が要るため。最初の版では外し、戻す時は審査メモ(`docs/store/app-review-notes.md`)に「目覚ましを作った時だけ許可を求める」説明を足してから出す |
