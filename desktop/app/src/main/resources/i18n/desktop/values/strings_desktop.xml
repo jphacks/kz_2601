@@ -6,6 +6,14 @@
     <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
     <string name="desktop_already_running">Tailor It はもう起動しています</string>
+    <string name="desktop_applimit_body">アプリが %1$d 個あり、上限は %2$d 個です。置き換えるアプリを選ぶと、削除か抜けるをしたあとで、同じ依頼でもう一度作ります。</string>
+    <string name="desktop_applimit_confirm_delete">「%1$s」を削除しますか?</string>
+    <string name="desktop_applimit_confirm_leave">「%1$s」から抜けますか?</string>
+    <string name="desktop_applimit_delete_message">このアプリと中の記録が消えます。元に戻せません。</string>
+    <string name="desktop_applimit_empty">置き換えられるアプリが見つかりません。</string>
+    <string name="desktop_applimit_last_opened">最後に開いた日 %1$s</string>
+    <string name="desktop_applimit_never_opened">開いた記録なし</string>
+    <string name="desktop_applimit_row_current">使用中</string>
     <string name="desktop_book_searching">本の情報を探しています…</string>
     <string name="desktop_calendar_month_pattern">y年M月</string>
     <string name="desktop_calendar_opened">予定を開きました(%1$s)</string>
