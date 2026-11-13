@@ -8429,6 +8429,23 @@
         }
       }
     },
+    "メニューバーの表示を止めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops showing this in the menu bar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニューバーの表示を止めます"
+          }
+        }
+      }
+    },
     "メモ" : {
       "localizations" : {
         "en" : {
@@ -13898,6 +13915,23 @@
         }
       }
     },
+    "本体を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本体を開く"
+          }
+        }
+      }
+    },
     "本日の受付を終了しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14008,6 +14042,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "止まっている理由について確かめる"
+          }
+        }
+      }
+    },
+    "止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止める"
           }
         }
       }

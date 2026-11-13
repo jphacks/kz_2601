@@ -367,6 +367,7 @@ struct MacRootView: View {
         library.delete(id)
         MacAppOrigins().remove(id)
         badges.markRead(id)
+        MacMenuBarActivity.shared.remove(appId: id) // メニューバーの表示(#2254)も消す
         // 記録も消す(#1284)。開いているウインドウのエンジンを止めて手放してから消す(動いたままだと書き戻される)
         Task { await MacRecordEngines.shared.purge(appId: id) }
         // サーバーにあるアプリはサーバーからも消す(iOS の deleteApp と同じ)。届かなくても端末からは消す
