@@ -26,4 +26,12 @@ class FormBandSizingTest {
         assertEquals(0, FormBandSizing.minRows(Component(type = ComponentType.TEXT_FIELD, field = "name")))
         assertEquals(0, FormBandSizing.minRows(Component(type = ComponentType.TEXT)))
     }
+
+    @Test
+    fun bandRowsKeepTheirCountAtTwiceTheTextSize() {
+        // 段の行数は部品で決まり、1 行の高さが文字の倍率で伸びる(#2208)。倍率 2.0 でも 2 行の段は 1 行の倍率ぶんの 2 倍
+        assertEquals(2, FormBandSizing.minRows(Component(type = ComponentType.CHART)))
+        val cellH = DesktopGridMetrics.resolve(480f, 400f, 16f, fontScale = 2f).cellH
+        assertEquals(DesktopGridMetrics.MIN_CELL_HEIGHT * 2 * 2, cellH * FormBandSizing.minRows(Component(type = ComponentType.CHART)), 1e-3f)
+    }
 }

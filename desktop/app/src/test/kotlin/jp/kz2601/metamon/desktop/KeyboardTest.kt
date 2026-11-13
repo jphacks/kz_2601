@@ -149,6 +149,10 @@ class KeyboardTest {
             Shortcut.PRINT to ("Ctrl+P" to "⌘P"),
             Shortcut.HELP to ("F1" to "F1"),
             Shortcut.PREVIEW to ("Space" to "Space"),
+            Shortcut.UNDO to ("Ctrl+Z" to "⌘Z"),
+            Shortcut.ZOOM_IN to ("Ctrl++" to "⌘+"),
+            Shortcut.ZOOM_OUT to ("Ctrl+-" to "⌘-"),
+            Shortcut.ZOOM_RESET to ("Ctrl+0" to "⌘0"),
         )
         assertEquals("全部のショートカットが表にある", Shortcut.entries.toSet(), table.keys)
         for ((s, want) in table) {

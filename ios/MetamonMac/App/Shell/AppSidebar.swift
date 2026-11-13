@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonDSL
 import MetamonServices
 
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
@@ -28,6 +29,12 @@ struct AppSidebar: View {
     var onResetExample: (String) -> Void = { _ in }
     /// 「新しいウインドウで開く」(#1853)
     var onOpenInNewWindow: (String) -> Void = { _ in }
+    /// 右クリックに「リリースを申請…」を出すか(#2249)。サーバーに保存した自分のアプリだけ
+    var canRequestRelease: (String) -> Bool = { _ in false }
+    /// 「リリースを申請…」(#2249)
+    var onRequestRelease: (String) -> Void = { _ in }
+    /// 記録の行がこのアプリの行に落とされた(#2252)。値の入ったフォームを開く
+    var onDropRecord: (String, RecordClipboard.Payload) -> Void = { _, _ in }
     /// サーバーの一覧を初めて読んでいる(前回の一覧が無い・#1057)。作ったアプリの所にスケルトンを出す
     var loadingServerApps = false
     /// サーバーに届かず、前回の一覧を出している(#1057)
@@ -38,6 +45,8 @@ struct AppSidebar: View {
     @State private var renameText = ""
     @State private var deleteTarget: SampleApp?
     @State private var resetTarget: SampleApp?
+    /// 記録をドラッグして重ねている行(#2252)
+    @State private var dropTarget: String?
 
     /// 作ったアプリ・共有されたアプリ(右クリックの管理・Delete キーの対象)
     private var manageable: [SampleApp] { created + shared }
@@ -188,6 +197,16 @@ struct AppSidebar: View {
             }
         }
         .padding(.vertical, 2)
+        // 記録の行を落とすと、このアプリの新しいフォームに値を入れて開く(#2252)
+        .background(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.accentColor, lineWidth: 2)
+            .opacity(dropTarget == app.id ? 1 : 0))
+        .onDrop(of: [MacRecordDrop.type], isTargeted: Binding(get: { dropTarget == app.id },
+                                                             set: { dropTarget = $0 ? app.id : (dropTarget == app.id ? nil : dropTarget) })) { providers in
+            Task { @MainActor in
+                if let payload = await MacRecordDrop.load(providers) { onDropRecord(app.id, payload) }
+            }
+            return true
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(verbatim: MacSidebarBadges.accessibilityLabel(name: app.name, count: count)))
         .tag(app.id)
@@ -219,6 +238,11 @@ struct AppSidebar: View {
             renameTarget = app
         }
         Button("複製") { onDuplicate(app.id) }
+        #if !APP_STORE_REVIEW // 審査用ビルドはリリース申請を外す(iOS と同じ・#245)
+        if canRequestRelease(app.id) {
+            Button("リリースを申請…") { onRequestRelease(app.id) }
+        }
+        #endif
         let ids = section(of: app.id).map(\.id)
         if !isSearching, ids.count > 1, let index = ids.firstIndex(of: app.id) {
             Divider()

@@ -14,6 +14,7 @@ import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.services.AppConfigClient
+import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.LocalRecord
 import jp.kz2601.metamon.services.local.PendingOp
@@ -66,6 +67,9 @@ class SessionPersistence(
             row.recordId.takeUnless { row.isTemporary }
         }
     }
+
+    /** 設定の「使っている量」を読む口(#2814)。サインイン中(送り先がある)だけ */
+    val usage: PlanUsageSource? = client as? PlanUsageSource
 
     /** 送り待ちの件数(このアプリの分だけ・画面に小さく出す)。 */
     var pending: Int by mutableStateOf(0)
@@ -242,6 +246,31 @@ class SessionPersistence(
         val done = CompletableDeferred<Unit>()
         if (writes.trySend { done.complete(Unit) }.isFailure) return
         done.await()
+    }
+
+    /** 会話の取り直し(#2214)の送り先。モックなら null。 */
+    private val remote: AppConfigClient? = client
+
+    /** サーバーの記録を読む(共有の会話を開いている間の取り直し・#2214)。送り先が無ければ null。 */
+    suspend fun fetchRemote(entity: String): List<Record>? = remote?.queryAllRecords(appId, entity)?.map { r ->
+        Record(r.id, r.data.mapValues { JSONValue.from(it.value) }, createdAt = r.createdAt, updatedAt = r.updatedAt, author = r.author, authorName = r.authorName)
+    }
+
+    /**
+     * 端末の行から見た id の対応(#2214): 送れた自分の作成のサーバーの id → 画面の仮 id(`local-…`)。
+     * 書き込みの列の上で読む(画面から積んだ作成を書き終えた後の端末)。
+     */
+    suspend fun sentAliases(entity: String): Map<String, String> {
+        val done = CompletableDeferred<Map<String, String>>()
+        val sent = writes.trySend {
+            done.complete(
+                runCatching {
+                    store.records.rows(appId, entity).mapNotNull { r -> screenId(r).takeIf { it != r.recordId }?.let { r.recordId to it } }.toMap()
+                }.getOrDefault(emptyMap()),
+            )
+        }
+        if (sent.isFailure) return emptyMap()
+        return done.await()
     }
 
     /** 書き込みの列を閉じる(積んだ分は書き終える)。アプリを替えた時。 */
