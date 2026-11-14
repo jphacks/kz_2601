@@ -1,6 +1,10 @@
 package jp.kz2601.metamon.renderer.components.health
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.targetNumber
 import jp.kz2601.metamon.renderer.R
@@ -63,6 +70,8 @@ import kotlin.math.min
  * `healthStat`(#870): 端末のヘルスのデータのカード(iOS の `HealthStatLeaf`)。entity を持たず Health Connect から読む。
  * metric steps|weight × period today|week。today は数字(steps は target で達成率のバー)、week は 7 日のグラフ。
  * Health Connect が無い・権限が無い時は理由を出す。前面に戻るたびに読み直す。
+ * `live: true`(steps・#3694)は、前面(RESUMED)にいる間だけ `TYPE_STEP_COUNTER` を購読し、一発読みの今日の値に増分を足して数字を増やす。
+ * 背面に回ると listener を外す。既定(live 無し)は今までどおり一発読みだけ。
  */
 @Composable
 fun HealthStatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -70,7 +79,10 @@ fun HealthStatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     val source = LocalHealthSource.current ?: remember(context) { defaultHealthSource(context) }
     val weight = HealthStatRules.isWeight(c.metric)
     val week = HealthStatRules.isWeek(c.period)
+    val live = c.live == true && !weight
     var phase by remember(c) { mutableStateOf<HealthPhase>(HealthPhase.Loading) }
+    // live が増分を足す元(一発読みの値)。phase は増分込みなので別に持つ(二重に数えない)
+    var baseline by remember(c) { mutableStateOf<List<HealthDailyValue>?>(null) }
     var reload by remember { mutableIntStateOf(0) }
 
     val needed = remember(source, weight) { source.readPermissions(weight) }
@@ -81,10 +93,17 @@ fun HealthStatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     LaunchedEffect(source, weight, week, reload) {
         phase = try {
             val days = HealthStatRules.days(c.metric, c.period)
-            HealthPhase.Loaded(if (weight) source.weights(days) else source.steps(days))
+            val values = if (weight) source.weights(days) else source.steps(days)
+            baseline = values
+            HealthPhase.Loaded(values)
         } catch (e: HealthDataException) {
+            baseline = null
             HealthPhase.Failed(e.failure)
         }
+    }
+
+    if (live) {
+        LiveSteps(reload, onValues = { phase = HealthPhase.Loaded(it) }, baseline = { baseline })
     }
 
     Column(
@@ -104,6 +123,39 @@ fun HealthStatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
         }
     }
 }
+
+/**
+ * live(#3694): 前面(RESUMED)にいる間だけ歩数計を購読し、[baseline] の今日に増分を足して [onValues] で返す。
+ * [reload](前面に戻った・許可した)のたびに増分の基準を取り直す。`ACTIVITY_RECOGNITION` が無ければ 1 回だけ聞き、拒まれたら一発読みのまま。
+ */
+@Composable
+private fun LiveSteps(reload: Int, onValues: (List<HealthDailyValue>) -> Unit, baseline: () -> List<HealthDailyValue>?) {
+    val context = LocalContext.current
+    val counter = LocalStepCounterSource.current ?: remember(context) { defaultStepCounterSource(context) }
+    var allowed by remember { mutableStateOf(context.hasActivityRecognition()) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed = it }
+    LaunchedEffect(Unit) { if (!allowed) ask.launch(Manifest.permission.ACTIVITY_RECOGNITION) }
+
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var resumed by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, _ -> resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(counter, allowed, resumed, reload) {
+        if (!allowed || !resumed) return@LaunchedEffect
+        val delta = LiveStepDelta()
+        counter.counts().collect { raw ->
+            val base = baseline() ?: return@collect
+            onValues(LiveStepDelta.apply(base, delta.delta(raw)))
+        }
+    }
+}
+
+private fun Context.hasActivityRecognition(): Boolean =
+    checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
 
 private sealed interface HealthPhase {
     data object Loading : HealthPhase

@@ -45,7 +45,7 @@
     <string name="feedback_composer_sent_body">Thank you. We\'ll use your feedback to improve the app.</string>
     <string name="feedback_composer_sent_title">Sent</string>
     <string name="feedback_composer_settings_entry">Send feedback</string>
-    <string name="feedback_composer_settings_footer">You can also open this by shaking the device. You choose what to send before sending.</string>
+    <string name="feedback_composer_settings_footer">You choose what to send before sending.</string>
     <string name="feedback_composer_show_dsl">Show the full DSL to be sent</string>
     <string name="feedback_composer_title">Feedback</string>
 </resources>

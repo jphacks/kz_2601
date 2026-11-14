@@ -16,6 +16,9 @@ func checkHealthStat(where string, c *Component, add func(string, ...any)) {
 	if c.Target != nil && c.Metric != "steps" {
 		add("%s: healthStat target is only for metric steps", where)
 	}
+	if c.Live && c.Metric != "steps" {
+		add("%s: healthStat live is only for metric steps", where)
+	}
 	if c.Target != nil {
 		if v, ok := c.Target.Number(); !ok {
 			add("%s: healthStat target must be a number", where)
