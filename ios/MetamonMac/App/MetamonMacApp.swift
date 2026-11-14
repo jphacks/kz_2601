@@ -70,7 +70,7 @@ struct MetamonMacApp: App {
 
     var body: some Scene {
         WindowGroup(id: MacCommands.mainWindowId) { root(window: nil) }
-            .defaultSize(width: 1100, height: 720)
+            .defaultSize(width: 1280, height: 800)
             .windowResizability(.contentMinSize)
             .commands { MacCommands() }
 

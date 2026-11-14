@@ -2,19 +2,30 @@
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:42
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:47
 19585e6c607daf879faceefaa5f06dfb827de30e:backend/internal/auth/verifier.go:curl-auth-header:43
+# YOLP のテスト用の偽のアプリ ID(faf34af で追加・strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+faf34af0faa1b6a1f6f0c69c4527549ec04ff712:backend/internal/extapi/yolp_test.go:generic-api-key:15
 # LiveKit のテスト用の偽の鍵(e92d242d で追加・3e3aeafc で偽と分かる値に置き換え済み)。実の鍵ではない。
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.go:generic-api-key:41
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23
+# Unsplash のテスト用の偽の鍵(db9ba9f で追加・strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+db9ba9fb19cf8dfa82dcfae6853db07f5a8599bf:backend/internal/extapi/unsplash_test.go:generic-api-key:14
 # SharedPreferences のキー名(exactAlarm.prompted.v1)の誤検知。秘密情報ではない。
 860439072a981a5daabedf24da7f85a1036fbfef:android/app/src/main/kotlin/jp/kz2601/metamon/notifications/ExactAlarmAsk.kt:generic-api-key:45
+# TMDB のテスト用の偽の鍵(72be522 で追加・strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+72be522547135c31d68ef14758c8836082996244:backend/internal/extapi/tmdb_test.go:generic-api-key:14
+72be522547135c31d68ef14758c8836082996244:backend/internal/extapi/tmdb_test.go:generic-api-key:15
 # SwitchBot のテスト用の偽の値(b57df1d・feat/backend-switchbot-1704 に残る。develop では strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
 b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.go:generic-api-key:19
 b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.go:generic-api-key:20
 # Windows のプロパティキー PKEY_Title の GUID(公開の定数)。秘密情報ではない。
 6ad265f1f4383e6546f9b9312e7551e7f392e2a7:desktop/app/src/main/kotlin/jp/kz2601/metamon/desktop/platform/JumpList.kt:generic-api-key:256
+# Google Cloud Translation のテスト用の偽の鍵(7b65608 で追加・strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+7b6560899e7f2c60940797541d5fee90199f0820:backend/internal/extapi/google_translate_test.go:generic-api-key:14
 # OAuth 1.0a のテスト値(RFC 5849 の公開サンプル)。秘密情報ではない。
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:68
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:105
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:132
 # OAuth 1.0a のテスト値(RFC 5849 の公開サンプル)。同じ行の別コミット。秘密情報ではない。
 cf0c4e2868c4163533f1789d60329d7a9ab0d5e3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:101
+# Last.fm のテスト用の偽の鍵(0 から f を並べた値)。実の鍵ではない。
+0bf93b57b79013a12bf1c6a87776c87c72a39fc4:backend/internal/extapi/lastfm_test.go:generic-api-key:24

@@ -302,7 +302,7 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 
 | 経過 | stage | create の文言 | edit の文言 | 備考 |
 |---|---|---|---|---|
-| 0〜3s | normal | どんなアプリにするか考えています… + 経過秒の横に目安「ふつう 10 秒ほど」(0〜10s だけ)+ 小さい **キャンセル** | 変更を反映しています… + **中止** | キャンセル / 中止は最初から出す(言い間違いに気づいたらすぐ止める・UX 点検 M6) |
+| 0〜3s | normal | 何に変身するか考えています… + 経過秒の横に目安「ふつう 10 秒ほど」(0〜10s だけ)+ 小さい **キャンセル** | 変更を反映しています… + **中止** | キャンセル / 中止は最初から出す(言い間違いに気づいたらすぐ止める・UX 点検 M6) |
 | 3〜6s | normal | 必要な画面とデータを決めています… | 〃 | |
 | 6〜9s | normal | 画面を組み立てています… | 〃 | create p50 はここで完了 |
 | 9〜10s | normal | 細部を整えています… | 〃 | (以後 3s 周期で巡回) |
@@ -499,7 +499,7 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
   │     タップ → AppRuntime.switchApp(to:): 今の画面をサムネに撮る → DeviceAppID.set(appId) → GET /dsl(失敗時 DocumentCache)→ apply()(変身アニメ)→ startSync()
   │                 records は apply() で破棄し、画面が要求する entity を load(entities:) の既存経路で読み直す
   ├─ 「+ 新しいアプリ」 → startFresh(.newApp): DeviceAppID.rotate() + 初期状態(音声画面)。挨拶は「新しいアプリですね」
-  └─ 「Tailor It に戻る(初期画面)」 → startFresh(.home): 同上。挨拶は「おかえりなさい。次は何を作りますか?」
+  └─ 「Tailor It に戻る(初期画面)」 → startFresh(.home): 同上。挨拶は「おかえりなさい。次は何に変身しましょうか?」
 一覧の取得: GET /v1/apps(uid スコープ・HTTPAppConfigClient.listApps)→ AppSummary.visible(): status=archived と未生成(currentVersion<=1)を除外、現在のアプリを先頭、以降は更新日時順
             失敗時は AppListCache(Application Support/metamon-dsl/apps.json)の保存済み一覧(toast「オフライン」)
 サムネ: AppThumbnailStore(Application Support/metamon-thumbs/<appId>.jpg・1/3 スケール JPEG)。撮るのは「切替・一覧を開く直前」と「apply の 1.2 秒後(RootView.onChange(version))」
@@ -521,10 +521,10 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 
 | 状況(`Greeting.Context`) | 判定 | 見出し |
 |---|---|---|
-| firstVisit | 起動回数 0(`UserDefaults metamon.visitCount`・`Greeting.launchIsReturning`)| どんなアプリが欲しいですか? |
-| returning | 2 回目以降の起動で初期画面 | おかえりなさい。今日は何を作りますか? |
-| newApp | 変身一覧「+ 新しいアプリ」/ 発話「別のアプリ」(`AppRuntime.homeEntry = .newApp`) | 新しいアプリですね。どんなアプリにしますか? |
-| home | 「Tailor It に戻る」/ アプリのリセット(`.home`) | おかえりなさい。次は何を作りますか? |
+| firstVisit | 起動回数 0(`UserDefaults metamon.visitCount`・`Greeting.launchIsReturning`)| どんなアプリに変身しましょうか? |
+| returning | 2 回目以降の起動で初期画面 | おかえりなさい。今日は何に変身しましょうか? |
+| newApp | 変身一覧「+ 新しいアプリ」/ 発話「別のアプリ」(`AppRuntime.homeEntry = .newApp`) | 新しいアプリですね。何に変身しましょうか? |
+| home | 「Tailor It に戻る」/ アプリのリセット(`.home`) | おかえりなさい。次は何に変身しましょうか? |
 | editing | 既にアプリがある(FAB からの音声シート) | このアプリをどう変えますか? |
 
 初期画面の見出しは DSL の `voiceInput.prompt` ではなく Greeting を使う(生成アプリ内の `voiceInput` 部品は従来どおり `prompt` を表示)。
@@ -1179,6 +1179,7 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 | 生成・直し(`send`) | 何も保存されていない。課金画面(`.paidFeature(features)`)→ 買えばサーバーへの取引の送信(`serverSyncTask`)を待って同じ依頼を送り直す / 閉じたら「〇〇は Tailor It Pro が必要なため、保存しませんでした」。端末では Pro なのに 402 の時は課金画面を出さず案内だけ(送り直しを繰り返さない)。`AppRuntime+PaidGate.swift` の `presentProRequired` |
 | 共有の記録の書き込み(同期キュー) | `SyncEvent.proRequired`。書いた分は戻す。作成者なら課金画面、参加者(`creator_needs_pro`)は「作った人が Pro ではないため書き込めません(見ることはできます)」。印を付ける等の即時の書き込みは `message(for:)` の同じ文言 |
 | オンラインの AI(`POST /v1/text`) | `AITextError.needsPro` → 課金画面(`requestProForAIText`) |
+| 設定の「つないだサービス」(#1493・`Features/Connections/ConnectedServicesSection.swift`・状態は `ConnectedServices.swift` を Mac と共有) | 一覧はサーバーの `GET /v1/me/connections` の `providers`(つなげるもの)と `keyless`(鍵なしで使えるもの)そのもので、端末は provider の一覧を持たない(`supportedFeatures` で絞らない。審査用の版だけ空を送る)。読み込み中はスケルトン、読めた一覧は `ExtConnectionListCache` に控え、読めない時は控えを「前に読み込んだ一覧」の一言と再試行つきで出す(控えが無ければ再試行できる失敗・`ext_unavailable` は隠す)。「鍵なしで使えるもの」は別のセクションに名前と状態だけ(つなぐボタンは無い)。名前はサーバーの `nameJa` / `nameEn` → 端末の `ConnectedServiceCatalog` → id |
 | 外の API の op(つないだサービス・#2001) | `MetamonServices/External/ExtDenial.swift` が 409 `ext_not_connected`(`details.provider`)・402(既存の `ProRequired` / `CoinDenial` で判定)・503 `ext_unavailable` / `ext_busy` を振り分け、`Features/Connections/ExtDenialSheet.swift` の `.extDenialSheets($denial, onMessage:)` が「次にすること」を出す。つないでいない → つなぐ案内のシート(名前は `GET /v1/me/connections` の `nameJa` / `nameEn` → 端末の名前 → id。「つなぐ」は設定の「つないだサービス」と同じ `ConnectFlow`・つなげたら閉じる。provider が分からない 409 はシートを出さず設定へ案内する一言)。Pro が要る → 課金画面(`features` が空なら「つないだサービス」)、作成者の Pro が要る時と端末は Pro なのにサーバーが知らない時は一言だけ。コイン → `CoinGate`(引き受けられなければ `CoinCopy.denialBody`)。止まっている・混んでいる → 一言だけ。一言の出し方は呼ぶ側に任せる。今の呼び出し口は DEBUG の設定の「開発用: 試験用のサービスを呼ぶ」(偽の provider `fakeOauth`・`METAMON_MOCK=1` + `METAMON_MOCK_EXT_ERROR=<code>` でエラーを仕込める)だけで、部品から呼ぶつなぎは部品の Issue で足す。審査用の版では案内の画面を外し、コインの断りは `.unavailable` 扱い |
 | 審査用の版 | 有料の機能を作らない(backend が共有を private に直し、serverRules を作らない)ので当たらない想定。当たっても課金画面は無いので文言だけ |
 | テスト | `MetamonTests/ProRequiredFlowTests.swift`・`MetamonServicesTests/RecordSyncTests.swift`(`testSyncQueueProRequired…`・`testProRequiredParsing`)・`AITextGateTests` |

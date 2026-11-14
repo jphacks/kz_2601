@@ -79,7 +79,7 @@
     <string name="voice_gen_seconds">%1$d 秒</string>
     <string name="voice_gen_slow">もう少しかかっています…</string>
     <string name="voice_gen_stop">中止</string>
-    <string name="voice_gen_thinking">どんなアプリにするか考えています…</string>
+    <string name="voice_gen_thinking">何に変身するか考えています…</string>
     <string name="voice_gen_usually">ふつう 10 秒ほど</string>
     <string name="voice_gen_warning">時間がかかっています。もう少しだけお待ちください</string>
     <string name="voice_hello_day">こんにちは</string>
@@ -205,10 +205,10 @@
     <string name="voice_tips_pick_hint">入力欄に入れる</string>
     <string name="voice_tips_title">頼み方のコツ</string>
     <string name="voice_title_editing">このアプリをどう変えますか?</string>
-    <string name="voice_title_first">どんなアプリが欲しいですか?</string>
-    <string name="voice_title_home">おかえりなさい。\n次は何を作りますか?</string>
-    <string name="voice_title_new_app">新しいアプリですね。\nどんなアプリにしますか?</string>
-    <string name="voice_title_returning">おかえりなさい。\n今日は何を作りますか?</string>
+    <string name="voice_title_first">どんなアプリに変身しましょうか?</string>
+    <string name="voice_title_home">おかえりなさい。\n次は何に変身しましょうか?</string>
+    <string name="voice_title_new_app">新しいアプリですね。\n何に変身しましょうか?</string>
+    <string name="voice_title_returning">おかえりなさい。\n今日は何に変身しましょうか?</string>
     <string name="voice_tomorrow">明日</string>
     <string name="voice_unavailable_hint">この端末では声の入力を使えません。下の欄に文字で入力すれば、今すぐ作れます。</string>
     <string name="voice_unchanged_reason">変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。</string>

@@ -170,10 +170,8 @@ private struct AppCanvasContent: View {
     let onTalk: (ScreenContext) -> Void
     /// マップの「この画面について話す」・モーダルの中の部品の「この部品について話す」を押した文脈。マップ・モーダルが閉じ終わったら会話を開く
     @State private var pendingTalk: ScreenContext?
-    /// 表示メニューの拡大 / 縮小(#1206)。生成したアプリの文字だけを Dynamic Type の段で変える
+    /// 表示メニューの拡大 / 縮小(#1206)。生成したアプリの中身だけを段の割合で拡大する(`macGeneratedAppZoom`)
     @AppStorage(MacTextZoom.storageKey) private var zoomStep = MacTextZoom.defaultStep
-
-    private var textSize: DynamicTypeSize { MacTextZoom.size(at: zoomStep) }
 
     /// 画面マップで選べる記録(#1322)。表示用の記録(隠した値は落とす)で、見出しは参照の見出しと同じ
     private func recordChoices(_ entity: String) -> [ScreenMapRecordChoice] {
@@ -185,7 +183,7 @@ private struct AppCanvasContent: View {
 
     var body: some View {
         DSLNavigationRoot()
-            .dynamicTypeSize(textSize)
+            .macGeneratedAppZoom(step: zoomStep)
             .background { SaveFormShortcut(runtime: runtime) } // ⌘Return で保存(#1138)。⌘S はメニュー(MacCommands)
             .background { ZoomInAlias(step: $zoomStep) } // ⌘= でも拡大(#1206・メニューは ⌘+)
             .background {
@@ -210,10 +208,10 @@ private struct AppCanvasContent: View {
             }
             // Mac の fullScreenCover は無いので sheet で出す(大きめの最小サイズ)
             .sheet(item: $runtime.sheet, onDismiss: talkAfterModal) { route in
-                modal(route).dynamicTypeSize(textSize).frame(minWidth: 420, minHeight: 480)
+                modal(route).macGeneratedAppZoom(step: zoomStep).frame(minWidth: 420, minHeight: 480)
             }
             .sheet(item: $runtime.fullScreen, onDismiss: talkAfterModal) { route in
-                modal(route).dynamicTypeSize(textSize).frame(minWidth: 640, minHeight: 560)
+                modal(route).macGeneratedAppZoom(step: zoomStep).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
             #if !APP_STORE_REVIEW

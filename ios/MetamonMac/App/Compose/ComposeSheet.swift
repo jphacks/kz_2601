@@ -13,7 +13,9 @@ struct ComposeSheet: View {
     var undo: (() -> Void)? = nil
     @Environment(MacVoiceInput.self) private var voice
 
-    static let size = CGSize(width: 560, height: 620)
+    /// 既定の大きさ(展示の大きい画面で窮屈にならないよう広め)と、小さい画面でも収まる下限
+    static let size = CGSize(width: 680, height: 720)
+    static let minSize = CGSize(width: 560, height: 620)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,7 +32,7 @@ struct ComposeSheet: View {
                 ComposeFinished(summary: summary, unchanged: unchanged, onClose: close, undo: unchanged ? nil : undo)
             }
         }
-        .frame(minWidth: Self.size.width, idealWidth: Self.size.width, minHeight: Self.size.height, idealHeight: Self.size.height)
+        .frame(minWidth: Self.minSize.width, idealWidth: Self.size.width, minHeight: Self.minSize.height, idealHeight: Self.size.height)
         .background(.background)
         .modifier(MacModelDownloadConfirm())
         .onDisappear { // 録音中に閉じたら録音を捨てる・走っている呼び出しを止める

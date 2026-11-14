@@ -1,7 +1,7 @@
 # 生成アプリのデザインシステム(Renderer 共通 UI)
 
 > 対象: `ios/Packages/MetamonRenderer`(DSL から生成されるアプリ側の全部品)。**色の正典は `Support/SemanticColor.swift` の `SemanticPalette`**(ライト/ダーク対)で、`RenderTheme.Colors` がそれを公開し、本体(音声画面・生成中画面)の `ios/Metamon/App/Theme.swift` の色は `RenderTheme.Colors` を参照する(#102 で色の二重定義を解消)。余白・角丸は従来どおり本体と二重定義なので片方を変えたらもう片方も揃える。ウィジェット(`MetamonWidget`)だけは Renderer を import できないので brandA/brandB を複製している。
-> 目的: 「どんなアプリが欲しい?」画面・「作成中」画面と、生成後のアプリ(家計簿・筋トレ・散歩…)が**同じブランドの作り込み**に見えること。アプリごとに変えない(`app.theme.primaryColor` は使わず、常に Tailor It ブランド)。
+> 目的: 「どんなアプリに変身しましょうか?」画面・「作成中」画面と、生成後のアプリ(家計簿・筋トレ・散歩…)が**同じブランドの作り込み**に見えること。アプリごとに変えない(`app.theme.primaryColor` は使わず、常に Tailor It ブランド)。
 
 ## 1. 原則
 1. **1 ブランド**: 藍→青緑のグラデーション(アプリアイコンの紺 × ツルの生成りから取った「藍 × 生成り」・#102)が「押せる・選ばれている・いま注目」の 3 つだけを指す。装飾には使わない。
@@ -109,4 +109,4 @@ Mac 版(`ios/MetamonMac`)も同じトークンを使う。Mac だけの色は作
 | 文字 | text style のまま(Mac では body 13pt など Mac の大きさ)。本体の画面の文字・余白は `MacTheme`(`ios/MetamonMac/App/Theme/MacTheme.swift`)。ウィンドウの端の余白は 20pt |
 | サイドバー・ツールバー | Mac 標準の材質と形のまま。ブランド色は選択行などアクセントだけに出る |
 | ツル | `Brand.xcassets` の絵を共有。中央の列・サイドバー・設定が空の時に出す。「視差効果を減らす」では揺らさない。背景は iOS の音声画面と同じ滲み(`Theme.backdrop`) |
-| 生成したアプリの配置 | 列は 6 のまま(DSL の area をそのまま読む)。外枠の幅 = 高さ × 3/4(iPad の縦向きと同じ縦長)を 480〜720pt に収めて中央寄せ。行の高さ = 高さ ÷ 12、52pt を下回る低いウィンドウでは 52pt で止めて縦スクロール(`GridMetrics.resolveDesktop`)。iOS の配置は変えない |
+| 生成したアプリの配置 | 列は 6 のまま(DSL の area をそのまま読む)。外枠の幅 = 高さ × 4/3(iPad の横向きと同じ横長)を 480〜900pt に収めて中央寄せ。行の高さ = 高さ ÷ 12、52pt を下回る低いウィンドウでは 52pt で止めて縦スクロール(`GridMetrics.resolveDesktop`)。iOS の配置は変えない |

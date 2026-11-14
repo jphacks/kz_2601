@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"net/url"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -55,9 +56,31 @@ func (a *allowTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return a.next.RoundTrip(req)
 }
 
-// AllowedURL reports whether u is on one of hosts (no user info).
+// AllowedURL reports whether u is on one of hosts (no user info): an exact
+// scheme://host, or for an entry "https://*.example.com" (a provider whose
+// host is per account, Backlog's space) one label and that suffix
+// ("https://acme.example.com"; never the bare domain, a deeper subdomain or
+// a port).
 func AllowedURL(hosts []string, u *url.URL) bool {
-	return u != nil && u.User == nil && slices.Contains(hosts, u.Scheme+"://"+u.Host)
+	if u == nil || u.User != nil {
+		return false
+	}
+	got := u.Scheme + "://" + u.Host
+	if slices.Contains(hosts, got) {
+		return true
+	}
+	for _, h := range hosts {
+		if scheme, dom, ok := strings.Cut(h, "://*."); ok && hostUnder(u, scheme, dom) {
+			return true
+		}
+	}
+	return false
+}
+
+// hostUnder: u is scheme://<label>.<dom> with one DNS label and no port.
+func hostUnder(u *url.URL, scheme, dom string) bool {
+	label, ok := strings.CutSuffix(u.Host, "."+dom)
+	return ok && u.Scheme == scheme && label != "" && !strings.ContainsAny(label, ".:") && u.Port() == ""
 }
 
 // ReadBody reads at most MaxBody of a response (more is an error).

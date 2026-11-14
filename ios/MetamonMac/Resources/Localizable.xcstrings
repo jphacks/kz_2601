@@ -3686,19 +3686,19 @@
         }
       }
     },
-    "おかえりなさい。\n今日は何を作りますか?" : {
+    "おかえりなさい。\n今日は何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome back.\nWhat shall we make today?"
+            "value" : "Welcome back.\nWhat shall I turn into today?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "おかえりなさい。\n今日は何を作りますか?"
+            "value" : "おかえりなさい。\n今日は何に変身しましょうか?"
           }
         }
       }
@@ -3720,19 +3720,19 @@
         }
       }
     },
-    "おかえりなさい。\n次は何を作りますか?" : {
+    "おかえりなさい。\n次は何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome back.\nWhat shall we make next?"
+            "value" : "Welcome back.\nWhat shall I turn into next?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "おかえりなさい。\n次は何を作りますか?"
+            "value" : "おかえりなさい。\n次は何に変身しましょうか?"
           }
         }
       }
@@ -4883,6 +4883,22 @@
         }
       }
     },
+    "この文で作り始める" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start making with this request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この文で作り始める"
+          }
+        }
+      }
+    },
     "この欄を消す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5853,35 +5869,19 @@
         }
       }
     },
-    "どんなアプリが欲しいですか?" : {
+    "どんなアプリに変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "What app do you want?"
+            "value" : "What shall I turn into?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "どんなアプリが欲しいですか?"
-          }
-        }
-      }
-    },
-    "どんなアプリにするか考えています…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thinking about what kind of app to make…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "どんなアプリにするか考えています…"
+            "value" : "どんなアプリに変身しましょうか?"
           }
         }
       }
@@ -7908,6 +7908,23 @@
         }
       }
     },
+    "サインインしなくても、アプリから使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps can use these without you signing in."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインインしなくても、アプリから使えます。"
+          }
+        }
+      }
+    },
     "サインインし直してから送ってください。" : {
       "localizations" : {
         "en" : {
@@ -8088,6 +8105,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サーバーに保存した自分のアプリだけ共有できます"
+          }
+        }
+      }
+    },
+    "サーバーに届かないため、前に読み込んだ一覧を出しています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't reach the server, so this is the last list loaded."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに届かないため、前に読み込んだ一覧を出しています。"
           }
         }
       }
@@ -10223,6 +10257,23 @@
         }
       }
     },
+    "今つなげるサービスはありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No services to connect right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今つなげるサービスはありません。"
+          }
+        }
+      }
+    },
     "今のアプリの版" : {
       "localizations" : {
         "en" : {
@@ -10735,6 +10786,22 @@
         }
       }
     },
+    "何に変身するか考えています…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thinking about what to turn into…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何に変身するか考えています…"
+          }
+        }
+      }
+    },
     "何も変えずに閉じます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11098,6 +11165,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "例: 父、たろう"
+          }
+        }
+      }
+    },
+    "例えば" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For example"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例えば"
           }
         }
       }
@@ -14330,6 +14413,22 @@
         }
       }
     },
+    "文字で作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type to Make"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字で作る"
+          }
+        }
+      }
+    },
     "文字で頼む" : {
       "localizations" : {
         "en" : {
@@ -14459,19 +14558,19 @@
         }
       }
     },
-    "新しいアプリですね。\nどんなアプリにしますか?" : {
+    "新しいアプリですね。\n何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A new app.\nWhat kind of app?"
+            "value" : "A new app.\nWhat shall I turn into?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新しいアプリですね。\nどんなアプリにしますか?"
+            "value" : "新しいアプリですね。\n何に変身しましょうか?"
           }
         }
       }
@@ -16051,6 +16150,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面マップ"
+          }
+        }
+      }
+    },
+    "画面マップ・共有・設定を開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the screen map, sharing, and settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面マップ・共有・設定を開く"
           }
         }
       }
@@ -17646,6 +17761,22 @@
         }
       }
     },
+    "話して作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to Make"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して作る"
+          }
+        }
+      }
+    },
     "話し終えた" : {
       "localizations" : {
         "en" : {
@@ -19193,6 +19324,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください"
+          }
+        }
+      }
+    },
+    "鍵なしで使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sign-in needed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵なしで使えます"
+          }
+        }
+      }
+    },
+    "鍵なしで使えるもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works without signing in"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵なしで使えるもの"
           }
         }
       }

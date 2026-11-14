@@ -53,6 +53,7 @@ import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
+import java.awt.datatransfer.Clipboard
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
@@ -80,6 +81,8 @@ class DesktopIo(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     /** 文字にし終えた後の反映を画面のスレッドで行う(テストは直に呼ぶ)。 */
     private val post: (() -> Unit) -> Unit = { r -> EventQueue.invokeLater { Snapshot.withMutableSnapshot(r) } },
+    /** コピー・貼り付けの行き先(テストは作り物の [Clipboard] を渡す)。 */
+    private val clipboard: () -> Clipboard? = ExportClipboard::system,
 ) {
     val entities: List<Entity> = dsl.entityModels()
     var pending by mutableStateOf<PendingImport?>(null)
@@ -203,7 +206,7 @@ class DesktopIo(
 
     /** 作った TSV をクリップボードへ(table の選んだ行など)。 */
     fun copyText(tsv: String, rows: Int) {
-        if (!ExportClipboard.put(tsv, runCatching { Toolkit.getDefaultToolkit().systemClipboard }.getOrNull())) {
+        if (!ExportClipboard.put(tsv, clipboard())) {
             return run { notice = Strings["desktop_io_copy_failed"] }
         }
         notice = Strings.format("desktop_io_copied_rows", rows)
@@ -212,7 +215,7 @@ class DesktopIo(
     /** クリップボードの表(TSV / CSV)を一覧に取り込む確認。 */
     fun pasteRows(entityId: String) {
         val entity = entity(entityId) ?: return
-        val text = clipboardText() ?: return run { notice = Strings["desktop_io_no_table_on_clipboard"] }
+        val text = clipboardText(clipboard()) ?: return run { notice = Strings["desktop_io_no_table_on_clipboard"] }
         offer(RecordIo.pastedTable(text), entity, null, Strings["desktop_io_pasted_table"])
     }
 
@@ -318,8 +321,8 @@ class DesktopIo(
                 null
             }
 
-        fun clipboardText(): String? = try {
-            Toolkit.getDefaultToolkit().systemClipboard.getData(DataFlavor.stringFlavor) as? String
+        fun clipboardText(cb: Clipboard? = ExportClipboard.system()): String? = try {
+            cb?.getData(DataFlavor.stringFlavor) as? String
         } catch (_: UnsupportedFlavorException) {
             null
         } catch (_: Exception) {

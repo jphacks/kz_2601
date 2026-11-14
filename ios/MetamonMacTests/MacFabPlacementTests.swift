@@ -14,13 +14,14 @@ final class MacFabPlacementTests: XCTestCase {
         XCTAssertTrue(MacFabExperiment.isEnabled(defaults))
     }
 
-    func testOffKeepsDesktopMetricsUnchanged() {
+    func testOnOnlyNarrowsColumnForGutter() {
         for size in [CGSize(width: 720, height: 480), CGSize(width: 1100, height: 720), CGSize(width: 1512, height: 945)] {
             let off = GridMetrics.resolveDesktop(width: size.width, height: size.height, inset: inset)
-            XCTAssertFalse(off.fabInGutter, "フラグ off は今と同じ(\(size))")
+            XCTAssertFalse(off.fabInGutter, "フラグ off は余白を見ない(\(size))")
             let on = GridMetrics.resolveDesktop(width: size.width, height: size.height, inset: inset, fabInGutter: true)
-            XCTAssertEqual(on.frameWidth, off.frameWidth, "列の幅は変えない")
-            XCTAssertEqual(on.cellH, off.cellH)
+            XCTAssertLessThanOrEqual(on.frameWidth, off.frameWidth, "on は FAB の余白のぶんだけ細くなることがある")
+            XCTAssertEqual(on.frameWidth, min(off.frameWidth, size.width - GridMetrics.fabGutter * 2), accuracy: 0.001)
+            XCTAssertEqual(on.cellH, off.cellH, "行の高さは変えない")
         }
     }
 

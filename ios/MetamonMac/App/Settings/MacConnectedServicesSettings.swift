@@ -31,6 +31,8 @@ struct MacConnectedServicesSettings: View {
 }
 
 /// 一覧・つなぐ・つなぎ直す・切る(iOS の `ConnectedServicesSection` と同じ文言・同じ出し分け)。
+/// 一覧はサーバーから(端末は provider の一覧を持たない)。読み込み中はスケルトン、読めない時は控え(`stale`)か再試行、
+/// 「鍵なしで使えるもの」は別のセクションに名前だけ。
 struct MacConnectedServicesSection: View {
     let client: any ExternalServicesClient
     @State private var model = ConnectedServicesModel()
@@ -45,15 +47,30 @@ struct MacConnectedServicesSection: View {
                 // サーバーが外の API を止めている(ext_unavailable)。iOS はセクションごと隠すが、Mac はタブなので理由を出す
                 Section { MacUnavailableSettingRow(title: "つないだサービス") }
             case .loading:
-                section { HStack { ProgressView().controlSize(.small); Text("読み込み中").foregroundStyle(.secondary) } }
+                section { MacConnectedServicesSkeleton() }
             case .failed(let text):
                 section {
                     Text(text).foregroundStyle(.secondary)
-                    Button("再試行") { Task { await model.load(client) } }
-                        .accessibilityIdentifier("settings.connections.retry")
+                    retryButton
                 }
             case .loaded(let rows):
-                section { ForEach(rows) { row($0) } }
+                section {
+                    if rows.connectable.isEmpty {
+                        Text("今つなげるサービスはありません。").foregroundStyle(.secondary)
+                    }
+                    ForEach(rows.connectable) { row($0) }
+                    if model.stale { retryButton }
+                }
+                if !rows.keyless.isEmpty {
+                    Section {
+                        ForEach(rows.keyless) { row($0) }
+                    } header: {
+                        Text("鍵なしで使えるもの")
+                    } footer: {
+                        Text("サインインしなくても、アプリから使えます。")
+                    }
+                    .accessibilityIdentifier("settings.connections.keyless")
+                }
             }
         }
         .task { await model.load(client) }
@@ -83,13 +100,18 @@ struct MacConnectedServicesSection: View {
         L10n.tr("\(confirmDisconnect?.name ?? "") とのつなぎを切りますか？")
     }
 
+    private var retryButton: some View {
+        Button("再試行") { Task { await model.load(client) } }
+            .accessibilityIdentifier("settings.connections.retry")
+    }
+
     private func section(@ViewBuilder _ content: () -> some View) -> some View {
         Section {
             content()
         } header: {
             Text("つないだサービス")
         } footer: {
-            Text(model.message ?? L10n.tr("カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。"))
+            Text(MacConnectedServicesCopy.footer(model))
                 .foregroundStyle(model.message == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.Colors.warning))
         }
         .accessibilityIdentifier("settings.connections")
@@ -133,6 +155,8 @@ struct MacConnectedServicesSection: View {
         case .notConnected: // 今つなげない時は行ごと押せない(row の .disabled)
             Button("つなぐ") { connect(row.provider) }
                 .accessibilityIdentifier("settings.connections.\(row.provider).connect")
+        case .keyless: // つながなくても使える: 名前と状態だけ
+            EmptyView()
         }
     }
 
@@ -164,6 +188,36 @@ enum MacConnectedServicesCopy {
         case .connected: L10n.tr("つないでいます")
         case .needsReconnect: L10n.tr("つなぎ直してください")
         case .notConnected: L10n.tr("つないでいません")
+        case .keyless: L10n.tr("鍵なしで使えます")
+        }
+    }
+
+    /// セクションの下の一言: 操作の失敗 → 控えを出している時 → ふだんの説明(iOS と同じ)
+    @MainActor static func footer(_ model: ConnectedServicesModel) -> String {
+        if let m = model.message { return m }
+        if model.stale { return L10n.tr("サーバーに届かないため、前に読み込んだ一覧を出しています。") }
+        return L10n.tr("カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。")
+    }
+}
+
+/// 読み込み中のスケルトン(データ無しと区別するため必ず出す)。行の形のまま伏せる
+struct MacConnectedServicesSkeleton: View {
+    var rows = 3
+
+    var body: some View {
+        ForEach(0..<rows, id: \.self) { _ in
+            LabeledContent {
+                EmptyView()
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: "Google Calendar")
+                    Text(verbatim: "not connected").font(.footnote)
+                }
+            }
+            .foregroundStyle(.secondary)
+            .redacted(reason: .placeholder)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("読み込み中")
         }
     }
 }

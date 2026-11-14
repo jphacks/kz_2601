@@ -133,7 +133,7 @@ extension View {
     }
 }
 
-/// 表示メニューの「拡大」⌘+ /「縮小」⌘- /「実際のサイズ」⌘0(#1206)。中央の生成したアプリの文字を Dynamic Type の段で上げ下げする。
+/// 表示メニューの「拡大」⌘+ /「縮小」⌘- /「実際のサイズ」⌘0(#1206)。中央の生成したアプリを Dynamic Type の段の割合で拡大・縮小する(`macGeneratedAppZoom`)。
 /// 段は UserDefaults に残す(ウインドウ・起動をまたいで同じ)。端の段では押せない。
 enum MacTextZoom {
     static let storageKey = LocalWipe.macTextZoomKey
@@ -144,8 +144,8 @@ enum MacTextZoom {
         .accessibility1, .accessibility2, .accessibility3,
     ]
 
-    /// 「実際のサイズ」= .large(system の既定)
-    static let defaultStep = steps.firstIndex(of: .large)!
+    /// 「実際のサイズ」= .xLarge。Mac の text style は iOS より小さい(.large の body が 13pt)ので、iOS の .large と同じくらいに見える 1 段上を既定にする
+    static let defaultStep = steps.firstIndex(of: .xLarge)!
 
     static func clamped(_ step: Int) -> Int { min(max(step, 0), steps.count - 1) }
 
@@ -168,12 +168,47 @@ enum MacTextZoom {
         defaults.set(clamped(step), forKey: storageKey)
     }
 
-    /// 本文(body)の大きさの、実際のサイズ(17pt)に対する割合。設定の選択肢に出す(#937)。
+    /// 本文(body)の大きさの、実際のサイズ(既定の段)に対する割合。設定の選択肢に出す(#937)。
     /// 値は iOS の Dynamic Type の body の pt(xSmall 14 … accessibility3 40)
     static let bodyPoints: [Double] = [14, 15, 16, 17, 19, 21, 23, 28, 33, 40]
 
+    /// 描く時の拡大率。system の既定(.large・Mac の body 13pt)を 1 とした本文の大きさの割合
+    static func scale(at step: Int) -> CGFloat {
+        CGFloat(bodyPoints[clamped(step)] / bodyPoints[steps.firstIndex(of: .large)!])
+    }
+
     static func percent(at step: Int) -> Int {
         Int((bodyPoints[clamped(step)] / bodyPoints[defaultStep] * 100).rounded())
+    }
+}
+
+/// 作ったアプリの中身(中央の列・モーダル)の拡大。Mac の SwiftUI は `dynamicTypeSize` で text style の大きさが変わらない
+/// (body は段によらず 13pt)ので、段の割合(`MacTextZoom.scale`)だけ小さい論理の大きさで並べてから拡大して描く(ブラウザの拡大と同じ)。
+/// 文字は拡大後の大きさで描き直されるのでにじまない。部品・余白も同じ割合で大きくなる。
+struct MacZoomLayout: Layout {
+    let scale: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let size = child.sizeThatFits(ProposedViewSize(width: proposal.width.map { $0 / scale },
+                                                       height: proposal.height.map { $0 / scale }))
+        return CGSize(width: size.width * scale, height: size.height * scale)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                              proposal: ProposedViewSize(width: bounds.width / scale, height: bounds.height / scale))
+    }
+}
+
+extension View {
+    /// 作ったアプリの中身を表示メニューの段(`MacTextZoom`)の割合で拡大する
+    func macGeneratedAppZoom(step: Int) -> some View {
+        let scale = MacTextZoom.scale(at: step)
+        return MacZoomLayout(scale: scale) {
+            // 段は部品の並べ替え(大きい段で縦積みにする等)の判断にも渡す
+            self.dynamicTypeSize(MacTextZoom.size(at: step)).scaleEffect(scale, anchor: .topLeading)
+        }
     }
 }
 

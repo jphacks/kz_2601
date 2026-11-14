@@ -179,6 +179,7 @@ Mac には集中モードを読む口も、フィルタもまだありません�
 設定(⌘,)の「通知」と「プライバシー」の間のタブです(#1714・`App/Settings/MacConnectedServicesSettings.swift`)。
 
 - 一覧・つなぐ・つなぎ直す・切る・状態は iOS の `ConnectedServices.swift` を共有する。トークンは runner だけが持つ([external-apis.md](../backend/features/external-apis.md))。
+- 一覧はサーバーの `GET /v1/me/connections` の `providers` / `keyless` そのもの(端末は provider の一覧を持たないので、新しい provider はアプリを更新しなくても並ぶ)。読み込み中はスケルトン、読めない時は控え(`ExtConnectionListCache`)を一言と再試行つきで出す。「鍵なしで使えるもの」(OAuth の要らない provider)は別のセクションに名前と状態だけ。
 - つなぐ時は `ASWebAuthenticationSession`(前面のウインドウ・ephemeral)。戻り先 `tailorit://connected?...` は `MacLinkReceiver` が受けて一覧を取り直す。
 - サーバーが外の API を止めている時は「この端末では使えません」。Pro でない人は課金画面を出す。審査用の版には出さない。
 
