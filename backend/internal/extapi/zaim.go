@@ -158,7 +158,7 @@ func (z *zaim) tokenRequest(ctx context.Context, endpoint, token, secret string,
 	}
 	resp, err := z.hc.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ReadBody(resp.Body)
@@ -589,7 +589,7 @@ func (z *zaim) do(ctx context.Context, t *Token, method, path string, form url.V
 	}
 	resp, err := z.hc.Do(req)
 	if err != nil {
-		return err
+		return transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, err := ReadBody(resp.Body)

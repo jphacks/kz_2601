@@ -507,3 +507,27 @@ func TestZaimDefinition(t *testing.T) {
 		}
 	}
 }
+
+// A transport failure is the provider's (upstream, retryable), not an
+// internal error, and carries no URL.
+func TestZaimTransportError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hj, _ := w.(http.Hijacker)
+		c, _, _ := hj.Hijack()
+		_ = c.Close()
+	}))
+	t.Cleanup(srv.Close)
+	z, err := newZaim(Secrets{ClientID: "k", ClientSecret: "s"}, zaimWire{RequestURL: srv.URL + "/req", AccessURL: srv.URL + "/acc", APIBase: srv.URL + "/v2", Client: srv.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	_, err = z.money(ctx, Input{Token: &Token{AccessToken: "a", RefreshToken: "s"}})
+	var pe *ProviderError
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream || strings.Contains(err.Error(), srv.URL) {
+		t.Fatalf("api: %v", err)
+	}
+	if _, _, _, err := z.Begin(ctx, "https://runner.example/oauth/callback/zaim?state=x"); Reason(err) != ReasonUpstream || strings.Contains(err.Error(), srv.URL) {
+		t.Fatalf("request token: %v", err)
+	}
+}
