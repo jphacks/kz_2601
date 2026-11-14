@@ -266,19 +266,74 @@ func TestExtRunnerLimit(t *testing.T) {
 // providerIDs returns GET /v1/me/connections providers as "id:enabled".
 func providerIDs(t *testing.T, r resp) []string {
 	t.Helper()
-	list, ok := r.body["providers"].([]any)
+	out := extListIDs(t, r, "providers")
+	for _, v := range r.body["providers"].([]any) {
+		if p := v.(map[string]any); p["nameJa"] == "" || p["nameEn"] == "" {
+			t.Fatalf("no name: %v", p)
+		}
+	}
+	return out
+}
+
+// extListIDs returns the key of GET /v1/me/connections (providers / keyless) as "id:enabled".
+func extListIDs(t *testing.T, r resp, key string) []string {
+	t.Helper()
+	list, ok := r.body[key].([]any)
 	if r.code != http.StatusOK || !ok {
-		t.Fatalf("providers: %d %s", r.code, r.raw)
+		t.Fatalf("%s: %d %s", key, r.code, r.raw)
 	}
 	out := []string{}
 	for _, v := range list {
 		p := v.(map[string]any)
-		if p["nameJa"] == "" || p["nameEn"] == "" {
-			t.Fatalf("no name: %v", p)
-		}
 		out = append(out, fmt.Sprintf("%s:%v", p["id"], p["enabled"]))
 	}
 	return out
+}
+
+// keylessWant is the keyless list the registry implies: every provider
+// without OAuth, sorted by id, fakes only when the runner has them on.
+func keylessWant(fakesOn bool) []string {
+	out := []string{}
+	for _, p := range extapi.Providers() {
+		if p.NeedsOAuth || (p.Fake && !fakesOn) {
+			continue
+		}
+		out = append(out, fmt.Sprintf("%s:%v", p.ID, p.Fake && fakesOn))
+	}
+	return out
+}
+
+// The list also says which services work without connecting :
+// keyless = providers without OAuth, enabled like providers, fakes only
+// when on, narrowed by supportedFeatures the same way.
+func TestExtKeylessProviders(t *testing.T) {
+	e := newExtEnv(t, 100)
+	r := e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil)
+	got := extListIDs(t, r, "keyless")
+	want := keylessWant(true)
+	if !slices.Equal(got, want) {
+		t.Fatalf("keyless: %v, want %v", got, want)
+	}
+	if len(got) < 3 || !slices.Contains(got, "fakeFree:true") || !slices.Contains(got, "frankfurter:false") {
+		t.Fatalf("keyless: %v", got)
+	}
+	for _, id := range providerIDs(t, r) {
+		if slices.Contains(got, id) {
+			t.Fatalf("an OAuth provider in keyless: %s", id)
+		}
+	}
+	got = extListIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections?supportedFeatures=externalCall.fakeFree,externalCall.fakeOauth", nil, nil), "keyless")
+	if !slices.Equal(got, []string{"fakeFree:true"}) {
+		t.Fatalf("narrowed: %v", got)
+	}
+	// the review build lists every keyless provider but no fake (決定 6)
+	review := "/v1/me/connections?supportedFeatures=" + url.QueryEscape(strings.Join(extapi.ReviewBuildFeatures(), ","))
+	if got := extListIDs(t, e.do("solo", http.MethodGet, review, nil, nil), "keyless"); !slices.Equal(got, keylessWant(false)) {
+		t.Fatalf("review build: %v", got)
+	}
+	if got := extListIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections?supportedFeatures=", nil, nil), "keyless"); len(got) != 0 {
+		t.Fatalf("empty features: %v", got)
+	}
 }
 
 // The list also says which services can be connected (#1566): OAuth
@@ -369,5 +424,8 @@ func TestExtOff(t *testing.T) {
 	// the services are still listed, all off, the fake not at all
 	if got := providerIDs(t, r); !slices.Equal(got, []string{"asana:false", "github:false", "googleCalendar:false", "googleSheets:false", "googleTasks:false", "linear:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false", "vercel:false", "withings:false"}) {
 		t.Fatalf("providers off: %v", got)
+	}
+	if got := extListIDs(t, r, "keyless"); !slices.Equal(got, keylessWant(false)) {
+		t.Fatalf("keyless off: %v", got)
 	}
 }

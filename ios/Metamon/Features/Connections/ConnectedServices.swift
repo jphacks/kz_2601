@@ -14,52 +14,99 @@ enum ConnectedServicesPolicy {
     }
 }
 
-/// 「つないだサービス」の一覧を取る時に送る `supportedFeatures`(#1493)。この画面で扱える provider の `externalCall.<id>`。
+/// 「つないだサービス」の一覧を取る時に送る `supportedFeatures`(#1493)。
+/// 端末は provider の一覧を持たず、サーバーが登録している provider をそのまま出す(nil = 絞らない)ので、
+/// 新しい provider はアプリを更新しなくても並ぶ。審査用の版だけ空(= 何も出さない・決定 6)。
 /// generate に送る `ClientCapabilities.supportedFeatures` とは別(外を呼ぶ DSL の部品はまだ無い)。
 enum ConnectedServicesFeatures {
-    /// この画面で扱える provider(OAuth の要るもの)
-    static let providers = ["googleCalendar", "todoist", "outlookCalendar", "notion", "googleTasks", "github", "linear", "asana"]
-
-    static var current: [String] {
+    static var current: [String]? {
         #if APP_STORE_REVIEW
-        list(reviewBuild: true, debug: false)
-        #elseif DEBUG
-        list(reviewBuild: false, debug: true)
+        list(reviewBuild: true)
         #else
-        list(reviewBuild: false, debug: false)
+        list(reviewBuild: false)
         #endif
     }
 
-    /// 審査用の版は空(= 何も出さない・決定 6)。DEBUG だけ偽の provider も。
-    static func list(reviewBuild: Bool, debug: Bool) -> [String] {
-        if reviewBuild { return [] }
-        return (providers + (debug ? ["fakeOauth"] : [])).map { "externalCall.\($0)" }
-    }
+    static func list(reviewBuild: Bool) -> [String]? { reviewBuild ? [] : nil }
 }
 
-/// provider の端末側の名前とアイコン。名前はサーバーの `nameJa`/`nameEn` を優先し、無い時だけ使う。
+/// provider の端末側の名前とアイコン。名前はサーバーの `nameJa`/`nameEn` を優先し、無い時だけ使う
+/// (鍵なしの provider はサーバーに名前が無いことが多い)。知らない provider は id のまま・アイコンは汎用。
 enum ConnectedServiceCatalog {
     private static let names: [String: (ja: String, en: String)] = [
         "asana": ("Asana", "Asana"),
+        "coingecko": ("CoinGecko(暗号資産の価格)", "CoinGecko"),
+        "connpass": ("connpass", "connpass"),
+        "deepl": ("DeepL 翻訳", "DeepL"),
+        "estat": ("e-Stat(政府統計)", "e-Stat"),
+        "frankfurter": ("為替レート(Frankfurter)", "Exchange rates (Frankfurter)"),
         "github": ("GitHub", "GitHub"),
         "googleCalendar": ("Google カレンダー", "Google Calendar"),
+        "googlePlaces": ("Google プレイス", "Google Places"),
+        "googleSheets": ("Google スプレッドシート", "Google Sheets"),
         "googleTasks": ("Google ToDo リスト", "Google Tasks"),
+        "gtfsRealtime": ("GTFS リアルタイム(交通)", "GTFS Realtime"),
         "linear": ("Linear", "Linear"),
+        "natureRemo": ("Nature Remo", "Nature Remo"),
+        "nhk": ("NHK 番組表", "NHK program guide"),
         "notion": ("Notion", "Notion"),
+        "odpt": ("公共交通オープンデータ(ODPT)", "ODPT (public transport)"),
+        "openMeteo": ("Open-Meteo(天気)", "Open-Meteo"),
+        "openWeather": ("OpenWeather(天気)", "OpenWeather"),
+        "openaiUsage": ("OpenAI の利用量", "OpenAI usage"),
         "outlookCalendar": ("Outlook カレンダー", "Outlook Calendar"),
+        "podcasts": ("ポッドキャスト", "Podcasts"),
+        "qiita": ("Qiita", "Qiita"),
+        "rakutenRecipe": ("楽天レシピ", "Rakuten Recipe"),
+        "slack": ("Slack", "Slack"),
+        "switchbot": ("SwitchBot", "SwitchBot"),
+        "tmdb": ("TMDB(映画・ドラマ)", "TMDB"),
         "todoist": ("Todoist", "Todoist"),
+        "vercel": ("Vercel", "Vercel"),
+        "wikipedia": ("Wikipedia", "Wikipedia"),
+        "withings": ("Withings", "Withings"),
+        "youtube": ("YouTube", "YouTube"),
+        "zipcloud": ("郵便番号(zipcloud)", "Postal codes (zipcloud)"),
     ]
 
     private static let symbols: [String: String] = [
         "asana": "circle.hexagongrid",
+        "coingecko": "bitcoinsign.circle",
+        "connpass": "person.3",
+        "deepl": "character.bubble",
+        "estat": "chart.bar",
+        "frankfurter": "yensign.circle",
         "github": "chevron.left.forwardslash.chevron.right",
         "googleCalendar": "calendar",
+        "googlePlaces": "mappin.and.ellipse",
+        "googleSheets": "tablecells",
         "googleTasks": "checklist",
+        "gtfsRealtime": "tram",
         "linear": "list.bullet.rectangle",
+        "natureRemo": "homekit",
+        "nhk": "tv",
         "notion": "doc.text",
+        "odpt": "tram",
+        "openMeteo": "cloud.sun",
+        "openWeather": "cloud.sun",
+        "openaiUsage": "gauge.with.dots.needle.33percent",
         "outlookCalendar": "calendar",
+        "podcasts": "mic",
+        "qiita": "text.book.closed",
+        "rakutenRecipe": "fork.knife",
+        "slack": "number",
+        "switchbot": "homekit",
+        "tmdb": "film",
         "todoist": "checklist",
+        "vercel": "triangle",
+        "wikipedia": "book",
+        "withings": "heart",
+        "youtube": "play.rectangle",
+        "zipcloud": "envelope",
     ]
+
+    /// 端末が名前とアイコンを持っている provider(テスト用)
+    static var knownIDs: [String] { names.keys.sorted() }
 
     /// 知らない provider のアイコン
     static let fallbackSymbol = "link"
@@ -80,18 +127,29 @@ enum ConnectedServiceStatus: Equatable {
     /// provider がトークンを拒んだ(`status: error`)
     case needsReconnect
     case notConnected
+    /// つながなくても使える(OAuth の要らない provider・「鍵なしで使えるもの」の行。ボタンは無い)
+    case keyless
 }
 
 struct ConnectedServiceRow: Equatable, Identifiable {
     var provider: String
     var name: String
     var status: ConnectedServiceStatus
-    /// このサーバーで今つなげるか(false なら「つなぐ」「つなぎ直す」を出さない。切るのはできる)
+    /// このサーバーで今つなげる(鍵なしなら今使える)か(false なら「つなぐ」「つなぎ直す」を出さない。切るのはできる)
     var enabled: Bool = true
     var id: String { provider }
 
-    /// つないでいないうえに今つなげない(行ごと押せなくする)
-    var isUnavailable: Bool { !enabled && status == .notConnected }
+    /// つないでいない(か鍵なし)うえに今使えない(行ごと押せなくする)
+    var isUnavailable: Bool { !enabled && (status == .notConnected || status == .keyless) }
+    /// 「鍵なしで使えるもの」の行
+    var isKeyless: Bool { status == .keyless }
+}
+
+extension [ConnectedServiceRow] {
+    /// 「つないだサービス」(つなぐ・切るのある行)
+    var connectable: [ConnectedServiceRow] { filter { !$0.isKeyless } }
+    /// 「鍵なしで使えるもの」
+    var keyless: [ConnectedServiceRow] { filter(\.isKeyless) }
 }
 
 /// 「つないだサービス」の表示の状態。
@@ -119,7 +177,7 @@ enum ConnectedServicesState: Equatable {
         return n.isEmpty ? ConnectedServiceCatalog.name(id, english: english) : n
     }
 
-    /// つないだもの(サーバーの providers の順 → 知らないもの)の後に、まだつないでいない provider。
+    /// つないだもの(サーバーの providers の順 → 知らないもの)の後に、まだつないでいない provider、最後に鍵なしで使えるもの。
     /// `providers` が無い古いサーバーでは、つないだものだけ出す。
     static func rows(_ list: ExtConnectionList, english: Bool) -> [ConnectedServiceRow] {
         let providers = list.providers ?? []
@@ -138,7 +196,9 @@ enum ConnectedServicesState: Equatable {
                                        status: $0.status == .active ? .connected : .needsReconnect, enabled: enabled($0.provider)) }
         let rest = providers.filter { seen.insert($0.id).inserted }
             .map { ConnectedServiceRow(provider: $0.id, name: name($0.id), status: .notConnected, enabled: $0.enabled) }
-        return connected + rest
+        let keyless = (list.keyless ?? []).filter { seen.insert($0.id).inserted }
+            .map { ConnectedServiceRow(provider: $0.id, name: Self.name($0, id: $0.id, english: english), status: .keyless, enabled: $0.enabled) }
+        return connected + rest + keyless
     }
 }
 
@@ -169,16 +229,26 @@ enum ConnectCallback: Equatable {
 }
 
 /// 「つないだサービス」の状態と操作。View から独立させてテストする。
+/// 読めた一覧は `ExtConnectionListCache` に控え、読めない時(オフラインなど)は控えを `stale` 付きで出す(控えが無ければ再試行できる失敗)。
 @MainActor
 @Observable
 final class ConnectedServicesModel {
     private(set) var state: ConnectedServicesState = .loading
     /// 直前の一覧に `providers` があったか(無いのは古いサーバー)。`.loaded` の時だけ意味がある
     private(set) var providersKnown = false
+    /// 今の `.loaded` が控え(読めなかったので前の一覧を出している)。再試行のボタンと一言を出す
+    private(set) var stale = false
     /// 操作中の provider(ボタンを止める)
     private(set) var busy: String?
     /// 直前の操作の失敗(セクションの下に出す)
     var message: String?
+
+    private let cache: ExtConnectionListCache?
+
+    /// `cache` が nil なら控えを使わない(テスト用)
+    init(cache: ExtConnectionListCache? = .shared) {
+        self.cache = cache
+    }
 
     /// 同意の画面を開き、戻り先の URL を返す(View が `webAuthenticationSession` を渡す)
     typealias Authenticate = @MainActor (URL) async throws -> URL
@@ -187,12 +257,29 @@ final class ConnectedServicesModel {
         do {
             let list = try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)
             providersKnown = list.providers != nil
+            stale = false
             state = .from(.success(list))
+            cache?.store(list)
         } catch is CancellationError {
             // 読み込み中のまま止まらないように。もう読めた一覧は上書きしない(画面に戻れば .task が読み直す)
-            if state == .loading { state = .failed(L10n.tr("一覧を読み込めませんでした。")) }
+            if state == .loading { fallBack() }
         } catch {
-            state = .from(.failure(error))
+            if (error as? APIError)?.isExtUnavailable == true {
+                state = .hidden
+            } else {
+                fallBack()
+            }
+        }
+    }
+
+    /// 読めなかった: 控えがあればそれを `stale` で出す。無ければ再試行できる失敗
+    private func fallBack() {
+        if let cached = cache?.load() {
+            providersKnown = cached.providers != nil
+            stale = true
+            state = .from(.success(cached))
+        } else {
+            state = .failed(L10n.tr("一覧を読み込めませんでした。"))
         }
     }
 

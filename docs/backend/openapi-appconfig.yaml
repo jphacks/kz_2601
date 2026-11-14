@@ -2085,7 +2085,8 @@ paths:
         利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付・今月の回数(`monthCalls`・#2144)だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
         `EXT_RUNNER_URL` が無い時は空の一覧。
         `providers` はつなげるサービスの一覧(#1566・OAuth の要る provider だけ・id の順)。`enabled` は runner が今動かしているか(`EXT_RUNNER_URL` が無い時はみな false)。偽の provider は runner が動かしている時だけ(本番では出ない)。
-        `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ。審査用の版は OAuth の provider のキーを送らないので何も出ない(決定 6)。
+        `keyless` はつながなくても使えるサービスの一覧(OAuth の要らない provider・id の順・形と `enabled` は `providers` と同じ)。端末の「つないだサービス」が「鍵なしで使えるもの」として出す(つなぐボタンは無い)。名前が無い provider は `nameJa` / `nameEn` が空。
+        `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ(両方)。審査用の版は OAuth の provider のキーを送らないので `providers` は何も出ない(決定 6)。
       parameters:
         - in: query
           name: supportedFeatures
@@ -2104,6 +2105,7 @@ paths:
                 properties:
                   connections: { type: array, items: { $ref: '#/components/schemas/ExtConnection' } }
                   providers: { type: array, items: { $ref: '#/components/schemas/ExtProvider' } }
+                  keyless: { type: array, items: { $ref: '#/components/schemas/ExtProvider' }, description: 'つながなくても使えるサービス(OAuth の要らない provider)。無い = 古いサーバー' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
@@ -2441,11 +2443,11 @@ components:
           description: 'この人が今月(JST)その provider を呼んだ回数(#2144)。回数の上限と同じ数え方(キャッシュから返した分・呼ぶ前に止まった分は数えない)で、自動の動きの分も入る。上限の値は返さない。読めなかった時・古い runner の時は省く'
     ExtProvider:
       type: object
-      description: つなげるサービス(GET /me/connections の providers)
+      description: つなげるサービス(GET /me/connections の providers)・つながなくても使えるサービス(keyless)
       required: [id, nameJa, nameEn, enabled]
       properties:
         id: { type: string, example: googleCalendar, description: 'POST /me/connections/{provider}/start の provider' }
-        nameJa: { type: string, example: Google カレンダー }
+        nameJa: { type: string, example: Google カレンダー, description: 'OAuth の provider は必ずある。keyless は無ければ空(端末が id から名前を出す)' }
         nameEn: { type: string, example: Google Calendar }
         enabled: { type: boolean, description: 'このサーバーで今つなげるか(false なら画面はボタンを押せなくする)' }
     ExtResult:

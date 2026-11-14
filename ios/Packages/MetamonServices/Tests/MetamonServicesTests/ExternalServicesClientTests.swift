@@ -49,6 +49,38 @@ final class ExternalServicesClientTests: XCTestCase {
         XCTAssertNil(list[1].connectedAt)
     }
 
+    /// `keyless`(つながなくても使えるサービス)も読む。無い = 古いサーバー(nil)。
+    func testListDecodesKeyless() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"""
+        {"connections":[],"providers":[],
+         "keyless":[{"id":"frankfurter","nameJa":"","nameEn":"","enabled":true},
+                    {"id":"openWeather","nameJa":"OpenWeather","nameEn":"OpenWeather","enabled":false}]}
+        """#)])
+        let answer = try await client.connections(supportedFeatures: nil)
+        XCTAssertEqual(answer.keyless, [ExtProvider(id: "frankfurter", nameJa: "", nameEn: "", enabled: true),
+                                        ExtProvider(id: "openWeather", nameJa: "OpenWeather", nameEn: "OpenWeather", enabled: false)])
+        StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[],"providers":[]}"#)])
+        XCTAssertNil(try await client.connections(supportedFeatures: nil).keyless)
+    }
+
+    /// 最後の一覧の控え(オフライン用): 保存 → 読む → 消す。日付・状態・providers・keyless が往復する
+    func testConnectionListCacheRoundTrip() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cache = ExtConnectionListCache(directory: dir)
+        XCTAssertNil(cache.load())
+        let list = ExtConnectionList(connections: [ExtConnection(provider: "todoist", status: .error, scopes: ["a"], connectedAt: Date(timeIntervalSince1970: 1_700_000_000))],
+                                     providers: [ExtProvider(id: "todoist", nameJa: "Todoist", nameEn: "Todoist", enabled: false)],
+                                     keyless: [ExtProvider(id: "frankfurter", nameJa: "", nameEn: "")])
+        cache.store(list)
+        XCTAssertEqual(cache.load(), list)
+        let old = ExtConnectionList(connections: [], providers: nil)
+        cache.store(old)
+        XCTAssertEqual(cache.load(), old, "古いサーバーの答え(providers 無し)もそのまま")
+        cache.clear()
+        XCTAssertNil(cache.load())
+    }
+
     /// 古いサーバーは providers を返さない。nil(空の配列と区別する)で読める。
     func testListWithoutProvidersFromOldServer() async throws {
         StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[{"provider":"todoist","status":"active"}]}"#)])
@@ -190,7 +222,13 @@ final class ExternalServicesClientTests: XCTestCase {
         XCTAssertEqual(some, ["todoist"])
         let none = try await mock.connections(supportedFeatures: []).providers
         XCTAssertEqual(none, [])
-        let old = try await MockExternalServicesClient(providers: nil).connections(supportedFeatures: []).providers
-        XCTAssertNil(old)
+        let old = try await MockExternalServicesClient(providers: nil).connections(supportedFeatures: [])
+        XCTAssertNil(old.providers)
+        XCTAssertNil(old.keyless, "古いサーバーは keyless も返さない")
+        // keyless も同じく絞る
+        let keyless = try await mock.connections(supportedFeatures: nil).keyless?.map(\.id)
+        XCTAssertEqual(keyless, MockExternalServicesClient.defaultKeyless.map(\.id))
+        let oneKeyless = try await mock.connections(supportedFeatures: ["externalCall.openWeather"]).keyless?.map(\.id)
+        XCTAssertEqual(oneKeyless, ["openWeather"])
     }
 }

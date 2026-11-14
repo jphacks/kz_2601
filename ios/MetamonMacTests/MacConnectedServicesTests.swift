@@ -63,20 +63,60 @@ final class MacConnectedServicesTests: XCTestCase {
     func testListShowsConnectedThenProviders() async {
         let client = FakeClient()
         client.list.connections = [ExtConnection(provider: "notion", status: .active)]
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(client)
         XCTAssertEqual(model.state, .loaded([
             ConnectedServiceRow(provider: "notion", name: "Notion", status: .connected),
             ConnectedServiceRow(provider: "googleCalendar", name: "Google カレンダー", status: .notConnected),
         ]))
-        // この画面で扱える provider だけに絞って聞く(iOS と同じ)
+        // 端末は provider の一覧を持たず、絞らずに聞く(iOS と同じ)
         XCTAssertEqual(client.supportedFeatures, .some(ConnectedServicesFeatures.current))
+        XCTAssertNil(ConnectedServicesFeatures.current)
+    }
+
+    /// 鍵なしで使えるもの(keyless)は別の行(status .keyless・ボタン無し)。文言は iOS と同じ
+    func testKeylessRows() async {
+        let client = FakeClient()
+        client.list.keyless = [ExtProvider(id: "frankfurter", nameJa: "", nameEn: ""), ExtProvider(id: "openWeather", nameJa: "天気", nameEn: "Weather", enabled: false)]
+        let model = ConnectedServicesModel(cache: nil)
+        await model.load(client)
+        guard case .loaded(let rows) = model.state else { return XCTFail("\(model.state)") }
+        XCTAssertEqual(rows.connectable.map(\.provider), ["googleCalendar", "notion"])
+        XCTAssertEqual(rows.keyless, [
+            ConnectedServiceRow(provider: "frankfurter", name: "為替レート(Frankfurter)", status: .keyless),
+            ConnectedServiceRow(provider: "openWeather", name: "天気", status: .keyless, enabled: false),
+        ])
+        XCTAssertEqual(MacConnectedServicesCopy.status(rows.keyless[0]), "鍵なしで使えます")
+        XCTAssertEqual(MacConnectedServicesCopy.status(rows.keyless[1]), "いまは使えません")
+    }
+
+    /// 読めない時は控え(前に読めた一覧)を stale で出し、一言と再試行を出す。控えが無ければ失敗
+    func testListFailureFallsBackToCache() async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cache = ExtConnectionListCache(directory: dir)
+        let client = FakeClient()
+        client.list.connections = [ExtConnection(provider: "notion", status: .active)]
+        let model = ConnectedServicesModel(cache: cache)
+        await model.load(client)
+        XCTAssertFalse(model.stale)
+
+        client.listError = URLError(.notConnectedToInternet)
+        let offline = ConnectedServicesModel(cache: cache)
+        await offline.load(client)
+        guard case .loaded(let rows) = offline.state else { return XCTFail("\(offline.state)") }
+        XCTAssertEqual(rows.first?.provider, "notion")
+        XCTAssertTrue(offline.stale)
+        XCTAssertEqual(MacConnectedServicesCopy.footer(offline), "サーバーに届かないため、前に読み込んだ一覧を出しています。")
+        client.listError = nil
+        await offline.load(client)
+        XCTAssertFalse(offline.stale)
     }
 
     func testListFailureIsRetryable() async {
         let client = FakeClient()
         client.listError = URLError(.notConnectedToInternet)
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(client)
         XCTAssertEqual(model.state, .failed("一覧を読み込めませんでした。"))
         client.listError = nil
@@ -87,7 +127,7 @@ final class MacConnectedServicesTests: XCTestCase {
     func testExtUnavailableHides() async {
         let client = FakeClient()
         client.listError = Self.unavailable
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(client)
         XCTAssertEqual(model.state, .hidden)
     }
@@ -96,7 +136,7 @@ final class MacConnectedServicesTests: XCTestCase {
 
     func testConnectOpensAuthURLAndReloads() async {
         let client = FakeClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         var opened: [URL] = []
         await model.connect("notion", client: client) { url in
             opened.append(url)
@@ -111,14 +151,14 @@ final class MacConnectedServicesTests: XCTestCase {
 
     func testConnectErrorCallbackShowsMessage() async {
         let client = FakeClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.connect("notion", client: client) { _ in URL(string: "tailorit://connected?provider=notion&status=error")! }
         XCTAssertEqual(model.message, "つなげませんでした。もう一度試してください。")
     }
 
     func testConnectCancelIsSilent() async {
         let client = FakeClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.connect("notion", client: client) { _ in throw ASWebAuthenticationSessionError(.canceledLogin) }
         XCTAssertNil(model.message, "自分で閉じた時は何も言わない")
     }
@@ -126,7 +166,7 @@ final class MacConnectedServicesTests: XCTestCase {
     func testConnectStartFailure() async {
         let client = FakeClient()
         client.startError = URLError(.timedOut)
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.connect("notion", client: client) { _ in XCTFail("同意の画面は開かない"); return URL(string: "x:")! }
         XCTAssertEqual(model.message, "つなげませんでした。もう一度試してください。")
     }
@@ -147,7 +187,7 @@ final class MacConnectedServicesTests: XCTestCase {
     func testDisconnectRemovesAndReloads() async {
         let client = FakeClient()
         client.list.connections = [ExtConnection(provider: "notion", status: .error)]
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.disconnect("notion", client: client)
         XCTAssertEqual(client.disconnected, ["notion"])
         XCTAssertNil(model.message)
@@ -160,7 +200,7 @@ final class MacConnectedServicesTests: XCTestCase {
     func testDisconnectFailureShowsMessage() async {
         let client = FakeClient()
         client.disconnectError = URLError(.notConnectedToInternet)
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.disconnect("notion", client: client)
         XCTAssertEqual(model.message, "切れませんでした。もう一度試してください。")
         client.disconnectError = Self.unavailable

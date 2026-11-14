@@ -114,15 +114,14 @@ final class ConnectedServicesTests: XCTestCase {
         XCTAssertEqual(ConnectedServicesCopy.status(.notConnected), "Not connected")
     }
 
-    /// この画面だけの supportedFeatures。審査用の版は空(= サーバーは何も出さない)。
+    /// この画面の supportedFeatures: 端末は provider の一覧を持たず絞らない(nil)。審査用の版は空(= サーバーは何も出さない)。
     func testSupportedFeaturesForThisScreen() {
-        XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: true, debug: true), [])
-        XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: false, debug: false),
-                       ["externalCall.googleCalendar", "externalCall.todoist", "externalCall.outlookCalendar", "externalCall.notion",
-                        "externalCall.googleTasks", "externalCall.github", "externalCall.linear", "externalCall.asana"])
-        XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: false, debug: true).last, "externalCall.fakeOauth")
-        #if DEBUG
-        XCTAssertTrue(ConnectedServicesFeatures.current.contains("externalCall.fakeOauth"))
+        XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: true), [])
+        XCTAssertNil(ConnectedServicesFeatures.list(reviewBuild: false))
+        #if APP_STORE_REVIEW
+        XCTAssertEqual(ConnectedServicesFeatures.current, [])
+        #else
+        XCTAssertNil(ConnectedServicesFeatures.current, "サーバーが登録している provider をそのまま出す")
         #endif
         // generate に送る一覧には足さない(外を呼ぶ DSL の部品はまだ無い)
         XCTAssertFalse(ClientCapabilities.supportedFeatures.contains { $0.hasPrefix("externalCall.") })
@@ -130,7 +129,8 @@ final class ConnectedServicesTests: XCTestCase {
 
     /// サーバーの名前が無い時は端末の名前(ja/en)。知らない provider は id のまま・アイコンは汎用。
     func testCatalogNamesAndSymbols() {
-        for id in ConnectedServicesFeatures.providers {
+        XCTAssertTrue(ConnectedServiceCatalog.knownIDs.count >= 20)
+        for id in ConnectedServiceCatalog.knownIDs {
             XCTAssertNotEqual(ConnectedServiceCatalog.name(id, english: false), id, id)
             XCTAssertNotEqual(ConnectedServiceCatalog.name(id, english: true), id, id)
             XCTAssertNotEqual(ConnectedServiceCatalog.symbol(id), ConnectedServiceCatalog.fallbackSymbol, id)
@@ -156,12 +156,101 @@ final class ConnectedServicesTests: XCTestCase {
 
     func testLoadSendsSupportedFeatures() async {
         let mock = MockExternalServicesClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(mock)
         let sent = await mock.lastSupportedFeatures
         XCTAssertEqual(sent, .some(ConnectedServicesFeatures.current))
         guard case .loaded(let rows) = model.state else { return XCTFail("\(model.state)") }
-        XCTAssertEqual(rows.map(\.provider).sorted(), ["fakeOauth", "googleCalendar", "todoist"], "DEBUG は偽の provider も出す")
+        XCTAssertEqual(rows.connectable.map(\.provider).sorted(), ["fakeOauth", "googleCalendar", "todoist"], "サーバーが返した provider をそのまま")
+        XCTAssertEqual(rows.keyless.map(\.provider), ["frankfurter", "openWeather"])
+        XCTAssertFalse(model.stale)
+    }
+
+    // MARK: - 鍵なしで使えるもの
+
+    private static let frankfurter = ExtProvider(id: "frankfurter", nameJa: "", nameEn: "")
+    private static let weather = ExtProvider(id: "openWeather", nameJa: "OpenWeather", nameEn: "OpenWeather", enabled: false)
+
+    /// つないだもの → つなげるもの → 鍵なしで使えるもの(status .keyless)。名前はサーバー → 端末 → id。
+    func testKeylessRowsComeLast() {
+        let list = ExtConnectionList(connections: [ExtConnection(provider: "todoist", status: .active)],
+                                     providers: [Self.gcal, Self.todoist],
+                                     keyless: [Self.frankfurter, Self.weather, ExtProvider(id: "someFree", nameJa: "", nameEn: "")])
+        let rows = ConnectedServicesState.rows(list, english: false)
+        XCTAssertEqual(rows, [
+            ConnectedServiceRow(provider: "todoist", name: "Todoist", status: .connected),
+            ConnectedServiceRow(provider: "googleCalendar", name: "Google カレンダー", status: .notConnected),
+            ConnectedServiceRow(provider: "frankfurter", name: "為替レート(Frankfurter)", status: .keyless),
+            ConnectedServiceRow(provider: "openWeather", name: "OpenWeather", status: .keyless, enabled: false),
+            ConnectedServiceRow(provider: "someFree", name: "someFree", status: .keyless),
+        ])
+        XCTAssertEqual(rows.connectable.map(\.provider), ["todoist", "googleCalendar"])
+        XCTAssertEqual(rows.keyless.map(\.provider), ["frankfurter", "openWeather", "someFree"])
+        XCTAssertEqual(ConnectedServicesState.rows(list, english: true)[2].name, "Exchange rates (Frankfurter)")
+        // 古いサーバー(keyless 無し)は鍵なしの行が無い
+        XCTAssertTrue(ConnectedServicesState.rows(ExtConnectionList(connections: [], providers: [Self.gcal]), english: false).keyless.isEmpty)
+    }
+
+    /// 鍵なしの行の文言: 使える / 止まっている(いまは使えません)。ボタンは無い(行は押せない扱い)
+    func testKeylessCopy() {
+        let on = ConnectedServiceRow(provider: "frankfurter", name: "為替", status: .keyless)
+        let off = ConnectedServiceRow(provider: "openWeather", name: "天気", status: .keyless, enabled: false)
+        XCTAssertFalse(on.isUnavailable)
+        XCTAssertTrue(off.isUnavailable)
+        XCTAssertEqual(ConnectedServicesCopy.status(on), "鍵なしで使えます")
+        XCTAssertEqual(ConnectedServicesCopy.status(off), "いまは使えません")
+        LanguagePreference.shared.setting = .en
+        XCTAssertEqual(ConnectedServicesCopy.status(on), "No sign-in needed")
+    }
+
+    // MARK: - 控え(オフライン)
+
+    private func tempCache() -> (ExtConnectionListCache, URL) {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-test-\(UUID().uuidString)")
+        return (ExtConnectionListCache(directory: dir), dir)
+    }
+
+    /// 読めた一覧は控え、読めない時は控えを stale で出す。読めたら stale が消える。
+    func testLoadFailureFallsBackToCache() async {
+        let (cache, dir) = tempCache()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mock = MockExternalServicesClient(connections: [ExtConnection(provider: "todoist", status: .active)])
+        let model = ConnectedServicesModel(cache: cache)
+        await model.load(mock)
+        XCTAssertEqual(cache.load()?.connections.map(\.provider), ["todoist"], "読めた一覧を控える")
+
+        await mock.setNextError(URLError(.notConnectedToInternet))
+        let offline = ConnectedServicesModel(cache: cache)
+        await offline.load(mock)
+        guard case .loaded(let rows) = offline.state else { return XCTFail("\(offline.state)") }
+        XCTAssertEqual(rows.first, ConnectedServiceRow(provider: "todoist", name: "Todoist", status: .connected))
+        XCTAssertTrue(offline.stale)
+        XCTAssertTrue(offline.providersKnown)
+        XCTAssertEqual(ConnectedServicesCopy.footer(offline), "サーバーに届かないため、前に読み込んだ一覧を出しています。")
+
+        await offline.load(mock)
+        XCTAssertFalse(offline.stale, "読めたら控えではなくなる")
+        XCTAssertEqual(ConnectedServicesCopy.footer(offline), "カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。")
+        offline.message = "x"
+        XCTAssertEqual(ConnectedServicesCopy.footer(offline), "x", "操作の失敗が最優先")
+    }
+
+    /// 控えが無ければ再試行できる失敗。ext_unavailable は控えがあっても隠す。
+    func testLoadFailureWithoutCacheIsRetryable() async {
+        let (cache, dir) = tempCache()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mock = MockExternalServicesClient()
+        let model = ConnectedServicesModel(cache: cache)
+        await mock.setNextError(URLError(.timedOut))
+        await model.load(mock)
+        XCTAssertEqual(model.state, .failed("一覧を読み込めませんでした。"))
+        XCTAssertFalse(model.stale)
+        await model.load(mock)
+        guard case .loaded = model.state else { return XCTFail("再試行で読み込める") }
+
+        await mock.setNextError(APIError.server(status: 503, code: "ext_unavailable", message: ""))
+        await model.load(mock)
+        XCTAssertEqual(model.state, .hidden, "控えがあっても止めている時は隠す")
     }
 
     func testCallbackParse() {
@@ -173,7 +262,7 @@ final class ConnectedServicesTests: XCTestCase {
 
     func testConnectRefreshesListAfterReturn() async {
         let mock = MockExternalServicesClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(mock)
         await model.connect("todoist", client: mock) { _ in
             XCTFail("モックは同意の画面を開かない")
@@ -187,17 +276,17 @@ final class ConnectedServicesTests: XCTestCase {
 
     func testDisconnectRemovesRow() async {
         let mock = MockExternalServicesClient(connections: [ExtConnection(provider: "todoist", status: .active)])
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.disconnect("todoist", client: mock)
         let disconnected = await mock.disconnected
         XCTAssertEqual(disconnected, ["todoist"])
         guard case .loaded(let rows) = model.state else { return XCTFail("\(model.state)") }
-        XCTAssertFalse(rows.contains { $0.status != .notConnected })
+        XCTAssertFalse(rows.connectable.contains { $0.status != .notConnected })
     }
 
     func testConnectExtUnavailableHides() async {
         let mock = MockExternalServicesClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(mock)
         await mock.setNextError(APIError.server(status: 503, code: "ext_unavailable", message: ""))
         await model.connect("todoist", client: mock) { $0 }
@@ -205,7 +294,7 @@ final class ConnectedServicesTests: XCTestCase {
     }
 
     func testCallbackErrorShowsMessage() async {
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         let live = StubStartClient()
         await model.connect("todoist", client: live) { _ in URL(string: "tailorit://connected?provider=todoist&status=error")! }
         XCTAssertEqual(model.message, "つなげませんでした。もう一度試してください。")
@@ -215,11 +304,11 @@ final class ConnectedServicesTests: XCTestCase {
     func testUnexpectedCallbackShowsMessage() async {
         let failed = "つなげませんでした。もう一度試してください。"
         for back in ["tailorit://import/abc", "tailorit://connected?provider=notion&status=ok", "tailorit://connected?status=ok"] {
-            let model = ConnectedServicesModel()
+            let model = ConnectedServicesModel(cache: nil)
             await model.connect("todoist", client: StubStartClient()) { _ in URL(string: back)! }
             XCTAssertEqual(model.message, failed, back)
         }
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.connect("todoist", client: StubStartClient()) { _ in URL(string: "tailorit://connected?provider=todoist&status=ok")! }
         XCTAssertNil(model.message)
     }
@@ -233,7 +322,7 @@ final class ConnectedServicesTests: XCTestCase {
     }
 
     func testUserCancelIsSilent() async {
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.connect("todoist", client: StubStartClient()) { _ in
             throw NSError(domain: ASWebAuthenticationSessionErrorDomain, code: ASWebAuthenticationSessionError.Code.canceledLogin.rawValue)
         }

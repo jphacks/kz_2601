@@ -9075,6 +9075,23 @@
         }
       }
     },
+    "サインインしなくても、アプリから使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps can use these without you signing in."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインインしなくても、アプリから使えます。"
+          }
+        }
+      }
+    },
     "サインインし直してから送ってください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9207,6 +9224,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サーバーが混み合っています。少し待ってからもう一度送ってください。"
+          }
+        }
+      }
+    },
+    "サーバーに届かないため、前に読み込んだ一覧を出しています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't reach the server, so this is the last list loaded."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに届かないため、前に読み込んだ一覧を出しています。"
           }
         }
       }
@@ -11638,6 +11672,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今すぐ送る"
+          }
+        }
+      }
+    },
+    "今つなげるサービスはありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No services to connect right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今つなげるサービスはありません。"
           }
         }
       }
@@ -22238,6 +22289,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音中。タップで終了"
+          }
+        }
+      }
+    },
+    "鍵なしで使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sign-in needed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵なしで使えます"
+          }
+        }
+      }
+    },
+    "鍵なしで使えるもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works without signing in"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵なしで使えるもの"
           }
         }
       }

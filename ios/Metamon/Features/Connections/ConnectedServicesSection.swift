@@ -4,6 +4,8 @@ import SwiftUI
 import MetamonServices
 
 /// 設定の「つないだサービス」(#1493): つないだ外のサービスの一覧・つなぐ・つなぎ直す・切る。
+/// 一覧はサーバーの `GET /v1/me/connections` から(端末は provider の一覧を持たない)。読み込み中はスケルトン、
+/// 読めない時は控えの一覧(`stale`)か再試行。「鍵なしで使えるもの」(OAuth の要らない provider)は別のセクションに名前だけ出す。
 /// Pro だけ(Pro でなければ課金画面)。サーバーが外の API を止めている(`ext_unavailable`)時はセクションごと出さない。
 struct ConnectedServicesSection: View {
     @Environment(\.services) private var services
@@ -18,16 +20,29 @@ struct ConnectedServicesSection: View {
             case .hidden:
                 EmptyView()
             case .loading:
-                section { HStack { ProgressView(); Text("読み込み中").foregroundStyle(.secondary) } }
+                section { ConnectedServicesSkeleton() }
             case .failed(let text):
                 section {
                     Text(text).foregroundStyle(.secondary)
-                    Button("再試行") { Task { await model.load(services.external) } }
-                        .accessibilityIdentifier("settings.connections.retry")
+                    retryButton
                 }
             case .loaded(let rows):
                 section {
-                    ForEach(rows) { row($0) }
+                    if rows.connectable.isEmpty {
+                        Text("今つなげるサービスはありません。").foregroundStyle(.secondary)
+                    }
+                    ForEach(rows.connectable) { row($0) }
+                    if model.stale { retryButton }
+                }
+                if !rows.keyless.isEmpty {
+                    Section {
+                        ForEach(rows.keyless) { row($0) }
+                    } header: {
+                        Text("鍵なしで使えるもの")
+                    } footer: {
+                        Text("サインインしなくても、アプリから使えます。")
+                    }
+                    .accessibilityIdentifier("settings.connections.keyless")
                 }
             }
         }
@@ -49,13 +64,18 @@ struct ConnectedServicesSection: View {
         L10n.tr("\(confirmDisconnect?.name ?? "") とのつなぎを切りますか？")
     }
 
+    private var retryButton: some View {
+        Button("再試行") { Task { await model.load(services.external) } }
+            .accessibilityIdentifier("settings.connections.retry")
+    }
+
     private func section(@ViewBuilder _ content: () -> some View) -> some View {
         Section {
             content()
         } header: {
             Text("つないだサービス")
         } footer: {
-            Text(model.message ?? L10n.tr("カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。"))
+            Text(ConnectedServicesCopy.footer(model))
                 .foregroundStyle(model.message == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.Colors.warning))
         }
         .accessibilityIdentifier("settings.connections")
@@ -106,6 +126,8 @@ struct ConnectedServicesSection: View {
             Button("つなぐ") { connect(row.provider) }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("settings.connections.\(row.provider).connect")
+        case .keyless: // つながなくても使える: 名前と状態だけ
+            EmptyView()
         }
     }
 
@@ -148,6 +170,36 @@ enum ConnectedServicesCopy {
         case .connected: L10n.tr("つないでいます")
         case .needsReconnect: L10n.tr("つなぎ直してください")
         case .notConnected: L10n.tr("つないでいません")
+        case .keyless: L10n.tr("鍵なしで使えます")
+        }
+    }
+
+    /// セクションの下の一言: 操作の失敗 → 控えを出している時 → ふだんの説明
+    @MainActor static func footer(_ model: ConnectedServicesModel) -> String {
+        if let m = model.message { return m }
+        if model.stale { return L10n.tr("サーバーに届かないため、前に読み込んだ一覧を出しています。") }
+        return L10n.tr("カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。")
+    }
+}
+
+/// 読み込み中のスケルトン(データ無しと区別するため必ず出す)。行の形のまま伏せる
+struct ConnectedServicesSkeleton: View {
+    var rows = 3
+
+    var body: some View {
+        ForEach(0..<rows, id: \.self) { _ in
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: ConnectedServiceCatalog.fallbackSymbol).frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: "Google Calendar")
+                    Text(verbatim: "not connected").font(.footnote)
+                }
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .redacted(reason: .placeholder)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("読み込み中")
         }
     }
 }
