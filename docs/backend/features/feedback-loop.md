@@ -26,20 +26,38 @@ flowchart LR
   C[クラッシュの急増<br/>手で記録] --> I
   TF[TestFlight の<br/>フィードバック] --> I
   GF[生成の失敗の急増<br/>ログから] --> I
+  UN[無い機能を頼まれた<br/>ai.unsupported のログから] --> I
   I[ingest<br/>伏せ字・同意の版] --> X[(loop_inbox)]
   X --> T[triage<br/>LLM・道具なし・JSON だけ]
   T --> X
   X --> D[draft<br/>決まった形・出口の検査]
   D --> Q[(loop_drafts<br/>非公開の待ち行列)]
-  Q --> H{{人: drafts approve<br/>承認 1}}
-  H --> G[GitHub の Issue<br/>要約だけ]
+  Q --> AI[auto-issue<br/>出口の検査・上限]
+  AI --> G[GitHub の Issue<br/>要約だけ・from-feedback]
+  Q -.->|人が見る時| H{{人: drafts approve}}
+  H -.-> G
   G --> A{{人: agent:ready<br/>#370}}
   A --> P[エージェントの PR]
   P --> M{{人: レビューとマージ<br/>承認 2}}
   M --> N[fixed<br/>お知らせ・リリースノートの下書き]
 ```
 
-自動なのは「取り込み → 振り分け → 下書き」と「直ったお知らせ」だけ。**Issue を作るのは人の `drafts approve` だけ**で、エージェントの PR を起動するのも、マージするのも人。定期の実行は Cloud Run Job と Cloud Scheduler(`infra/feedback_loop.tf`)で、既定は止まっている([定期の実行](#定期の実行))。
+自動なのは「取り込み → 振り分け → 下書き → **Issue の起票**(`auto-issue`)」と「直ったお知らせ」。**Issue を作るまでは人の承認が無い**(オーナーの決定 2026-11-14・[#365 の決定](../../decisions/365-self-improvement-loop.md#決定2026-11-14))。エージェントの PR を起動するのと、PR のレビューとマージは今までどおり人。`drafts approve` は、人が待ち行列を見て先に出したい時・自動では出ない下書き(P3 の `question`)を出したい時の口として残る。定期の実行は Cloud Run Job と Cloud Scheduler(`infra/feedback_loop.tf`)で、既定で作る([定期の実行](#定期の実行))。
+
+### 自動で出す決まり(auto-issue)
+
+| 決まり | 値 |
+|---|---|
+| 動く条件 | `LOOP_ISSUE_AUTO=on` **と** `LOOP_PUBLISH=on`。Firestore の `loop_control/switches` の `issue_auto` / `publish` / `all` のどれかが `false` なら止まる(既定は止まっている・fail closed)。`LOOP_ISSUE_REPO` が無ければ起動しない(dry run は `-dry-run` を明示した時だけ) |
+| 出すもの | `pending` の下書きのうち、分類が `bug` / `feature`(優先度を問わない)と、`question` の P1・P2。`spam` / `praise` は出さない(そもそも下書きにならない)。P3 の `question` は待ち行列に残り、人の `drafts approve` でだけ出る |
+| 順 | 優先度の高い順(P1 → P3)、同じ優先度は古い順。前の実行でループが承認したが投稿に失敗した下書きが先 |
+| 上限 | 1 回の実行で `LOOP_ISSUE_AUTO_MAX_PER_RUN`(既定 10)件、直近 24 時間で `LOOP_ISSUE_AUTO_MAX_PER_DAY`(既定 30)件(Issue とコメントを合わせて数える)。超えた分は次の実行へ |
+| 検査 | 人の承認と同じ出口の検査(`draft.Check`)を自動の本文に通し、落ちたら出さずに `held`(監査 `auto_skipped` / `check_failed`) |
+| 本文 | 人の承認と同じ決まった形(要約・件数と入口・版・OS)。末尾に「ループが自動で出した Issue(人の確認を経ていない)」と書く。再現の手順は「未記入」。「関係しそうな Issue」(#2288)があれば番号だけ列挙する |
+| 重複 | 人の承認と同じ: 束にまだ直っていない Issue があれば新しい Issue を作らず、その Issue にコメントを足す |
+| ラベル | `LOOP_ISSUE_LABELS` + 固定の `from-feedback` + `priority:P1` / `P2` / `P3`(束の優先度)。`agent:*` は付けない(人が付ける) |
+| 記録 | `loop_audit` に段 `issue_auto` で `draft_approved`(actor `loop`)・`auto_skipped`(理由のコード)・`auto_run`(件数)、段 `publish` で `issue_created` / `issue_appended`(actor `loop`) |
+| 止める | `switch set -by <名前> issue_auto off`(次の実行から)。全部なら `all off`。Scheduler ごとなら `feedback_loop_paused = true` |
 
 ### 流れとパッケージ
 
@@ -50,7 +68,7 @@ flowchart LR
 | [`draft`](../../../backend/internal/loop/draft) | draft・publish | 束ごとに決まった形の下書きを作り、`loop_drafts` に置く。出口の検査(`draft.Check`)・束の優先度(`draft.BundlePriority`)・承認と投稿(`review.go`)もここ | `cmd/feedback-loop`(`draft`・`drafts`)・`triage/eval` |
 | [`fixed`](../../../backend/internal/loop/fixed) | notify | 出した Issue がマージされた PR で閉じたら、送り主にお知らせ(`loop_notices`)を作る。push は `push.go` | `cmd/feedback-loop`(`fixed`) |
 | [`github`](../../../backend/internal/loop/github) | publish・notify | ループ専用の小さな GitHub の口。Issue を作る・コメントを足す・Issue がどう閉じたか(`fix.go`)を読むだけ | `cmd/feedback-loop`(`drafts`・`fixed`) |
-| [`ingest`](../../../backend/internal/loop/ingest) | intake | 出どころ(アプリ内・クラッシュ・ストアのレビュー・TestFlight・生成の失敗)を 1 つの形にして、伏せ字してから `loop_inbox` へ | `cmd/feedback-loop`(`ingest`・`ingest-crash`・`inbox`・`drafts`) |
+| [`ingest`](../../../backend/internal/loop/ingest) | intake | 出どころ(アプリ内・クラッシュ・ストアのレビュー・TestFlight・生成の失敗・無い機能の申告)を 1 つの形にして、伏せ字してから `loop_inbox` へ | `cmd/feedback-loop`(`ingest`・`ingest-crash`・`inbox`・`drafts`) |
 | [`pii`](../../../backend/internal/loop/pii) | intake(ほかの段の検査でも使う) | 決まった形で個人情報を伏せ字にする(`pii.Mask`)。LLM は呼ばない | `ingest`・`draft`・`triage` |
 | [`triage`](../../../backend/internal/loop/triage) | triage | LLM で分類・束ね・優先度付け。出力はスキーマと検査器 1(`check.go`)を通った物だけ使う | `cmd/feedback-loop`(`triage`・`triage-score`)・`triage/eval` |
 | [`triage/eval`](../../../backend/internal/loop/triage/eval) | (`-model ai` の時だけ triage) | 正解付きの組で振り分けの一致率を測る・`loop_inbox` を正解欄が空の組として書き出す([振り分けの精度を測る](#振り分けの精度を測る)) | `cmd/feedback-loop`(`triage-eval`・`triage-label-export`) |
@@ -64,7 +82,8 @@ flowchart LR
 | 同意の版で AI に回すかを決める | アプリ内のフィードバックは `LOOP_CONSENT_VERSIONS` に入った版だけ。既定は空 = アプリ内のフィードバックは AI に回らない。ストアのレビュー(公開の文)とクラッシュは同意の版を見ずに AI に回す(2026-11-10 決定) |
 | 伏せ字が多すぎる・出力が外れたら人へ | 本文の 3 割を超える伏せ字・スキーマや検査器 1 に外れた出力・個人情報の疑いは `held`(週の手作業の振り分けへ) |
 | 振り分けの LLM は読んで分類を返すだけ | 道具を渡さない(`ai.Completion` に道具の口が無い)。呼び出しごとの乱数の区切りの中にデータとして入れ、`<` `>` は全角にする。出力はスキーマ + 許可された値 + 要約の検査(URL・メンション・コード・HTML・ラベルらしい文字・個人情報) |
-| 段ごとに止められる・既定は止まっている | `LOOP_<段>=on` の時だけ動く。`loop_control/switches` の `all` / 段が `false` なら止まる。読めなければ止まる |
+| 段ごとに止められる・既定は止まっている | `LOOP_<段>=on` の時だけ動く。`loop_control/switches` の `all` / 段が `false` なら止まる。読めなければ止まる。自動の起票(`issue_auto`)は `publish` のスイッチでも止まる |
+| 自動で出す Issue は数と種類を絞る | `auto-issue` は 1 回 10 件・24 時間 30 件(環境変数で変える)。`bug` / `feature` と P1・P2 の `question` だけ。本文に「自動で出した」と書く([自動で出す決まり](#自動で出す決まりauto-issue)) |
 | 何が起きたか後からたどれる | すべての段が `loop_audit` に記録(ID と理由のコードだけ)。書けなければ段を止める。`feedbackId` と Issue の対応はここにだけある |
 | 承認の後に書き換わったら出さない | 承認した題名と本文のハッシュを残し、投稿の直前に比べる |
 | 費用の上限 | 振り分けは 1 回の件数の上限(`-max`)と、月のトークンの上限(`LOOP_MONTHLY_TOKEN_CAP`)。上限に届いたら次の呼び出しの前に止まる |
@@ -85,7 +104,7 @@ flowchart LR
 | `loop_control/usage-YYYY-MM` | 振り分けのトークン数 | — |
 | `loop_control/cursor-{source}` | 取り込みの続きの位置 | — |
 
-スクショと DSL はループに入れない。クラッシュは種類・件数・版だけ。生成の失敗はコードと件数だけ。ストアのレビューはニックネームと国を捨てる。Google Play のレビューは本文・星・アプリの版・Android の API レベル・更新日時だけを API に頼む(名前・端末・端末の情報・こちらの返信の文は取らない)。TestFlight はコメント・ビルド番号・OS の大きい版・日時だけを API に頼む(メール・名前・テスター・端末・スクショ・クラッシュログは取らない)。
+スクショと DSL はループに入れない。クラッシュは種類・件数・版だけ。生成の失敗はコードと件数だけ。無い機能の申告は、生成が summary に書いた「○○は△△で代替しました」の ○○ と △△(伏せ字済み)と件数・OS・アプリの数だけ(アプリのハッシュ・uid のハッシュは数えるだけで持たない)。ストアのレビューはニックネームと国を捨てる。Google Play のレビューは本文・星・アプリの版・Android の API レベル・更新日時だけを API に頼む(名前・端末・端末の情報・こちらの返信の文は取らない)。TestFlight はコメント・ビルド番号・OS の大きい版・日時だけを API に頼む(メール・名前・テスター・端末・スクショ・クラッシュログは取らない)。
 
 ## コマンド
 
@@ -93,9 +112,9 @@ flowchart LR
 
 | コマンド | 段 | すること |
 |---|---|---|
-| `ingest [-source in_app\|app_store_review\|google_play_review\|testflight\|gen_failure]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、Google Play のレビューは `LOOP_SOURCE_GOOGLEPLAY=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on` の時だけ |
+| `ingest [-source in_app\|app_store_review\|google_play_review\|testflight\|gen_failure\|unsupported]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、Google Play のレビューは `LOOP_SOURCE_GOOGLEPLAY=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on`、無い機能の申告は `LOOP_SOURCE_UNSUPPORTED=on` の時だけ |
 | `ingest -source all` | intake | アプリ内と `LOOP_SOURCE_*=on` の出どころを順に全部回す(定期の実行の 1 ジョブ用)。1 つが失敗しても次へ進み、最後に失敗した出どころをまとめて非 0 で終わる。監査ログに出どころごとの件数(`source_done`)と失敗(`source_failed`)を残す。`-source` 無しの既定は今のまま(最初の失敗で止まる) |
-| `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・Google Play のレビュー・クラッシュ・TestFlight・生成の失敗)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `google_play_review` / `crash` / `testflight` / `gen_failure`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
+| `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・Google Play のレビュー・クラッシュ・TestFlight・生成の失敗・無い機能の申告)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `google_play_review` / `crash` / `testflight` / `gen_failure` / `unsupported`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
@@ -104,15 +123,16 @@ flowchart LR
 | `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す。束にもう出した Issue(まだ直っていないもの)があれば、その Issue への追記の下書きにする([既存の Issue への追記](#既存の-issue-への追記)) |
 | `drafts list [-status pending]` / `show <id>` | — | 待ち行列を見る。`show` は出口の検査の結果と、承認の前に見る点を出す |
 | `drafts edit -by NAME [-title T] [-body-file F] <id>` | — | 再現の手順などを人が書く(出口の検査を通す) |
-| `drafts approve -by NAME <id>` | publish | **承認 1**。`LOOP_ISSUE_REPO` があれば Issue を作る(追記の下書きはその Issue へのコメント)。無ければ dry run(作られる Issue / コメントを表示するだけ) |
+| `drafts approve -by NAME <id>` | publish | 人が出す。`LOOP_ISSUE_REPO` があれば Issue を作る(追記の下書きはその Issue へのコメント)。無ければ dry run(作られる Issue / コメントを表示するだけ)。自動では出ない P3 の `question` や、自動の実行を待たずに出したい時に使う |
 | `drafts reject -by NAME [-reason R] <id>` / `publish <id>` | publish | 却下 / dry run の後で投稿 |
+| `auto-issue [-dry-run]` | issue_auto + publish | 出口の検査を通った `pending` の下書きを、人の承認なしに Issue にする([自動で出す決まり](#自動で出す決まりauto-issue))。`-dry-run` は出す候補の ID を並べるだけ |
 | `fixed [-dry-run]` | notify | 出した Issue がマージされた PR で閉じたかを見て、送り主にお知らせを作り、リリースノートの下書きを表示する |
 | `notices -uid UID` | — | ある人のお知らせを見る |
 | `purge [-dry-run]` | (止めない) | 期限切れ・元が消えた写し・削除したアカウントの写しを消す |
 | `switch show` / `switch set -by NAME <stage\|all> <on\|off>` | — | 停止スイッチ |
 | `audit [-since 168h] [-draft ID] [-item ID] [-summary]` | — | 監査ログ。`-summary` は週の振り返り(段と操作ごとの件数・トークン) |
 
-段: `intake` / `triage` / `draft` / `publish` / `notify`。
+段: `intake` / `triage` / `draft` / `publish` / `issue_auto` / `notify`。
 
 ## 環境変数
 
@@ -121,7 +141,8 @@ flowchart LR
 | 変数 | 既定 | 意味 |
 |---|---|---|
 | `GOOGLE_CLOUD_PROJECT` / `FIRESTORE_DATABASE` / `APP_ENV` | — | 接続先([internal/fsenv](../../../backend/internal/fsenv)) |
-| `LOOP_INTAKE` / `LOOP_TRIAGE` / `LOOP_DRAFT` / `LOOP_PUBLISH` / `LOOP_NOTIFY` | 空 = 止まっている | `on` の時だけその段が動く |
+| `LOOP_INTAKE` / `LOOP_TRIAGE` / `LOOP_DRAFT` / `LOOP_PUBLISH` / `LOOP_ISSUE_AUTO` / `LOOP_NOTIFY` | 空 = 止まっている | `on` の時だけその段が動く。`auto-issue` は `LOOP_ISSUE_AUTO` と `LOOP_PUBLISH` の両方 |
+| `LOOP_ISSUE_AUTO_MAX_PER_RUN` / `LOOP_ISSUE_AUTO_MAX_PER_DAY` | `10` / `30` | `auto-issue` が 1 回の実行・直近 24 時間で出す上限(Issue とコメントを合わせて)。正の整数以外は起動しない |
 | `LOOP_PAUSED` | 空 | `1` で全段を止める |
 | `LOOP_CONSENT_VERSIONS` | 空 | AI に回してよいアプリ内の同意の版(カンマ区切り) |
 | `LOOP_AI_SOURCES` | `in_app,app_store_review,crash` | AI に回してよい出どころ。既定はすべて(ストアのレビューも回す・2026-11-10 決定)。外した出どころは `held`(`source_not_allowed`)。アプリ内は同意の版の確認も通す |
@@ -134,11 +155,12 @@ flowchart LR
 | `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | `GOOGLE_PLAY_PACKAGE_NAME` / 空 = job の ADC | Google Play のレビューを読むアプリのパッケージ名と、サービスアカウントのキー(JSON の中身そのもの・Secret Manager から入れる)。キーが無ければ job の SA で読む(鍵を作らずに済むのでこちらを勧める)。どちらの SA も Play Console で「返信」の権限(レビューを読むのに要る)を付ける |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
 | `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。読む先は `LOOP_GENFAIL_SOURCE` で選ぶ(下の行)。既定は `LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)。`ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_SOURCE_UNSUPPORTED` | 空 | `on` で「無い機能を頼まれた」(#1769)を取り込む。生成が summary に「○○は△△で代替しました」「○○は今はできません」と申告するたびに AI のサービスが書く `ai.unsupported` の行(`requested` = ○○・`substitute` = △△、どちらも `pii.Mask` 済み・`platform`・`mode`・`app_hash`)を読み、**終わった UTC の 1 日**ごとに同じ ○○(空白と記号を落として比べる)を 1 件にまとめる(件数・OS ごとの数・アプリの数・代替の例 3 つまで)。読む先は `LOOP_GENFAIL_SOURCE` と同じ: 既定は `LOOP_UNSUPPORTED_LOGS`(`gcloud logging read --format=json` の書き出し・カンマ区切り)、`logging` なら生成の失敗と同じ Cloud Logging の読み口(`LOOP_GENFAIL_PROJECT` / `_SERVICES` / `_MAX_LINES`)。項目に `app_hash` / `uid_hash` は持たない。振り分けで `feature` になるのが普通(文に「無い機能を頼まれた」と書いてある)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `unsupported` を足す |
 | `LOOP_GENFAIL_SOURCE` | 空 = `file` | 生成の失敗のログを読む先。`file` = `LOOP_GENFAIL_LOGS` のファイル。`logging` = Cloud Logging の API(`entries.list`・#2146)で、`LOOP_GENFAIL_PROJECT`(既定 `GOOGLE_CLOUD_PROJECT`)の Cloud Run のサービス `LOOP_GENFAIL_SERVICES`(カンマ区切り・既定 `ai-<APP_ENV>`)の `jsonPayload.event="ai.generate"` の行を、比べるのに要る期間(`LOOP_GENFAIL_WINDOW` + `LOOP_GENFAIL_BASELINE`)だけ新しい順に読む。上限は `LOOP_GENFAIL_MAX_LINES`(既定 50000 行・1 回 1000 行ずつ)。上限に届いたら古い基準の行を読まずに警告を出す(直近の窓は必ず読む)。成功の行も読む(割合の分母に要る)。認証は job の ADC。要る権限は `roles/logging.viewer` だけ |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
-| `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`agent:` で始まるラベル(`agent:ready` など)が入っていたら `drafts show` / `edit` / `approve` / `reject` / `publish` は起動を拒む(人が付ける・ループは付けない) |
+| `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`auto-issue` はこれに `from-feedback` と `priority:P1`〜`P3` を足す。`agent:` で始まるラベル(`agent:ready` など)が入っていたら `drafts show` / `edit` / `approve` / `reject` / `publish` / `auto-issue` は起動を拒む(人が付ける・ループは付けない) |
 | `LOOP_RELATED_ISSUES` | 空 = 止まっている | `on` で `draft` が `LOOP_ISSUE_REPO` の開いている Issue の題名とラベルを読み、`drafts show` に「関係しそうな Issue」を出す([下](#関係しそうな-issue2288))。`LOOP_GITHUB_TOKEN` も要る |
 | `LOOP_NOTIFY_PUSH` | 空 | `on` で「直りました」を push でも送る(本人の同意 `users/{uid}/notifyConsent/_feedback_fixed` と週 1 回の上限つき) |
 | `APNS_AUTH_KEY` / `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_TOPIC` / `LOOP_APNS_ENVIRONMENT` | — | push の時だけ。runner と同じ APNs のキー |
@@ -163,7 +185,7 @@ flowchart LR
 | 束に出した Issue があり、まだ直っていない | 追記の下書き(`drafts list` に `(adds to owner/name#N)`、`show` に `adds to:`)。中身は**前回の後に届いた分だけ**の件数・入口・版・OS と要約(代表 1 + 最大 3) | その Issue に**コメント**を足す(`POST /repos/{repo}/issues/{n}/comments`)。題名は出さない。監査は `issue_appended` |
 
 - 追記の下書きも同じ決まった形・同じ出口の検査(`draft.Check`: 個人情報・URL・内部の ID・原文の一致)を、保存の時・承認の時・投稿の直前に通す。`uid`・アプリの ID・`lin_`/`fb_` は載せない。
-- 既定は新しい Issue と同じ: `LOOP_ISSUE_REPO` が無ければ dry run(足されるコメントを表示するだけ)、投稿は人の `drafts approve` / `publish` だけ。
+- 既定は新しい Issue と同じ: `LOOP_ISSUE_REPO` が無ければ dry run(足されるコメントを表示するだけ)。投稿は `auto-issue`(自動)か、人の `drafts approve` / `publish`。
 - 投稿の直前に、相手の Issue がまだ束の直っていない Issue か・`LOOP_ISSUE_REPO` と同じリポジトリかを確かめる。違えば出さない(`drafts reject` して `draft` をやり直す)。
 - 直った後に同じ束が来たら、再発として新しい Issue の下書きになる。
 - 追記の下書きも `fixed` の対象(Issue が閉じたら送り主にお知らせ)。リリースノートの下書きは Issue ごとに 1 行。
@@ -179,7 +201,7 @@ flowchart LR
 | 除くもの | ループが出した Issue(出した下書きの番号と、`LOOP_ISSUE_LABELS` のラベルの付いた物) |
 | 近さ | 束の代表の要約と題名を、日本語は文字の 2-gram・英語は小文字の語にして Dice 係数で比べる。0.25 未満は出さない。同点は番号の新しい順(`draft.FindRelated`) |
 | 置き場所 | 下書きの `related`(`loop_drafts`)。Issue の本文・題名には入れない(投稿されない・出口の検査の対象外) |
-| 見る所 | `drafts show` の「関係しそうな Issue」(`owner/name#N  題名`)。結び付ける・追記に変えるかは人が決める。ループは自動では何もしない |
+| 見る所 | `drafts show` の「関係しそうな Issue」(`owner/name#N  題名`)。`auto-issue` が出す Issue の本文には番号だけ(`#N`)を列挙する(題名は他人の文なので載せない)。結び付ける・閉じるかは人が決める。ループは自動では結び付けない |
 | 読めない時 | 通信・権限の失敗でも下書きは作る。`draft` の出力に `draft: related issues not read: <理由>` を 1 行。前の実行で付いた分は残る |
 | 追記の下書き | 付けない(相手の Issue が決まっているため) |
 
@@ -238,7 +260,7 @@ LOOP_TRIAGE=on LOOP_ANTHROPIC_API_KEY=... \
 
 ## 運用の手順
 
-定期の実行を有効にするまでは週 1 回、人が回す(有効にした後も `drafts` の承認・`switch`・`audit` は人が回す):
+定期の実行を有効にするまでは週 1 回、人が回す(有効にした後も `switch`・`audit`、出た Issue の確認は人が回す):
 
 ```sh
 cd backend
@@ -251,47 +273,51 @@ go run ./cmd/feedback-loop draft
 go run ./cmd/feedback-loop drafts list
 go run ./cmd/feedback-loop drafts show <id>          # 出口の検査と、承認の前に見る点
 go run ./cmd/feedback-loop drafts edit -by <名前> -body-file steps.md <id>
+LOOP_PUBLISH=on LOOP_ISSUE_AUTO=on LOOP_ISSUE_REPO=jphacks/kz_2601 LOOP_GITHUB_TOKEN=... \
+  go run ./cmd/feedback-loop auto-issue -dry-run         # 出す候補を見る
+LOOP_PUBLISH=on LOOP_ISSUE_AUTO=on LOOP_ISSUE_REPO=jphacks/kz_2601 LOOP_GITHUB_TOKEN=... \
+  go run ./cmd/feedback-loop auto-issue                  # 自動で出す(定期の実行と同じ)
 LOOP_PUBLISH=on LOOP_ISSUE_REPO=jphacks/kz_2601 LOOP_GITHUB_TOKEN=... \
-  go run ./cmd/feedback-loop drafts approve -by <名前> <id>
+  go run ./cmd/feedback-loop drafts approve -by <名前> <id>   # 人が出す時(P3 の question など)
 LOOP_NOTIFY=on LOOP_GITHUB_TOKEN=... go run ./cmd/feedback-loop fixed
 go run ./cmd/feedback-loop purge
 go run ./cmd/feedback-loop audit -summary
 ```
 
-承認(`drafts approve`)の前に人が見ること:
+自動で出た Issue を人が見ること(出た後・`from-feedback` ラベルで探す)と、`drafts approve` の前に人が見ること:
 
 - 本文に、エージェントへの操作の命令(マージ・ラベル・秘密・設定)が無い
 - 課金・認可・データの削除・`.github/` の作業になっていない(なっていれば却下し、人が自分で直す)
 - 個人を特定できる所(名前・場所・健康・お金の具体の値・珍しい機種と言語の組み合わせ)が無い
-- 再現の手順を自分の言葉で書いた
+- 再現の手順を自分の言葉で書いた(自動の Issue は「未記入」で出るので、Issue の上で書く)
 
 止める時: `go run ./cmd/feedback-loop switch set -by <名前> all off`(次の段の開始・振り分けの次の呼び出しから止まる)。それでも止まらない時は、Cloud Run の job の `LOOP_PAUSED=1`。
 
-定期にする時は [定期の実行](#定期の実行)。`drafts approve` は定期にしない(人の承認)。
+定期にする時は [定期の実行](#定期の実行)。
 
 ## 定期の実行
 
-`infra/feedback_loop.tf`(#368)。**既定は `feedback_loop_enabled = false` で、apply しても何も作らない。**
+`infra/feedback_loop.tf`(#368)。**既定は `feedback_loop_enabled = true`**(2026-11-14 の決定)。apply で SA・IAM・Secret の入れ物ができ、`feedback_loop_job_image` を入れるとジョブと Scheduler ができる。止めるなら `false`。
 
 | もの | 中身 |
 |---|---|
-| Cloud Run Job | `feedback-loop-ingest` / `-triage` / `-draft` / `-fixed` / `-purge`。1 コマンド = 1 ジョブ(イメージは distroless でシェルが無く、1 回の実行で 1 コマンドだけのため)。各ジョブはその段の `LOOP_<段>=on` だけを持つ(`purge` は止めない段なので無し) |
-| Cloud Scheduler | `feedback-loop-<コマンド>-daily`。既定は毎日 5:00 `ingest` → 5:20 `triage` → 6:00 `draft` → 6:30 `fixed` → 6:50 `purge`(JST・前の段の timeout より後にずらす。`feedback_loop_schedules` で変える)。失敗しても再試行しない(次の日に続きから拾う)。`triage` はジョブの再試行も無し(費用) |
+| Cloud Run Job | `feedback-loop-ingest` / `-triage` / `-draft` / `-auto-issue` / `-fixed` / `-purge`。1 コマンド = 1 ジョブ(イメージは distroless でシェルが無く、1 回の実行で 1 コマンドだけのため)。各ジョブはその段の `LOOP_<段>=on` だけを持つ(`auto-issue` は `LOOP_PUBLISH` と `LOOP_ISSUE_AUTO`、`purge` は止めない段なので無し)。`auto-issue` の上限は `feedback_loop_issue_auto_max_per_run` / `_per_day`(既定 10 / 30) |
+| Cloud Scheduler | `feedback-loop-<コマンド>-daily`。既定は毎日 5:00 `ingest` → 5:20 `triage` → 6:00 `draft` → 6:15 `auto-issue` → 6:30 `fixed` → 6:50 `purge`(JST・前の段の timeout より後にずらす。`feedback_loop_schedules` で変える)。失敗しても再試行しない(次の日に続きから拾う)。`triage`(費用)と `auto-issue`(GitHub に書く)はジョブの再試行も無し |
 | SA | `feedback-loop-job`: Firestore(`roles/datastore.user`)と、下の Secret だけを 1 つずつ読める。Firebase Auth・アプリの `ANTHROPIC_API_KEY` は読めない。`feedback-loop-scheduler`: この 5 本のジョブだけの `roles/run.invoker` |
-| Secret | 名前だけを参照し、値はコードにも state にも入らない(Secret の ID = 環境変数の名前・`latest`)。既定は `triage` に `LOOP_ANTHROPIC_API_KEY`、`fixed` に `LOOP_GITHUB_TOKEN`。`LOOP_` で始まるものは入れ物を Terraform が作り、`run-backend` は読めない。ストアのレビュー(`LOOP_ASC_*`)・push(`APNS_*`)は `feedback_loop_secret_env` に足した時だけ |
-| 秘密でない設定 | `feedback_loop_env`(`LOOP_CONSENT_VERSIONS`・`LOOP_SOURCE_APPSTORE` など・全部のジョブに入る)。鍵の名前を入れると validate で止まる |
+| Secret | 名前だけを参照し、値はコードにも state にも入らない(Secret の ID = 環境変数の名前・`latest`)。既定は `triage` に `LOOP_ANTHROPIC_API_KEY`、`draft`(関係しそうな Issue を読む時)・`auto-issue`・`fixed` に `LOOP_GITHUB_TOKEN`。`LOOP_` で始まるものは入れ物を Terraform が作り、`run-backend` は読めない。ストアのレビュー(`LOOP_ASC_*`)・push(`APNS_*`)は `feedback_loop_secret_env` に足した時だけ |
+| 秘密でない設定 | `feedback_loop_env`(`LOOP_ISSUE_REPO`・`LOOP_CONSENT_VERSIONS`・`LOOP_RELATED_ISSUES`・`LOOP_SOURCE_APPSTORE` など・全部のジョブに入る)。`auto-issue` には `LOOP_ISSUE_REPO` が要る。鍵の名前・段のスイッチ・上限を入れると validate で止まる |
 
 有効にする手順(人・prod):
 
 1. 「[ループを始める前に人がすること](#ループを始める前に人がすること)」を済ませる(同意文の版・専用のキー・トークン)。
-2. `envs/prod.tfvars` に `feedback_loop_enabled = true` を入れ、`infra/bootstrap.sh prod plan` で差分を見てから apply(SA・IAM・Secret の入れ物ができる)。
+2. `envs/prod.tfvars` に `feedback_loop_env = { LOOP_ISSUE_REPO = "jphacks/kz_2601", LOOP_CONSENT_VERSIONS = "<同意の版>" }` を入れ(`feedback_loop_enabled` は既定で true)、`infra/bootstrap.sh prod plan` で差分を見てから apply(SA・IAM・Secret の入れ物ができる)。GitHub に `from-feedback` と `priority:P1`〜`P3` のラベルがあることを確かめる(無ければ `gh label create`)。
 3. Secret に値を入れる(値の入っていない Secret を指すとジョブの起動が失敗する):
    ```sh
    gcloud secrets versions add LOOP_ANTHROPIC_API_KEY --project=jphacks-kz2601 --data-file=-
    gcloud secrets versions add LOOP_GITHUB_TOKEN --project=jphacks-kz2601 --data-file=-
    ```
-4. `/app/feedback-loop` を含むイメージ(backend の Dockerfile で同梱)の digest を `feedback_loop_job_image` に入れて、もう一度 plan → apply(ジョブ 5 本と Scheduler 5 本)。
-5. 最初は手で 1 回ずつ回して結果を見る: `gcloud run jobs execute feedback-loop-ingest --region=asia-northeast1 --wait`(`triage` / `draft` も同じ)。`go run ./cmd/feedback-loop audit -summary` で記録を確かめる。
+4. `/app/feedback-loop` を含むイメージ(backend の Dockerfile で同梱)の digest を `feedback_loop_job_image` に入れて、もう一度 plan → apply(ジョブ 6 本と Scheduler 6 本)。
+5. 最初は手で 1 回ずつ回して結果を見る: `gcloud run jobs execute feedback-loop-ingest --region=asia-northeast1 --wait`(`triage` / `draft` / `auto-issue` も同じ。`auto-issue` の前に手元で `auto-issue -dry-run` を見てもよい)。`go run ./cmd/feedback-loop audit -summary` で記録を確かめ、出た Issue(`from-feedback`)を読む。
 6. イメージの更新は Terraform が追わない(`ignore_changes`)。backend の更新ごとに `gcloud run jobs update feedback-loop-<コマンド> --image=...` で差し替える(消去ジョブと同じ)。
 
 止める: 段ごとは今までどおり `switch set -by <名前> <段|all> off`(次の実行から止まる)。Scheduler ごと止めるなら `feedback_loop_paused = true` で apply。ジョブも消すなら `feedback_loop_job_image = ""` だが、`deletion_protection` があるので先に外す。
@@ -313,8 +339,9 @@ go run ./cmd/feedback-loop audit -summary
 
 | もの | 状態 |
 |---|---|
-| 定期の実行を動かすこと | Terraform(`infra/feedback_loop.tf`)はあるが既定は止まっている。apply・Secret の値・有効化は人([定期の実行](#定期の実行)) |
+| 定期の実行を動かすこと | Terraform(`infra/feedback_loop.tf`)は既定で作る。apply・Secret の値・`LOOP_ISSUE_REPO` は人([定期の実行](#定期の実行)) |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
+| 無い機能の申告をレポートで数える | `ai.unsupported` の行は書くようになった(`internal/ai/unsupported_log.go`)が、`cmd/ai-session-report` はまだ数えない。ループは `LOOP_SOURCE_UNSUPPORTED=on` で取り込む |
 | 生成の失敗の急増を BigQuery から読む | Cloud Logging の API からは読める(`LOOP_GENFAIL_SOURCE=logging`・#2146)。ログの保存期間(既定 30 日)より長く比べたい・件数が `LOOP_GENFAIL_MAX_LINES` に収まらない時は、BigQuery のシンクを作って `ingest.GenLogSource` をもう 1 つ実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ。`LOOP_EMBED=on` で近い束を下書きに候補として書く(束ねるのは人)。モデルの埋め込みはまだ |
