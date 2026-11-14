@@ -4883,6 +4883,22 @@
         }
       }
     },
+    "この文で作り始める" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start making with this request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この文で作り始める"
+          }
+        }
+      }
+    },
     "この欄を消す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11102,6 +11118,22 @@
         }
       }
     },
+    "例えば" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For example"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例えば"
+          }
+        }
+      }
+    },
     "価格を取得できませんでした。通信状態を確認してください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14330,6 +14362,22 @@
         }
       }
     },
+    "文字で作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type to Make"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字で作る"
+          }
+        }
+      }
+    },
     "文字で頼む" : {
       "localizations" : {
         "en" : {
@@ -16055,6 +16103,22 @@
         }
       }
     },
+    "画面マップ・共有・設定を開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the screen map, sharing, and settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面マップ・共有・設定を開く"
+          }
+        }
+      }
+    },
     "直してと頼む" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17642,6 +17706,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "話した声をこの Mac の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字で頼めばすぐに記録帳を用意できます。"
+          }
+        }
+      }
+    },
+    "話して作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to Make"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して作る"
           }
         }
       }
