@@ -112,28 +112,9 @@ var genLabel = regexp.MustCompile(`^[a-z][a-z0-9_]{0,40}$`)
 // lines that do not decode are skipped; a label that is not a plain label is
 // dropped, so free text never reaches a code.
 func ParseGenLogs(r io.Reader) ([]GenEvent, error) {
-	data, err := io.ReadAll(r)
+	raws, err := splitLogRecords(r)
 	if err != nil {
 		return nil, err
-	}
-	var raws []json.RawMessage
-	if t := bytes.TrimSpace(data); len(t) > 0 && t[0] == '[' {
-		if err := json.Unmarshal(t, &raws); err != nil {
-			return nil, fmt.Errorf("decode JSON array: %w", err)
-		}
-	} else {
-		sc := bufio.NewScanner(bytes.NewReader(data))
-		sc.Buffer(make([]byte, 1<<20), 1<<24)
-		for sc.Scan() {
-			line := bytes.TrimSpace(sc.Bytes())
-			if len(line) == 0 || line[0] != '{' {
-				continue
-			}
-			raws = append(raws, append(json.RawMessage(nil), line...))
-		}
-		if err := sc.Err(); err != nil {
-			return nil, err
-		}
 	}
 	out := []GenEvent{}
 	for _, raw := range raws {
@@ -143,6 +124,33 @@ func ParseGenLogs(r io.Reader) ([]GenEvent, error) {
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
 	return out, nil
+}
+
+// splitLogRecords reads an export as its records: a JSON array of entries,
+// or JSON lines (entries or bare slog records). Lines that are not objects
+// are skipped.
+func splitLogRecords(r io.Reader) ([]json.RawMessage, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	var raws []json.RawMessage
+	if t := bytes.TrimSpace(data); len(t) > 0 && t[0] == '[' {
+		if err := json.Unmarshal(t, &raws); err != nil {
+			return nil, fmt.Errorf("decode JSON array: %w", err)
+		}
+		return raws, nil
+	}
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	sc.Buffer(make([]byte, 1<<20), 1<<24)
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		raws = append(raws, append(json.RawMessage(nil), line...))
+	}
+	return raws, sc.Err()
 }
 
 // genPayload holds only the fields the detector needs.
@@ -477,40 +485,47 @@ func genLogSourceFromEnv(getenv func(string) string) (GenLogSource, error) {
 		}
 		return GenLogFiles{Paths: paths}, nil
 	case "logging":
-		project := strings.TrimSpace(getenv(EnvGenFailProject))
-		if project == "" {
-			project = strings.TrimSpace(getenv("GOOGLE_CLOUD_PROJECT"))
-		}
-		services := []string{}
-		for s := range ParseList(getenv(EnvGenFailServices)) {
-			services = append(services, s)
-		}
-		sort.Strings(services)
-		if len(services) == 0 {
-			if env := strings.TrimSpace(getenv("APP_ENV")); env != "" {
-				services = []string{"ai-" + env}
-			}
-		}
-		var errs []error
-		if project == "" {
-			errs = append(errs, fmt.Errorf("%s=logging needs %s or GOOGLE_CLOUD_PROJECT", EnvGenFailSource, EnvGenFailProject))
-		}
-		if len(services) == 0 {
-			errs = append(errs, fmt.Errorf("%s=logging needs %s or APP_ENV", EnvGenFailSource, EnvGenFailServices))
-		}
-		api := GenLogAPI{Project: project, Services: services}
-		if v := getenv(EnvGenFailMaxLines); v != "" {
-			n, err := strconv.Atoi(v)
-			if err != nil || n <= 0 {
-				errs = append(errs, fmt.Errorf("%s: want a positive integer, got %q", EnvGenFailMaxLines, v))
-			}
-			api.MaxEntries = n
-		}
-		if err := errors.Join(errs...); err != nil {
-			return nil, err
-		}
-		return api, nil
+		return genLogAPIFromEnv(getenv)
 	default:
 		return nil, fmt.Errorf("%s: want file or logging, got %q", EnvGenFailSource, src)
 	}
+}
+
+// genLogAPIFromEnv builds the Cloud Logging reader from LOOP_GENFAIL_PROJECT
+// / _SERVICES / _MAX_LINES (shared by the generation failures and the
+// unsupported-feature declarations).
+func genLogAPIFromEnv(getenv func(string) string) (GenLogAPI, error) {
+	project := strings.TrimSpace(getenv(EnvGenFailProject))
+	if project == "" {
+		project = strings.TrimSpace(getenv("GOOGLE_CLOUD_PROJECT"))
+	}
+	services := []string{}
+	for s := range ParseList(getenv(EnvGenFailServices)) {
+		services = append(services, s)
+	}
+	sort.Strings(services)
+	if len(services) == 0 {
+		if env := strings.TrimSpace(getenv("APP_ENV")); env != "" {
+			services = []string{"ai-" + env}
+		}
+	}
+	var errs []error
+	if project == "" {
+		errs = append(errs, fmt.Errorf("%s=logging needs %s or GOOGLE_CLOUD_PROJECT", EnvGenFailSource, EnvGenFailProject))
+	}
+	if len(services) == 0 {
+		errs = append(errs, fmt.Errorf("%s=logging needs %s or APP_ENV", EnvGenFailSource, EnvGenFailServices))
+	}
+	api := GenLogAPI{Project: project, Services: services}
+	if v := getenv(EnvGenFailMaxLines); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			errs = append(errs, fmt.Errorf("%s: want a positive integer, got %q", EnvGenFailMaxLines, v))
+		}
+		api.MaxEntries = n
+	}
+	if err := errors.Join(errs...); err != nil {
+		return GenLogAPI{}, err
+	}
+	return api, nil
 }

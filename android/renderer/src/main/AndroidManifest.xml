@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- healthStat の live(#3694): 前面にいる間の歩数計(TYPE_STEP_COUNTER)。聞くのは HealthStatLeaf(live の時だけ) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <application>
         <service
             android:name="jp.kz2601.metamon.renderer.components.location.LocationTrackingService"
