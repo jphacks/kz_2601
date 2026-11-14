@@ -64,7 +64,7 @@ var (
 )
 
 func init() {
-	register(Provider{ID: GooglePlaces, Billing: BillingPaid,
+	register(Provider{ID: GooglePlaces, Billing: BillingPaid, Terms: Terms{Attribution: GooglePlacesAttribution},
 		Ops: []OpSpec{
 			{Name: "searchText", Args: []string{"q", "lat", "lng", "radius", "limit"}},
 			{Name: "searchNearby", Args: []string{"type", "lat", "lng", "radius", "limit"}},

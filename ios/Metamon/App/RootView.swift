@@ -84,8 +84,8 @@ struct RootView: View {
             .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
             .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
             .modifier(NotificationsOffBarHost()) // L3 通知がオフなら上に「設定を開く」付きのバー
-            #if !APP_STORE_REVIEW
-            .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
+            #if !APP_STORE_REVIEW && DEBUG
+            .modifier(FeedbackAutoOpenHost()) // #319 `METAMON_AUTO_FEEDBACK` で自動で開く(E2E 用)
             #endif
             .onChange(of: rt.document.version) { captureThumbnailAfterMorph() }
     }

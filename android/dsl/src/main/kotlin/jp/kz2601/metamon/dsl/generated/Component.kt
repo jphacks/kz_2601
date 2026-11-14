@@ -297,6 +297,8 @@ data class Component(
     val inputEntity: String? = null,
     val metric: Metric? = null,
     val period: Period? = null,
+    @Serializable(with = LenientBooleanSerializer::class)
+    val live: Boolean? = null,
     @Serializable(with = LenientIntSerializer::class)
     val keepMinutes: Int? = null,
     @Serializable(with = LenientIntSerializer::class)

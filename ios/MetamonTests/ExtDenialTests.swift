@@ -129,7 +129,7 @@ final class ExtDenialTests: XCTestCase {
 
     func testConnectEntersExistingFlow() async {
         let mock = MockExternalServicesClient()
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         let task = ConnectFlow.start("fakeOauth", model: model, client: mock, isPro: true) { _ in
             XCTFail("モックは同意の画面を開かない")
             return URL(string: "tailorit://connected?status=ok")!
@@ -143,7 +143,7 @@ final class ExtDenialTests: XCTestCase {
 
     func testConnectWithoutProDoesNothing() async {
         let mock = MockExternalServicesClient()
-        XCTAssertNil(ConnectFlow.start("fakeOauth", model: ConnectedServicesModel(), client: mock, isPro: false) { $0 })
+        XCTAssertNil(ConnectFlow.start("fakeOauth", model: ConnectedServicesModel(cache: nil), client: mock, isPro: false) { $0 })
         let started = await mock.started
         XCTAssertEqual(started, [], "Pro でなければ課金画面(呼び出し側)")
     }
@@ -196,7 +196,7 @@ final class ExtDenialTests: XCTestCase {
 
     @MainActor
     func testModelRemembersWhetherProvidersKnown() async {
-        let model = ConnectedServicesModel()
+        let model = ConnectedServicesModel(cache: nil)
         await model.load(MockExternalServicesClient())
         XCTAssertTrue(model.providersKnown, "モックは providers を返す")
     }

@@ -4258,19 +4258,19 @@
         }
       }
     },
-    "おかえりなさい。\n今日は何を作りますか?" : {
+    "おかえりなさい。\n今日は何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome back.\nWhat shall we make today?"
+            "value" : "Welcome back.\nWhat shall I turn into today?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "おかえりなさい。\n今日は何を作りますか?"
+            "value" : "おかえりなさい。\n今日は何に変身しましょうか?"
           }
         }
       }
@@ -4292,19 +4292,19 @@
         }
       }
     },
-    "おかえりなさい。\n次は何を作りますか?" : {
+    "おかえりなさい。\n次は何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome back.\nWhat shall we make next?"
+            "value" : "Welcome back.\nWhat shall I turn into next?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "おかえりなさい。\n次は何を作りますか?"
+            "value" : "おかえりなさい。\n次は何に変身しましょうか?"
           }
         }
       }
@@ -6519,36 +6519,19 @@
         }
       }
     },
-    "どんなアプリが欲しいですか?" : {
+    "どんなアプリに変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "What app do you want?"
+            "value" : "What shall I turn into?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "どんなアプリが欲しいですか?"
-          }
-        }
-      }
-    },
-    "どんなアプリにするか考えています…" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thinking about what kind of app to make…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "どんなアプリにするか考えています…"
+            "value" : "どんなアプリに変身しましょうか?"
           }
         }
       }
@@ -9075,6 +9058,23 @@
         }
       }
     },
+    "サインインしなくても、アプリから使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps can use these without you signing in."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインインしなくても、アプリから使えます。"
+          }
+        }
+      }
+    },
     "サインインし直してから送ってください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9207,6 +9207,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サーバーが混み合っています。少し待ってからもう一度送ってください。"
+          }
+        }
+      }
+    },
+    "サーバーに届かないため、前に読み込んだ一覧を出しています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't reach the server, so this is the last list loaded."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに届かないため、前に読み込んだ一覧を出しています。"
           }
         }
       }
@@ -11642,6 +11659,23 @@
         }
       }
     },
+    "今つなげるサービスはありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No services to connect right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今つなげるサービスはありません。"
+          }
+        }
+      }
+    },
     "今のアプリの版" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12424,6 +12458,23 @@
         }
       }
     },
+    "何に変身するか考えています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thinking about what to turn into…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何に変身するか考えています…"
+          }
+        }
+      }
+    },
     "何を記録したいですか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12454,6 +12505,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "何を記録しますか?"
+          }
+        }
+      }
+    },
+    "何を送るかは送る前に選べます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You choose what to send before sending."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何を送るかは送る前に選べます。"
           }
         }
       }
@@ -14969,19 +15037,19 @@
         }
       }
     },
-    "困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。" : {
+    "困ったこと・欲しい機能を、ここからそのまま送れます。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Send problems or ideas straight from here. You can also shake your device to open it."
+            "value" : "Send problems or ideas straight from here."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。"
+            "value" : "困ったこと・欲しい機能を、ここからそのまま送れます。"
           }
         }
       }
@@ -16358,19 +16426,19 @@
         }
       }
     },
-    "新しいアプリですね。\nどんなアプリにしますか?" : {
+    "新しいアプリですね。\n何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A new app.\nWhat kind of app?"
+            "value" : "A new app.\nWhat shall I turn into?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新しいアプリですね。\nどんなアプリにしますか?"
+            "value" : "新しいアプリですね。\n何に変身しましょうか?"
           }
         }
       }
@@ -18627,23 +18695,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "端に隠す"
-          }
-        }
-      }
-    },
-    "端末を振っても開けます。何を送るかは送る前に選べます。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You can also open this by shaking the device. You choose what to send before sending."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末を振っても開けます。何を送るかは送る前に選べます。"
           }
         }
       }
@@ -22238,6 +22289,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音中。タップで終了"
+          }
+        }
+      }
+    },
+    "鍵なしで使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sign-in needed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵なしで使えます"
+          }
+        }
+      }
+    },
+    "鍵なしで使えるもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works without signing in"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵なしで使えるもの"
           }
         }
       }

@@ -61,6 +61,7 @@ struct MetamonApp: App {
         if BuildConfig.forceMock { RecentlyPlayed.source = FakeRecentlyPlayed() } // 最近聞いた曲(#1988)は固定の履歴
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
+        if BuildConfig.forceMock { HealthData.liveSource = MockHealthLiveSource() } // healthStat の live(#3694)は 1 歩ずつ増える
         if BuildConfig.forceMock { SensorData.source = MockSensorData() } // sensorValue(#419)は決まった波形
         #else
         _ = ReviewBuildPackageMarker.self // パッケージにも APP_STORE_REVIEW が渡っていることをコンパイル時に保証(#245)

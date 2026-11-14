@@ -53,6 +53,7 @@ import jp.kz2601.metamon.onboarding.CoachMark
 import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.renderer.components.location.LocationTrackingBarHost
 import jp.kz2601.metamon.renderer.components.health.LocalHealthSource
+import jp.kz2601.metamon.renderer.components.health.LocalStepCounterSource
 import jp.kz2601.metamon.renderer.components.sensors.LocalSensorSource
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackComposerHost
@@ -205,6 +206,7 @@ fun MetamonRoot(container: AppContainer) {
                 LocalFeedHost provides container.feedHost,
                 LocalSensorSource provides container.sensorSource,
                 LocalHealthSource provides container.healthSource,
+                LocalStepCounterSource provides container.stepCounterSource,
             ) { MetamonApp(container) }
         }
     }
@@ -622,7 +624,7 @@ fun MetamonApp(container: AppContainer) {
         turn = BuildStageState.isRetentionTurn(state, retentionWaiting, noticeWaiting),
         onStop = vm::generateNow,
     )
-    // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
+    // フィードバックの画面(#319)。設定から開いた時に上に重ねる
     FeedbackComposerHost(container)
     // Tailor It Pro の課金画面(AI ボタン・設定から)。サインインのたびにサーバーの Pro を読み直す
     PaywallHost(container.pro, user?.uid)

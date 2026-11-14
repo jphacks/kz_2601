@@ -495,6 +495,7 @@ type Component struct {
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
 	Period string `json:"period,omitempty"` // today|week (default today)
+	Live   bool   `json:"live,omitempty"`   // steps: keep counting while the card is on screen (#3694)
 
 	// gridTable (#234). Entity / TitleField / SubtitleField / OnItemTap are shared.
 	ColumnField  string     `json:"columnField,omitempty"`  // x axis (e.g. weekday enum)
@@ -655,7 +656,7 @@ func Initial() App {
 			ID:    "home",
 			Title: "",
 			Components: []Component{
-				{Type: CompVoiceInput, ID: "mic", Area: "A1:F12", Prompt: "どんなアプリが欲しい？", Size: "large"},
+				{Type: CompVoiceInput, ID: "mic", Area: "A1:F12", Prompt: "どんなアプリに変身しましょうか？", Size: "large"},
 			},
 		}},
 	}

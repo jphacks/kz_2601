@@ -12,7 +12,7 @@ struct SectionContainer: View {
                 Text(title)
                     .font(RenderTheme.Fonts.sectionTitle)
                     .kerning(0.3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(RenderTheme.Colors.secondaryText)
                     .padding(.horizontal, RenderTheme.Spacing.xs + 2)
                     .macAccessibilityHeading()
             }

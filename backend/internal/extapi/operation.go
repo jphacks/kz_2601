@@ -50,6 +50,11 @@ type Output struct {
 	Item  *Row       `json:"item,omitempty"`
 	// ResultID is the id of what a write op made (resultIdField).
 	ResultID string `json:"resultId,omitempty"`
+	// Attribution is the credit the app shows with the rows (Terms; an op
+	// may set its own).
+	Attribution string `json:"attribution,omitempty"`
+	// NoAI: the provider's terms keep these rows out of AI input (Terms.NoAI).
+	NoAI bool `json:"noAI,omitempty"`
 	// Usage is the call's measured cost (paid providers).
 	Usage Usage `json:"-"`
 	// ValidUntil, when set, is when the first row stops being valid (ODPT
@@ -103,6 +108,9 @@ type Token struct {
 	RefreshToken string
 	Expiry       time.Time
 	Scopes       []string
+	// Host is the person's https host of a provider whose host is per
+	// account (Provider.ConnectHost, Backlog's space); "" otherwise.
+	Host string
 }
 
 // LogValue keeps the token out of logs.
@@ -143,4 +151,33 @@ type OAuthClient interface {
 	// ErrInvalidGrant when it renews t first and the refresh token is
 	// refused: gone, or renewed elsewhere meanwhile).
 	Revoke(ctx context.Context, t Token) error
+}
+
+// HostedOAuthClient is the OAuthClient of a provider whose endpoints are on
+// the person's own host (Provider.ConnectHost): Start and the callback pass
+// the host; Refresh, Revoke and the ops read it from Token.Host.
+type HostedOAuthClient interface {
+	OAuthClient
+	AuthURLOn(host, state, codeChallenge, redirectURI string, scopes []string) string
+	ExchangeOn(ctx context.Context, host, code, codeVerifier, redirectURI string) (Token, error)
+}
+
+// OAuth1Client is the OAuth 1.0a form of OAuthClient (Zaim). The consent
+// URL needs a request token from the provider first, so Begin reaches the
+// network (AuthURL does not; Start calls Begin instead and ignores AuthURL),
+// and the callback brings oauth_token + oauth_verifier instead of a code
+// (Callback takes the verifier as the code and calls Exchange1 instead of
+// Exchange). The request token and its secret wait in the state
+// (OAuthState.RequestToken / Verifier) between the two, as the PKCE
+// verifier does. An access token has no expiry and no refresh (Refresh is
+// ErrInvalidGrant); its token secret rides in Token.RefreshToken, sealed
+// with the token.
+type OAuth1Client interface {
+	OAuthClient
+	// Begin gets a request token whose callback is redirectURI and returns
+	// the consent URL, the request token and its secret.
+	Begin(ctx context.Context, redirectURI string) (authURL, requestToken, secret string, err error)
+	// Exchange1 turns the authorized request token and the callback's
+	// oauth_verifier into the access token.
+	Exchange1(ctx context.Context, requestToken, secret, verifier string) (Token, error)
 }

@@ -407,7 +407,7 @@ struct SettingsSheet: View {
                 NoticesSettingsRow(client: notices) // #374 「あなたの声で直りました」
             }
         } footer: {
-            Text("端末を振っても開けます。何を送るかは送る前に選べます。")
+            Text("何を送るかは送る前に選べます。")
         }
     }
     #endif
