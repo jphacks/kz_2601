@@ -419,3 +419,12 @@ func TestStravaTransportError(t *testing.T) {
 		t.Fatalf("secret in the error: %v", err)
 	}
 }
+
+// The API Agreement: a person's data only to that person, the credit, and
+// no AI until Strava confirms it.
+func TestStravaTerms(t *testing.T) {
+	p, _ := Lookup(Strava)
+	if p.Terms.NoCharge || !p.Terms.NoAI || !p.Terms.ShowOwnDataOnly || p.Terms.Attribution != StravaAttribution {
+		t.Fatalf("%+v", p.Terms)
+	}
+}

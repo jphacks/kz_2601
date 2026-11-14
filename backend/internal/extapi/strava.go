@@ -80,6 +80,8 @@ const (
 
 func init() {
 	register(Provider{ID: Strava, Billing: BillingFree, NeedsOAuth: true, NameJa: "Strava", NameEn: "Strava",
+		// API Agreement: 本人のデータは本人だけ・「Powered by Strava」。AI の禁止が消えたかを Strava に確かめるまで AI に渡さない
+		Terms: Terms{NoAI: true, ShowOwnDataOnly: true, Attribution: StravaAttribution},
 		Ops: []OpSpec{
 			{Name: "activities", Scopes: []string{stravaScopeActivity}, Args: []string{"limit", "after"}, Check: checkStravaActivities},
 			{Name: "stats", Scopes: []string{stravaScopeActivity}},
