@@ -11,7 +11,8 @@ import (
 	"testing"
 )
 
-const googleTranslateTestKey = "AIzaTestKey_0123456789abcdefghijklmnop"
+// 偽の鍵(gitleaks に掛からない値)。
+var googleTranslateTestKey = strings.Repeat("g", 32)
 
 // googleTranslateFake is a fake Translation v2 API on httptest (no live calls).
 type googleTranslateFake struct {
