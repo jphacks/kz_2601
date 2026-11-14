@@ -143,6 +143,7 @@ type tmdb struct {
 // for a movie, name / first_air_date for a show).
 type tmdbItem struct {
 	ID           int64    `json:"id"`
+	Adult        bool     `json:"adult"`
 	MediaType    string   `json:"media_type"`
 	Title        string   `json:"title"`
 	Name         string   `json:"name"`
@@ -230,7 +231,8 @@ func tmdbRows(items []tmdbItem, typ string, limit int) Output {
 			title, release = it.Name, it.FirstAirDate
 		}
 		title = tmdbClip(title, tmdbTitleRunes)
-		if it.ID <= 0 || title == "" || (kind != "movie" && kind != "tv") {
+		// adult titles are left out (trending has no include_adult=false)
+		if it.ID <= 0 || it.Adult || title == "" || (kind != "movie" && kind != "tv") {
 			continue
 		}
 		var vote string

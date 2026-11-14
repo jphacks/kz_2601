@@ -41,6 +41,7 @@ func tmdbServer(t *testing.T, status *atomic.Int64, seen *atomic.Value, hits *at
 			_, _ = w.Write([]byte(`{"page":1,"results":[
 				{"id":5,"media_type":"tv","name":"人気ドラマ","first_air_date":"2024-01-01","vote_average":7.1},
 				{"id":6,"media_type":"person","name":"俳優"},
+				{"id":9,"media_type":"movie","adult":true,"title":"成人向け","release_date":"2024-02-01","vote_average":5},
 				{"id":7,"media_type":"movie","title":"人気映画","release_date":"2024-02-02","vote_average":8}]}`))
 		case "/3/trending/movie/day":
 			_, _ = w.Write([]byte(`{"page":1,"results":[{"id":8,"title":"今日の映画","release_date":"2024-03-03","vote_average":6.5}]}`))
@@ -142,7 +143,7 @@ func TestTMDBTrending(t *testing.T) {
 	if q := f.req().URL.Query(); q.Get("language") != "ja-JP" || q.Has("query") {
 		t.Fatalf("query %v", q)
 	}
-	// all: each item's own media type; people are left out
+	// all: each item's own media type; people and adult titles are left out
 	out, err = ops["trending"].Do(t.Context(), Input{Args: map[string]string{"type": "all", "window": "week"}})
 	if err != nil || f.req().URL.Path != "/3/trending/all/week" {
 		t.Fatalf("all: %v (%v)", err, f.req().URL)
