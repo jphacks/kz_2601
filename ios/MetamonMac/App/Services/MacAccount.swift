@@ -172,6 +172,12 @@ final class MacAccount {
         await adoptUser(session.user?.uid) // wipe 済みなので持ち主を入れるだけ
     }
 
+    /// 既にあるアカウント(Apple 以外)に Apple をつなぐ(#361・設定の「サインインの方法」)。
+    /// その Apple ID が別のアカウントにあっても、切り替えもまとめもしない(uid は変わらないので端末のデータも消さない)
+    func linkApple(_ result: Result<ASAuthorization, Error>, nonce: String) async -> AppleLinkOutcome {
+        await session.linkAppleToCurrentAccount(result, nonce: nonce)
+    }
+
     /// 失敗の一言(設定・カードの下に出す)。サインインし直しと引き継ぎで置き場が分かれているのをまとめる
     var errorMessage: String? { session.linkError ?? session.errorMessage }
 }

@@ -18,6 +18,8 @@ Mac 版が macOS の仕組み(メニューバー・ウィジェット・Handoff�
 - [プッシュ通知](#プッシュ通知)
 - [近くの端末に送る(nearbyShare)](#近くの端末に送るnearbyshare)
 - [ショートカット・Siri(App Intents)](#ショートカットsiriapp-intents)
+- [Spotlight](#spotlight)
+- [集中モード](#集中モード)
 - [設定の「つないだサービス」](#設定のつないだサービス)
 - [Mac でしないこと(一言で知らせる)](#mac-でしないこと一言で知らせる)
 - [テスト(UI テスト・見た目の比較)](#テストui-テスト見た目の比較)
@@ -129,6 +131,48 @@ iOS と同じ Intent を Mac でも使います。Mac 用は本体との橋渡�
 | 待つ長さ | 最大 30 秒(Mac の `IntentHost.openLifetime`・`App/Intents/MacIntentHost.swift`。押した通知と同じ長さ)。同じ「開く」がまた来たら測り直す。過ぎたら後から急に開かず「見つからない」にする |
 | 見つからない | 消したアプリ・待っても載らなかった時は、サイドバーを出し、上の要約のお知らせに「開こうとしたアプリが見つかりませんでした。一覧から選んでください」(英訳あり) |
 | 話しかける | 一覧を待たずにすぐ実行する |
+
+### Mac で使える Intent とフレーズ
+
+Intent の型は iOS の `TailorItIntents.swift`・`IntentEntities.swift` をそのまま Mac のターゲットに入れています(`ios/project.yml`)。Mac に入っていない物は、フレーズが `#if os(iOS)` で囲まれていて、Mac のショートカットには出ません。
+
+| Intent | Mac | 中身 |
+| --- | --- | --- |
+| 記録を追加(`AddRecordIntent`) | 使える | アプリを開かずに記録を 1 件足す。記録先は端末に残る作ったアプリだけ(同梱の例の記録はメモリ上なので出さない)。中央と同じ `MacRecordEngines` のエンジンに書く |
+| 数字を読む(`GetStatValueIntent`) | 使えない | iOS だけ(コードのコメントに「Mac は #1034 の後で足す」)。`StatIntents.swift` は Mac のターゲットに入っていない |
+| 話しかける(`TalkToTailorItIntent`) | 使える | ⇧⌘M と同じ会話を開く |
+| 開く(`OpenTailorAppIntent`) | 使える | 一覧の選択へつなぐ(上の表) |
+
+- 作ったアプリの名前を使うフレーズは、一覧が変わった時(作った・名前を変えた・消した)に 2 秒まとめて引き直します(`IntentHost.appsMayHaveChanged` → `updateAppShortcutParameters()`)。
+- 審査用の版では「アプリ」が「記録帳」の言い換えになります([review-build.md](../ios/review-build.md))。
+- 推測: Mac のショートカット.app・Siri でどのフレーズが選ばれるかは、実機では確かめていない。
+
+## Spotlight
+
+Mac の Spotlight に出るのは、いまは **App Intents(上のショートカット)だけ** です。生成アプリの名前・記録を Core Spotlight の索引(`CSSearchableIndex`)に載せる仕組みは Mac にありません。
+
+| 項目 | iOS | Mac |
+| --- | --- | --- |
+| アプリの名前を探して開く | `SpotlightAppIndexer` / `CoreSpotlightIndex` が一覧の同期ごとに索引へ載せ、タップで `IntentHost.request(.open)`([iOS の Spotlight](../ios/system-integration.md#spotlight-で生成アプリを探す)) | 索引は無い。Spotlight から開けるのは Intent の「開く」(アプリ名を選ぶ)だけ |
+| 記録の中身 | 載せない(アプリの名前だけ) | 載せない。Handoff の activity も `isEligibleForSearch = false`(`MacHandoffTests`) |
+| 開いた時 | `SpotlightOpenReceiver` が appId を取り出す | 受け口が無い(`MacLinkReceiver` は `CSSearchableItemActionType` を受けない) |
+| サインアウト | `removeAll()` で索引を消す | 索引が無いので何もない |
+
+- 作る物は #2269(Mac: 生成アプリと記録を Spotlight で探せるようにする)。`SpotlightIndex` の UIKit に依らない部分を `ios/Shared/` に移し、Mac でも同じ時点で載せる・外す、という Issue の書き方です。
+- 決めること: 記録の文字まで載せるか(Issue の完了の条件は「記録の文字が出る」。iOS は名前だけなので食い違う)。暗号化した項目は載せない決まりは iOS と同じ。
+
+## 集中モード
+
+Mac には集中モードを読む口も、フィルタもまだありません。
+
+| 項目 | iOS | Mac |
+| --- | --- | --- |
+| 集中モード中かを読む口(`INFocusStatusCenter`・許可の流れ) | #2046(#1990)。式にはまだ出さない | #2328(#1990 の Mac)。コードなし。`MetamonMac.entitlements`・`Info.plist` にも足していない |
+| 集中モードのフィルタ(`TailorFocusFilter`) | 入っている([iOS の集中モードのフィルタ](../ios/system-integration.md#集中モードのフィルタ))。選んでいないアプリの通知とウィジェットを絞る | #3081。`TailorFocusFilter.swift` は Mac のターゲットに入っていない |
+
+- 読み取りは「集中中か」だけで、モードの名前は取れません。サーバーには送りません。
+- 決めること: Communication Notifications の能力(entitlement)が Mac にも要るか。Apple Developer の設定とプロファイルの作り直しは人の作業(#2328 の「やること」)。
+- 推測: Mac のウィジェット(`MetamonMacWidget`)を絞る作りは iOS の `WidgetSnapshot` の `appId` を使うと読めるが、Mac では未確認(#3081 で決まる)。
 
 ## 設定の「つないだサービス」
 

@@ -348,6 +348,7 @@ final class AppRuntime: RuntimeNavigating {
            let spec = try? JSONDecoder().decode(AutoRecord.self, from: data) {
             records[spec.entity] = await recordSync.save(appId: document.appId, entity: spec.entity, recordId: nil, data: spec.data,
                                                          author: postAuthor(for: spec.entity))
+            localWrites.bump(spec.entity)
             print("[Metamon] auto record saved locally: entity=\(spec.entity) count=\(records[spec.entity]?.count ?? 0) sync=\(recordSync.status.label)")
         }
         // スクショ用: `METAMON_AUTO_AUTHOR_PROMPT=1` で起動直後に「投稿に表示する名前」を聞くアラートを出す(#250)
@@ -444,9 +445,15 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
     /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
-    @ObservationIgnored let saveFlight = SaveFlight() // テストが保存の途中を見る
+    @ObservationIgnored private let saveFlight = SaveFlight()
+    /// 端末への書き込みの世代。送信完了の読み直しが保存の直後に古い内容で戻さないように(#3667)
+    @ObservationIgnored private let localWrites = LocalWriteGeneration()
+    /// `form` を保存している途中(書き込みの await の間)か。テストが保存の途中に入力する
+    func isSaving(_ form: FormDraft) -> Bool { saveFlight.isSaving(form) }
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
+    /// 別のアプリから値入りで開いたフォーム(#2235)を保存したら戻る先(AppRuntime+OpenForm.swift)
+    @ObservationIgnored var openFormReturn: OpenFormReturn?
     #if !APP_STORE_REVIEW
     /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(AppRuntime+AIChat.swift)
     @ObservationIgnored let aiChatPairs = AIChatPairLedger()
@@ -556,6 +563,7 @@ final class AppRuntime: RuntimeNavigating {
         noteRetention() // #482 保存期間の確認と期限切れの削除
         noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records, appId: doc.appId) // ホーム画面ウィジェットへ stat を反映
+        HomeQuickActions.noteOpened(doc.appId) // 長押しメニューの最近の順(#2232)。描き直しは下の引き直しで
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
 
@@ -984,6 +992,7 @@ final class AppRuntime: RuntimeNavigating {
         let fromSwitcher = showAppSwitcher // 一覧から来たなら開く直前に撮ってある(今撮るとシートが写る)
         showAppSwitcher = false
         guard morphJob == nil, appId != document.appId else { return }
+        openFormReturn = nil // 別の用で切り替えたら、値入りで開いたフォームの戻り先は捨てる(#2235)
         if !fromSwitcher {
             if afterSheetDismiss { try? await Task.sleep(for: .milliseconds(500)) }
             AppThumbnailStore.shared.capture(appId: document.appId, isVoiceOnly: dsl.isVoiceOnly)
@@ -1105,6 +1114,7 @@ final class AppRuntime: RuntimeNavigating {
             return false
         }
         records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: data)
+        localWrites.bump(entity)
         WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
         return true
     }
@@ -1124,6 +1134,7 @@ final class AppRuntime: RuntimeNavigating {
         guard dsl.entity(entity) != nil else { return nil }
         let written = await recordSync.write(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
         records[entity] = written.records
+        localWrites.bump(entity)
         WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
         await purgeExpired(entity) // #482
         return written.recordId
@@ -1145,6 +1156,7 @@ final class AppRuntime: RuntimeNavigating {
         var seen = Set<String>()
         for name in names where seen.insert(name).inserted {
             records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: [tf: .string(name)], author: postAuthor(for: entity))
+            localWrites.bump(entity)
         }
     }
 
@@ -1183,12 +1195,14 @@ final class AppRuntime: RuntimeNavigating {
     }
 
     /// ローカル DB の内容で表示を差し替える(画面外からの追加: Siri / ショートカット #80)。今のアプリ以外は何もしない。
+    /// 読む間に別のアプリへ切り替わった・端末に書いた(保存など #3667)なら、古い結果は捨てる。
     func reloadLocal(_ entity: String, appId: String) async {
         guard appId == document.appId else { return }
-        let cached = await recordSync.cached(appId: appId, entity: entity)
-        guard appId == document.appId else { return }
-        records[entity] = cached
-        WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
+        await localWrites.reload(entity, cached: { await recordSync.cached(appId: appId, entity: entity) }) { cached in
+            guard appId == document.appId else { return }
+            records[entity] = cached
+            WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
+        }
     }
 
     /// 同期キューからの通知。送信完了はローカル DB を読み直し、競合はサーバーから引き直す(サーバー優先)。
@@ -1201,11 +1215,7 @@ final class AppRuntime: RuntimeNavigating {
             switch event {
             case .sent(let appId, let entity):
                 PlanUsageStore.shared.invalidateApp(appId) // #317 記録・写真の量を読み直す
-                guard appId == document.appId else { return }
-                let cached = await recordSync.cached(appId: appId, entity: entity)
-                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
-                records[entity] = cached
-                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
+                await reloadLocal(entity, appId: appId)
             case .conflict(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 toast = L10n.tr("他の端末で変更されていたため、サーバーの内容に合わせました")
@@ -1310,6 +1320,7 @@ final class AppRuntime: RuntimeNavigating {
             navigate(to: screen, presentation: action.presentation, recordId: ctx.recordId, from: ctx.route)
 
         case .back:
+            if let r = openFormReturn, r.screen == ctx.route.screen { openFormReturn = nil } // 保存せずに閉じた(#2235)
             close(ctx.route)
 
         case .saveRecord:
@@ -1345,12 +1356,15 @@ final class AppRuntime: RuntimeNavigating {
                 appId: appId, entity: entity, form: form, recordId: recordId,
                 recordSync: recordSync, flight: saveFlight, author: postAuthor(for: entity), hooks: hooks,
                 canEdit: { self.canEdit(entity: $0, record: $1) },
-                current: { self.record(entity, $0) }, store: { self.records[entity] = $0 })
+                current: { self.record(entity, $0) }, store: { self.records[entity] = $0; self.localWrites.bump(entity) })
             switch outcome {
             case .readOnly: notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
             // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
             case .unchanged: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: false)
-            case .saved: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: true)
+            case .saved:
+                let back = takeOpenFormReturn(appId: appId, entityId: entity, route: ctx.route) // #2235
+                leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: true)
+                if let back { Task { await returnAfterOpenForm(back) } }
             case .inFlight, .held: break // 連打・名前を聞いている間
             }
 

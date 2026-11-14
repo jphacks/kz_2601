@@ -18,7 +18,7 @@ extension MacAppRuntime {
     /// 入力・操作の途中。DSL を差し替えるとランタイムごと作り直して下書き・開いた画面が消えるので待つ(iOS の `isInteracting` と同じ考え方)
     var isInteractingForHotReload: Bool {
         sheet != nil || fullScreen != nil || paths.values.contains { !$0.isEmpty }
-            || isShowingDialog || hasUnsavedInput()
+            || isShowingDialog || hasUnsavedInput() || gridEdit != nil // 並びの編集中(#2323)も待つ
     }
 
     /// 他の端末でこの entity が変わった。読み込んだ(表示中の)entity だけ取り直す。未表示の entity は画面が開いた時に読む

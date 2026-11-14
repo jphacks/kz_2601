@@ -15,6 +15,7 @@ final class RecordBook {
     private(set) var failed: Set<String> = []
     private(set) var records: [String: [Record]] = [:]
     @ObservationIgnored private let flight = SaveFlight()
+    @ObservationIgnored private let localWrites = LocalWriteGeneration()
     /// shared / public の entity に新しく作る記録の投稿者(#250・#963)。nil を返す entity(private)・未設定は作者を付けない
     @ObservationIgnored var postAuthor: ((String) -> (uid: String?, name: String?)?)?
     /// 端末に書いた(足す・変える・消す・取り消す)entity。Mac で同じアプリを開いた別のウインドウに知らせる(#1853)
@@ -58,8 +59,15 @@ final class RecordBook {
         }
     }
 
+    /// 端末の内容で読み直す。読む間に端末に書いたら(保存など)古い結果は捨てる(#3667)
     func reloadLocal(_ entity: String) async {
-        records[entity] = await recordSync.cached(appId: appId, entity: entity)
+        await localWrites.reload(entity, cached: { await recordSync.cached(appId: appId, entity: entity) }) { records[entity] = $0 }
+    }
+
+    /// 端末に書いた: 進行中の読み直しの結果を捨て、別のウインドウに知らせる
+    private func noteLocalWrite(_ entity: String) {
+        localWrites.bump(entity)
+        onLocalWrite?(entity)
     }
 
     enum UpdateOutcome: Equatable {
@@ -76,7 +84,7 @@ final class RecordBook {
         guard let current = record(entity, recordId) else { return .missing }
         guard canEdit(entity, current) else { return .readOnly }
         records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: recordId, data: data)
-        onLocalWrite?(entity)
+        noteLocalWrite(entity)
         return .saved
     }
 
@@ -84,7 +92,7 @@ final class RecordBook {
     func create(entity: String, data: [String: JSONValue]) async -> Bool {
         guard dsl.entity(entity) != nil else { return false }
         records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: data, author: postAuthor?(entity))
-        onLocalWrite?(entity)
+        noteLocalWrite(entity)
         return true
     }
 
@@ -93,7 +101,7 @@ final class RecordBook {
         guard dsl.entity(entity) != nil else { return nil }
         let written = await recordSync.write(appId: appId, entity: entity, recordId: nil, data: data, author: postAuthor?(entity))
         records[entity] = written.records
-        onLocalWrite?(entity)
+        noteLocalWrite(entity)
         return written.recordId
     }
 
@@ -129,6 +137,9 @@ final class RecordBook {
         static let none = SaveHooks()
     }
 
+    /// `form` を保存している途中(書き込みの await の間)か。テストが保存の途中に入力する
+    func isSaving(_ form: FormDraft) -> Bool { flight.isSaving(form) }
+
     /// saveRecord の書き込み(前段の判定は `RecordActionSteps.saveTarget`)。
     func save(entity: String, form: FormDraft, recordId: String?,
               author: (uid: String?, name: String?)? = nil, hooks: SaveHooks = .none,
@@ -136,7 +147,7 @@ final class RecordBook {
         await Self.save(appId: appId, entity: entity, form: form, recordId: recordId, recordSync: recordSync, flight: flight,
                         author: author ?? (recordId == nil ? postAuthor?(entity) : nil), hooks: hooks, canEdit: canEdit,
                         current: { self.record(entity, $0) },
-                        store: { self.records[entity] = $0; self.onLocalWrite?(entity) })
+                        store: { self.records[entity] = $0; self.noteLocalWrite(entity) })
     }
 
     /// 保存の手順の本体。記録の置き場が違う iOS の `AppRuntime` もこれを使う(#1141)。
@@ -156,7 +167,8 @@ final class RecordBook {
         let payload = form.payload
         let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: payload, author: author)
         store(written.records)
-        form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら送信待ち(M10)
+        // 送った値を保存済みとする(保存の間に入れ直した値は未保存のまま)。オフラインなら送信待ち(M10)
+        form.markSaved(queuedOffline: !recordSync.isOnline, sent: payload)
         hooks.afterSave(SavedWrite(entity: entity, recordId: written.recordId, payload: payload, isNew: recordId == nil))
         return .saved
     }
@@ -164,8 +176,8 @@ final class RecordBook {
     /// 一覧から隠し、取り消せる間は送らない(M11)。
     func deleteUndoably(entity: String, recordId: String, grace: Duration) async -> DeletionTicket {
         let ticket = await recordSync.deleteUndoably(appId: appId, entity: entity, recordId: recordId, grace: grace).ticket
+        noteLocalWrite(entity)
         await reloadLocal(entity)
-        onLocalWrite?(entity)
         return ticket
     }
 
@@ -173,8 +185,8 @@ final class RecordBook {
     @discardableResult
     func undoDelete(_ ticket: DeletionTicket) async -> Bool {
         guard await recordSync.undoDelete(ticket) != nil else { return false }
+        noteLocalWrite(ticket.entity)
         await reloadLocal(ticket.entity)
-        onLocalWrite?(ticket.entity)
         return true
     }
 }
@@ -187,4 +199,24 @@ final class SaveFlight {
     func begin(_ form: FormDraft) -> Bool { forms.insert(ObjectIdentifier(form)).inserted }
     func end(_ form: FormDraft) { forms.remove(ObjectIdentifier(form)) }
     func isSaving(_ form: FormDraft) -> Bool { forms.contains(ObjectIdentifier(form)) }
+}
+
+/// entity ごとの端末への書き込みの世代(#3667)。送信完了などの読み直しが `cached` を待つ間に新しい書き込みがあったら、
+/// 古い結果で上書きしない(保存の直後に前の内容へ戻らない)。await をまたぐので参照型で持つ
+@MainActor
+final class LocalWriteGeneration {
+    private var generations: [String: Int] = [:]
+
+    /// 端末に書いた(足す・変える・消す・取り消す)
+    func bump(_ entity: String) { generations[entity, default: 0] += 1 }
+
+    /// `cached` を待つ間に `entity` へ書き込みが無ければ `store` する。あれば結果を捨てて false
+    @discardableResult
+    func reload(_ entity: String, cached: () async -> [Record], store: ([Record]) -> Void) async -> Bool {
+        let before = generations[entity] ?? 0
+        let rows = await cached()
+        guard generations[entity] ?? 0 == before else { return false }
+        store(rows)
+        return true
+    }
 }

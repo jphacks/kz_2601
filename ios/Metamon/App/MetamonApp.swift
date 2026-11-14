@@ -16,7 +16,9 @@ struct MetamonApp: App {
     /// 起動のスプラッシュ(コールド起動の 1 回だけ・UI テストのモック起動では出さない)
     private let splashMode = SplashGate.decide()
     #if !APP_STORE_REVIEW
-    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)・長押しメニュー(#2232)
+    #else
+    @UIApplicationDelegateAdaptor(MetamonAppDelegate.self) private var appDelegate // 長押しメニュー(#2232)
     #endif
 
     /// Renderer 同梱のコンポーネント + アプリ本体が提供する `voiceInput`(WhisperKit 依存なので Renderer には置かない)。
@@ -39,6 +41,7 @@ struct MetamonApp: App {
         // クラッシュ報告(#296): 設定の「クラッシュ報告を送る」を反映(Firebase が無ければ何もしない)
         CrashReportingPreference.shared.activate(reporter: FirebaseCrashReporter() ?? NoopCrashReporter())
         UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)
+        NotificationCategories.register() // 通知のボタン・返信のカテゴリ(#2231)
         var services = BuildConfig.make()
         // #246(5.1.2(i)): 同意が無ければ ai へ一切送らない。どの入口(Siri 等)から呼ばれても効くよう Services の ai を包む
         AIConsentDebug.applyLaunchOverride()
@@ -54,6 +57,7 @@ struct MetamonApp: App {
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
         if BuildConfig.forceMock { DeviceCalendar.source = FakeDeviceCalendar.sample } // 端末のカレンダー・リマインダー(#1987)は固定の中身
+        if BuildConfig.forceMock { DeviceContacts.source = FakeDeviceContacts.sample } // 端末の連絡先の一覧(#2218)は固定の中身
         if BuildConfig.forceMock { RecentlyPlayed.source = FakeRecentlyPlayed() } // 最近聞いた曲(#1988)は固定の履歴
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
@@ -80,6 +84,12 @@ struct MetamonApp: App {
         runtime.tutorial = .shared
         runtime.coachMarks = .shared // #1441
         runtime.spotlight = SpotlightAppIndexer(index: CoreSpotlightIndex()) // #1996
+        NotificationReplyInbox.shared.install { [weak runtime] reply in
+            // 受けた後の動き(記録を足すなど)は決定(#1775)のあと。今はログ(Inbox)と DEBUG のトーストだけ(#2231)
+            #if DEBUG
+            runtime?.toast = "通知の応答: \(reply.action)" + (reply.text == nil ? "" : "(文字あり)")
+            #endif
+        }
         #if !APP_STORE_REVIEW
         runtime.betaWelcome = .shared // #313
         #endif
@@ -143,6 +153,7 @@ struct MetamonApp: App {
             .modifier(DebugClockBanner()) // 日付をずらしている間の印(#2082)
             #endif
             .modifier(SpotlightOpenReceiver()) // Spotlight の結果のタップ(#1996)。サインイン前でも受けて保留
+            .modifier(ShareInboxReceiver()) // 共有シートの拡張が受け取った物(#2224)
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
             .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269

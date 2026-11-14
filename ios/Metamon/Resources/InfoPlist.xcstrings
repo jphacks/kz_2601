@@ -1,6 +1,40 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "NFCReaderUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used so the apps you build can read text and links from NFC tags, write to them, and show the balance and recent history on your transit IC card. What's read is never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、NFC タグに書かれた文字や URL を読み取ったり、タグに書き込んだりするためと、交通系 IC カードの残高と最近の利用履歴を表示するために使用します。読み取った内容は端末の外に送りません。"
+          }
+        }
+      }
+    },
+    "NSBluetoothAlwaysUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read your heart rate from a Bluetooth heart rate monitor (such as a chest strap) so the apps you build can show and record it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、Bluetooth の心拍計(胸のベルトなど)から心拍数を読み取って表示・記録するために、Bluetooth を使用します。"
+          }
+        }
+      }
+    },
     "NSCalendarsFullAccessUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18,19 +52,53 @@
         }
       }
     },
+    "NSContactsUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read the names, birthdays, and groups in your contacts so the apps you build can show them in lists. Contact details are never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、連絡先の名前・誕生日・グループを一覧などに表示するために、連絡先を読み取ります。連絡先の内容は端末の外に送りません。"
+          }
+        }
+      }
+    },
+    "NSFocusStatusUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to check whether a Focus is on so the apps you build can quiet their display and notifications. The Focus name is never read and nothing is sent off your device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、集中モードの間は表示や通知を控えめにするために、集中モード中かどうかを使用します。モードの名前は読み取らず、端末の外に送りません。"
+          }
+        }
+      }
+    },
     "NSHealthShareUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reads your Health data so the apps you build can show your steps, weight, sleep, resting heart rate, walking and running distance, active energy, and exercise and mindful minutes."
+            "value" : "Reads your Health data so the apps you build can show your steps, weight, sleep, resting heart rate, walking and running distance, active energy, exercise and mindful minutes, workouts, and state of mind."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間を表示するために、ヘルスケアのデータを読み取ります。"
+            "value" : "生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間・ワークアウト・気分を表示するために、ヘルスケアのデータを読み取ります。"
           }
         }
       }
@@ -41,13 +109,64 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saves the weight you record in the apps you build to Health as well."
+            "value" : "Saves the weight and state of mind you record in the apps you build to Health as well."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。"
+            "value" : "生成したアプリで記録した体重と気分をヘルスケアにも保存するために、ヘルスケアへ書き込みます。"
+          }
+        }
+      }
+    },
+    "NSHomeKitUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read your Home data so the apps you build can show the names, power, brightness, temperature, and humidity of the rooms and accessories in your home. It never controls your accessories, and accessory names are never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、家の部屋と機器の名前・電源・明るさ・温度・湿度を表示するために、ホームのデータを読み取ります。機器の操作はしません。機器の名前は端末の外に送りません。"
+          }
+        }
+      }
+    },
+    "NSMotionUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses Motion & Fitness data so the apps you build can show and record your steps today and recently, changes in air pressure and altitude, and what you're doing right now (walking, running, cycling, or riding in a vehicle)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで今日や最近の歩数、気圧や高度の変化、今の動き(歩いている・走っている・自転車や乗り物で移動しているなど)を表示・記録するために、モーションとフィットネスのデータを使用します。"
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used by the apps you build to pick and save photos and videos in your photo library."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで写真や動画を選択・保存するために、写真ライブラリを使用します。"
           }
         }
       }
@@ -58,13 +177,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Used to read your reminders so the apps you build can show them in lists or by upcoming due date. Reminder titles and details are never sent off this device."
+            "value" : "Used to read and write your reminders so the apps you build can show them in lists or by upcoming due date and add new reminders. Reminder titles and details are never sent off this device."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成したアプリで、リマインダーを一覧や期限の近いものとして表示するために、リマインダーを読み取ります。リマインダーの題名や内容は端末の外に送りません。"
+            "value" : "生成したアプリで、リマインダーを一覧や期限の近いものとして表示したり、新しいリマインダーを追加したりするために、リマインダーを読み書きします。リマインダーの題名や内容は端末の外に送りません。"
           }
         }
       }

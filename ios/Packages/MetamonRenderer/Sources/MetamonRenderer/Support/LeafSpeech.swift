@@ -38,7 +38,7 @@ public final class LeafSpeech: NSObject, AVSpeechSynthesizerDelegate {
         #endif
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: Self.voiceLanguage(uiCode: LanguagePreference.shared.code))
+        SpeechVoice.configure(utterance, language: Self.voiceLanguage(uiCode: LanguagePreference.shared.code)) // 設定の声・速さ(#2229)
         speakingOwner = owner
         synthesizer.speak(utterance)
         return true

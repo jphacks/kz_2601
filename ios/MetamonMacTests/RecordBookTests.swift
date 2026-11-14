@@ -179,6 +179,37 @@ final class RecordBookTests: XCTestCase {
         XCTAssertTrue(created)
         XCTAssertEqual(b.records(for: "expense").count, 1)
     }
+
+    // MARK: - 読み直しと保存の競合(#3667)
+
+    /// `cached` を待つ間に端末に書いたら、読み直しの古い結果は捨てる
+    func testReloadDiscardsStaleRowsWhenWrittenMeanwhile() async {
+        let gen = LocalWriteGeneration()
+        var stored: [[Record]] = []
+        let kept = await gen.reload("expense", cached: { gen.bump("expense"); return [] }) { stored.append($0) }
+        XCTAssertFalse(kept, "読む間に書いたので捨てる")
+        XCTAssertTrue(stored.isEmpty)
+        let other = await gen.reload("expense", cached: { gen.bump("memo"); return [] }) { stored.append($0) }
+        XCTAssertTrue(other, "別の entity への書き込みは関係ない")
+        XCTAssertEqual(stored.count, 1)
+    }
+
+    /// 送信完了の読み直し(`reloadLocal`)が走っている間に保存しても、保存した内容が残る
+    func testReloadLocalDuringSaveKeepsNewerSave() async throws {
+        let dsl = try kakeibo()
+        let b = book(dsl)
+        _ = await b.save(entity: "expense", form: try newExpense(dsl, amount: 100, memo: "朝"), recordId: nil, canEdit: allowAll)
+        let first = try XCTUnwrap(b.records(for: "expense").first)
+        for memo in ["昼", "夜"] {
+            let reload = Task { await b.reloadLocal("expense") }
+            await Task.yield()
+            let edit = FormDraft(entity: try XCTUnwrap(dsl.entity("expense")), record: first)
+            edit.values["memo"] = .string(memo)
+            _ = await b.save(entity: "expense", form: edit, recordId: first.id, canEdit: allowAll)
+            await reload.value
+            XCTAssertEqual(b.records(for: "expense").first?.data["memo"], .string(memo), "読み直しの古い結果で戻らない")
+        }
+    }
 }
 
 // MARK: - 楽観的な保存の失敗(OptimisticSave)
