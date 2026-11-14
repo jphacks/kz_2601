@@ -227,13 +227,13 @@ func TestSpotifyFlow(t *testing.T) {
 	if !slices.Equal(res.Output.Rows, want) || f.lastPath != "/v1/me/player/recently-played" || f.lastQuery.Get("limit") != "10" {
 		t.Fatalf("rows %+v (%s %v)", res.Output.Rows, f.lastPath, f.lastQuery)
 	}
-	if e.runs() != 1 || res.Charge.Coins != 0 {
-		t.Fatalf("runs = %d (free: one `runs` a call)", e.runs())
+	if e.runs() != 0 || res.Charge.Coins != 0 {
+		t.Fatalf("runs = %d (NoCharge: the terms forbid charging, nothing is counted)", e.runs())
 	}
 
-	// nothing playing: 204 → no rows, still one `runs`
+	// nothing playing: 204 → no rows, still nothing counted
 	res, err = e.call(e.req(Spotify, "nowPlaying", nil))
-	if err != nil || len(res.Output.Rows) != 0 || res.Output.Rows == nil || e.runs() != 2 {
+	if err != nil || len(res.Output.Rows) != 0 || res.Output.Rows == nil || e.runs() != 0 {
 		t.Fatalf("204: %+v %v runs=%d", res.Output, err, e.runs())
 	}
 	f.playing = `{"is_playing":true,"item":{"name":"群青","artists":[{"name":"YOASOBI"}],"album":{"name":"THE BOOK"},"external_urls":{"spotify":"https://open.spotify.com/track/4TPwlDm6S3qvEiDlEHEx7z"}}}`

@@ -178,12 +178,35 @@ func (t mstodoTask) row() Row {
 	if r.Title == "" {
 		r.Title = mstodoNoTitle
 	}
-	if t.DueDateTime != nil && len(t.DueDateTime.DateTime) >= 10 {
-		if _, err := time.Parse(time.DateOnly, t.DueDateTime.DateTime[:10]); err == nil {
-			r.Subtitle = t.DueDateTime.DateTime[:10]
-		}
+	if t.DueDateTime != nil {
+		r.Subtitle = mstodoDue(*t.DueDateTime)
 	}
 	return r
+}
+
+// mstodoDue is the due date (JST) of Graph's dueDateTime. To Do may answer
+// in UTC even with the Prefer header: a UTC time is turned into JST first,
+// so a task due on a JST day is not shown a day early.
+func mstodoDue(w outlookWhen) string {
+	v := w.DateTime
+	if i := strings.IndexByte(v, '.'); i > 0 {
+		v = v[:i]
+	}
+	switch tz := strings.TrimSpace(w.TimeZone); {
+	case strings.EqualFold(tz, "UTC"), strings.EqualFold(tz, "Etc/UTC"), strings.EqualFold(tz, "Coordinated Universal Time"):
+		t, err := time.Parse("2006-01-02T15:04:05", v)
+		if err != nil {
+			return ""
+		}
+		return t.In(gcalJST).Format(time.DateOnly)
+	}
+	if len(v) < 10 {
+		return ""
+	}
+	if _, err := time.Parse(time.DateOnly, v[:10]); err != nil {
+		return ""
+	}
+	return v[:10]
 }
 
 // --- ops ---

@@ -59,8 +59,13 @@ var zaimProdWire = zaimWire{
 // is the browser's only.
 var zaimHosts = []string{"https://api.zaim.net"}
 
+// ZaimSunsetAt is when the Zaim API ends (2026-12-07 00:00 JST).
+var ZaimSunsetAt = time.Date(2026, 12, 7, 0, 0, 0, 0, time.FixedZone("JST", 9*3600))
+
 func init() {
 	register(Provider{ID: Zaim, Billing: BillingFree, NeedsOAuth: true, NameJa: "Zaim", NameEn: "Zaim",
+		// Zaim API は 2026-12-07 で終わる(https://content.zaim.net/notices/show/2280)。その時から自動で off
+		SunsetAt: ZaimSunsetAt, Terms: Terms{ShowOwnDataOnly: true},
 		Ops: []OpSpec{
 			{Name: "money", Args: []string{"limit", "startDate", "endDate", "mode"}, Check: checkZaimMoney},
 			{Name: "addPayment", Write: true, Args: []string{"amount", "categoryId", "genreId", "date", "place", "comment"}, Check: checkZaimAddPayment},
