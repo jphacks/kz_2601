@@ -9,7 +9,7 @@
 // Operations, environment and the order of the steps:
 // docs/backend/features/feedback-loop.md.
 //
-//	feedback-loop ingest [-source in_app|app_store_review|google_play_review|testflight|gen_failure|all]
+//	feedback-loop ingest [-source in_app|app_store_review|google_play_review|testflight|gen_failure|unsupported|all]
 //	feedback-loop ingest-crash -issue ID -type T -count N -version V
 //	feedback-loop inbox [-source S] [-status S] [-limit N]
 //	feedback-loop triage [-max 200] [-batch 20]
@@ -94,7 +94,7 @@ func main() {
 }
 
 const usageText = `usage: feedback-loop <command> [flags]
-  ingest [-source in_app|app_store_review|google_play_review|testflight|gen_failure|all]   copy new feedback into the inbox (masked); all = every source that is on, keep going past a failure
+  ingest [-source in_app|app_store_review|google_play_review|testflight|gen_failure|unsupported|all]   copy new feedback into the inbox (masked); all = every source that is on, keep going past a failure
   ingest-crash -issue ID -type T -count N -version V   record one crash spike
   inbox [-source S] [-status S] [-limit N]   every source in one list (metadata only, never the text)
   triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
@@ -229,7 +229,7 @@ const sourceAll = "all"
 
 func (a *app) ingest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
-	only := fs.String("source", "", "only this source (in_app / app_store_review / google_play_review / testflight / gen_failure), or all (keep going past a failure); default all that are on")
+	only := fs.String("source", "", "only this source (in_app / app_store_review / google_play_review / testflight / gen_failure / unsupported), or all (keep going past a failure); default all that are on")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -286,6 +286,7 @@ func (a *app) optionalSources() []optionalSource {
 		{loop.SourceGooglePlayReview, ingest.ErrGooglePlayOff, a.googlePlayFetcher},
 		{loop.SourceTestFlight, ingest.ErrTestFlightOff, a.testFlightFetcher},
 		{loop.SourceGenFailure, ingest.ErrGenFailOff, a.genFailFetcher},
+		{loop.SourceUnsupported, ingest.ErrUnsupportedOff, a.unsupportedFetcher},
 	}
 }
 
@@ -380,6 +381,15 @@ func (a *app) genFailFetcher() (ingest.Fetcher, error) {
 	}
 	g.Now = a.now
 	return g, nil
+}
+
+func (a *app) unsupportedFetcher() (ingest.Fetcher, error) {
+	u, err := ingest.UnsupportedConfigFromEnv(a.getenv)
+	if err != nil {
+		return nil, err
+	}
+	u.Now = a.now
+	return u, nil
 }
 
 func (a *app) ingestCrash(ctx context.Context, args []string) error {

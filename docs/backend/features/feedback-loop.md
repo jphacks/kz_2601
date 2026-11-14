@@ -26,6 +26,7 @@ flowchart LR
   C[クラッシュの急増<br/>手で記録] --> I
   TF[TestFlight の<br/>フィードバック] --> I
   GF[生成の失敗の急増<br/>ログから] --> I
+  UN[無い機能を頼まれた<br/>ai.unsupported のログから] --> I
   I[ingest<br/>伏せ字・同意の版] --> X[(loop_inbox)]
   X --> T[triage<br/>LLM・道具なし・JSON だけ]
   T --> X
@@ -67,7 +68,7 @@ flowchart LR
 | [`draft`](../../../backend/internal/loop/draft) | draft・publish | 束ごとに決まった形の下書きを作り、`loop_drafts` に置く。出口の検査(`draft.Check`)・束の優先度(`draft.BundlePriority`)・承認と投稿(`review.go`)もここ | `cmd/feedback-loop`(`draft`・`drafts`)・`triage/eval` |
 | [`fixed`](../../../backend/internal/loop/fixed) | notify | 出した Issue がマージされた PR で閉じたら、送り主にお知らせ(`loop_notices`)を作る。push は `push.go` | `cmd/feedback-loop`(`fixed`) |
 | [`github`](../../../backend/internal/loop/github) | publish・notify | ループ専用の小さな GitHub の口。Issue を作る・コメントを足す・Issue がどう閉じたか(`fix.go`)を読むだけ | `cmd/feedback-loop`(`drafts`・`fixed`) |
-| [`ingest`](../../../backend/internal/loop/ingest) | intake | 出どころ(アプリ内・クラッシュ・ストアのレビュー・TestFlight・生成の失敗)を 1 つの形にして、伏せ字してから `loop_inbox` へ | `cmd/feedback-loop`(`ingest`・`ingest-crash`・`inbox`・`drafts`) |
+| [`ingest`](../../../backend/internal/loop/ingest) | intake | 出どころ(アプリ内・クラッシュ・ストアのレビュー・TestFlight・生成の失敗・無い機能の申告)を 1 つの形にして、伏せ字してから `loop_inbox` へ | `cmd/feedback-loop`(`ingest`・`ingest-crash`・`inbox`・`drafts`) |
 | [`pii`](../../../backend/internal/loop/pii) | intake(ほかの段の検査でも使う) | 決まった形で個人情報を伏せ字にする(`pii.Mask`)。LLM は呼ばない | `ingest`・`draft`・`triage` |
 | [`triage`](../../../backend/internal/loop/triage) | triage | LLM で分類・束ね・優先度付け。出力はスキーマと検査器 1(`check.go`)を通った物だけ使う | `cmd/feedback-loop`(`triage`・`triage-score`)・`triage/eval` |
 | [`triage/eval`](../../../backend/internal/loop/triage/eval) | (`-model ai` の時だけ triage) | 正解付きの組で振り分けの一致率を測る・`loop_inbox` を正解欄が空の組として書き出す([振り分けの精度を測る](#振り分けの精度を測る)) | `cmd/feedback-loop`(`triage-eval`・`triage-label-export`) |
@@ -103,7 +104,7 @@ flowchart LR
 | `loop_control/usage-YYYY-MM` | 振り分けのトークン数 | — |
 | `loop_control/cursor-{source}` | 取り込みの続きの位置 | — |
 
-スクショと DSL はループに入れない。クラッシュは種類・件数・版だけ。生成の失敗はコードと件数だけ。ストアのレビューはニックネームと国を捨てる。Google Play のレビューは本文・星・アプリの版・Android の API レベル・更新日時だけを API に頼む(名前・端末・端末の情報・こちらの返信の文は取らない)。TestFlight はコメント・ビルド番号・OS の大きい版・日時だけを API に頼む(メール・名前・テスター・端末・スクショ・クラッシュログは取らない)。
+スクショと DSL はループに入れない。クラッシュは種類・件数・版だけ。生成の失敗はコードと件数だけ。無い機能の申告は、生成が summary に書いた「○○は△△で代替しました」の ○○ と △△(伏せ字済み)と件数・OS・アプリの数だけ(アプリのハッシュ・uid のハッシュは数えるだけで持たない)。ストアのレビューはニックネームと国を捨てる。Google Play のレビューは本文・星・アプリの版・Android の API レベル・更新日時だけを API に頼む(名前・端末・端末の情報・こちらの返信の文は取らない)。TestFlight はコメント・ビルド番号・OS の大きい版・日時だけを API に頼む(メール・名前・テスター・端末・スクショ・クラッシュログは取らない)。
 
 ## コマンド
 
@@ -111,9 +112,9 @@ flowchart LR
 
 | コマンド | 段 | すること |
 |---|---|---|
-| `ingest [-source in_app\|app_store_review\|google_play_review\|testflight\|gen_failure]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、Google Play のレビューは `LOOP_SOURCE_GOOGLEPLAY=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on` の時だけ |
+| `ingest [-source in_app\|app_store_review\|google_play_review\|testflight\|gen_failure\|unsupported]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、Google Play のレビューは `LOOP_SOURCE_GOOGLEPLAY=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on`、無い機能の申告は `LOOP_SOURCE_UNSUPPORTED=on` の時だけ |
 | `ingest -source all` | intake | アプリ内と `LOOP_SOURCE_*=on` の出どころを順に全部回す(定期の実行の 1 ジョブ用)。1 つが失敗しても次へ進み、最後に失敗した出どころをまとめて非 0 で終わる。監査ログに出どころごとの件数(`source_done`)と失敗(`source_failed`)を残す。`-source` 無しの既定は今のまま(最初の失敗で止まる) |
-| `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・Google Play のレビュー・クラッシュ・TestFlight・生成の失敗)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `google_play_review` / `crash` / `testflight` / `gen_failure`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
+| `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・Google Play のレビュー・クラッシュ・TestFlight・生成の失敗・無い機能の申告)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `google_play_review` / `crash` / `testflight` / `gen_failure` / `unsupported`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
@@ -154,6 +155,7 @@ flowchart LR
 | `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | `GOOGLE_PLAY_PACKAGE_NAME` / 空 = job の ADC | Google Play のレビューを読むアプリのパッケージ名と、サービスアカウントのキー(JSON の中身そのもの・Secret Manager から入れる)。キーが無ければ job の SA で読む(鍵を作らずに済むのでこちらを勧める)。どちらの SA も Play Console で「返信」の権限(レビューを読むのに要る)を付ける |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
 | `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。読む先は `LOOP_GENFAIL_SOURCE` で選ぶ(下の行)。既定は `LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)。`ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_SOURCE_UNSUPPORTED` | 空 | `on` で「無い機能を頼まれた」(#1769)を取り込む。生成が summary に「○○は△△で代替しました」「○○は今はできません」と申告するたびに AI のサービスが書く `ai.unsupported` の行(`requested` = ○○・`substitute` = △△、どちらも `pii.Mask` 済み・`platform`・`mode`・`app_hash`)を読み、**終わった UTC の 1 日**ごとに同じ ○○(空白と記号を落として比べる)を 1 件にまとめる(件数・OS ごとの数・アプリの数・代替の例 3 つまで)。読む先は `LOOP_GENFAIL_SOURCE` と同じ: 既定は `LOOP_UNSUPPORTED_LOGS`(`gcloud logging read --format=json` の書き出し・カンマ区切り)、`logging` なら生成の失敗と同じ Cloud Logging の読み口(`LOOP_GENFAIL_PROJECT` / `_SERVICES` / `_MAX_LINES`)。項目に `app_hash` / `uid_hash` は持たない。振り分けで `feature` になるのが普通(文に「無い機能を頼まれた」と書いてある)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `unsupported` を足す |
 | `LOOP_GENFAIL_SOURCE` | 空 = `file` | 生成の失敗のログを読む先。`file` = `LOOP_GENFAIL_LOGS` のファイル。`logging` = Cloud Logging の API(`entries.list`・#2146)で、`LOOP_GENFAIL_PROJECT`(既定 `GOOGLE_CLOUD_PROJECT`)の Cloud Run のサービス `LOOP_GENFAIL_SERVICES`(カンマ区切り・既定 `ai-<APP_ENV>`)の `jsonPayload.event="ai.generate"` の行を、比べるのに要る期間(`LOOP_GENFAIL_WINDOW` + `LOOP_GENFAIL_BASELINE`)だけ新しい順に読む。上限は `LOOP_GENFAIL_MAX_LINES`(既定 50000 行・1 回 1000 行ずつ)。上限に届いたら古い基準の行を読まずに警告を出す(直近の窓は必ず読む)。成功の行も読む(割合の分母に要る)。認証は job の ADC。要る権限は `roles/logging.viewer` だけ |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
@@ -339,6 +341,7 @@ go run ./cmd/feedback-loop audit -summary
 |---|---|
 | 定期の実行を動かすこと | Terraform(`infra/feedback_loop.tf`)は既定で作る。apply・Secret の値・`LOOP_ISSUE_REPO` は人([定期の実行](#定期の実行)) |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
+| 無い機能の申告をレポートで数える | `ai.unsupported` の行は書くようになった(`internal/ai/unsupported_log.go`)が、`cmd/ai-session-report` はまだ数えない。ループは `LOOP_SOURCE_UNSUPPORTED=on` で取り込む |
 | 生成の失敗の急増を BigQuery から読む | Cloud Logging の API からは読める(`LOOP_GENFAIL_SOURCE=logging`・#2146)。ログの保存期間(既定 30 日)より長く比べたい・件数が `LOOP_GENFAIL_MAX_LINES` に収まらない時は、BigQuery のシンクを作って `ingest.GenLogSource` をもう 1 つ実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ。`LOOP_EMBED=on` で近い束を下書きに候補として書く(束ねるのは人)。モデルの埋め込みはまだ |

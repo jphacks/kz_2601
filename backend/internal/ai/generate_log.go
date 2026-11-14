@@ -200,4 +200,7 @@ func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res
 		level = slog.LevelWarn
 	}
 	lg.LogAttrs(ctx, level, GenerateEvent, attrs...)
+	if err == nil {
+		s.logUnsupported(ctx, tr, res) // 「無い機能を頼まれた」の印 (unsupported_log.go)
+	}
 }
