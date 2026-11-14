@@ -77,6 +77,10 @@ func wikipediaText(a map[string]string, name string, max int) (string, error) {
 	if strings.IndexFunc(t, unicode.IsControl) >= 0 {
 		return "", fmt.Errorf("%w: %s must be one line", ErrBadArgs, name)
 	}
+	if t == "." || t == ".." {
+		// MediaWiki に無い題名。パスの区切りとして読まれないよう先に断る
+		return "", fmt.Errorf("%w: %s is not a page title", ErrBadArgs, name)
+	}
 	return t, nil
 }
 
