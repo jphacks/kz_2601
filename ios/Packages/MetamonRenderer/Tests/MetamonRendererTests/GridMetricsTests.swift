@@ -50,10 +50,10 @@ final class GridMetricsTests: XCTestCase {
 
     // MARK: - Mac(#938)
 
-    func testDesktopDefaultWindowCentersPortraitWidth() {
-        // 1100 × 720 のウィンドウ(サイドバー 220): 中央の列 ≒ 880 × 668
+    func testDesktopDefaultWindowUsesLandscapeWidth() {
+        // 1100 × 720 のウィンドウ(サイドバー 220): 中央の列 ≒ 880 × 668。高さ × 4/3 = 890.7 は列の幅で止まる(左右が空かない)
         let m = GridMetrics.resolveDesktop(width: 880, height: 668, inset: inset)
-        XCTAssertEqual(m.frameWidth, 501, accuracy: 0.001) // 668 × 3/4
+        XCTAssertEqual(m.frameWidth, 880, accuracy: 0.001)
         XCTAssertEqual(m.cellH, (668 - 28) / 12, accuracy: 0.001)
         XCTAssertFalse(m.scrollsVertically)
         XCTAssertFalse(m.fabInGutter)
@@ -66,10 +66,16 @@ final class GridMetricsTests: XCTestCase {
     }
 
     func testDesktopLowWindowKeepsRowHeightAndScrolls() {
-        let m = GridMetrics.resolveDesktop(width: 600, height: 400, inset: inset)
-        XCTAssertEqual(m.frameWidth, GridMetrics.minDesktopWidth)
+        let m = GridMetrics.resolveDesktop(width: 600, height: 300, inset: inset)
+        XCTAssertEqual(m.frameWidth, GridMetrics.minDesktopWidth) // 300 × 4/3 = 400 は下限で止める
         XCTAssertEqual(m.cellH, GridMetrics.landscapeCellHeight)
         XCTAssertTrue(m.scrollsVertically)
+    }
+
+    func testDesktopWidthFollowsHeightInLandscapeRatio() {
+        let m = GridMetrics.resolveDesktop(width: 1200, height: 600, inset: inset)
+        XCTAssertEqual(m.frameWidth, 800, accuracy: 0.001) // 600 × 4/3
+        XCTAssertEqual(GridMetrics.maxDesktopWidth, 900)
     }
 
     func testDesktopNarrowColumnUsesFullWidth() {

@@ -63,6 +63,7 @@ final class MacSnapshotTests: XCTestCase {
                 .environment(\.componentRegistry, ComponentRegistry.standard)
                 .environment(\.openForms, runtime.openForms)
                 .environment(\.locale, Locale(identifier: "ja_JP"))
+                .macGeneratedAppZoom(step: MacTextZoom.defaultStep) // アプリの中央の列と同じ拡大(既定の段)
         }
         var failures: [String] = []
         for size in Self.sizes {
