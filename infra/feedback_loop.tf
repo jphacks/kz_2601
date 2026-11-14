@@ -105,7 +105,7 @@ locals {
       stage_envs  = ["LOOP_PUBLISH", "LOOP_ISSUE_AUTO"]
       timeout     = "900s"
       max_retries = 0
-      extra_env   = {
+      extra_env = {
         LOOP_ISSUE_AUTO_MAX_PER_RUN = tostring(var.feedback_loop_issue_auto_max_per_run)
         LOOP_ISSUE_AUTO_MAX_PER_DAY = tostring(var.feedback_loop_issue_auto_max_per_day)
       }
