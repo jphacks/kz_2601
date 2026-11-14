@@ -19,11 +19,25 @@ public protocol HealthDataSource: Sendable {
     func saveWeight(kg: Double, at date: Date) async throws
     /// 直近 `days` 日の `metric`(古い順・記録のある日だけ・1 日 1 件)。単位は `HealthMetric.unit`。
     func daily(_ metric: HealthMetric, days: Int) async throws -> [HealthDailyValue]
+    /// `from`〜`to` の気分(State of Mind・古い順)。`kind` を渡すとその種類だけ。iOS 18 から。
+    func moods(from: Date, to: Date, kind: HealthMoodKind?) async throws -> [HealthMoodEntry]
+    /// 気分をヘルスケアに 1 件書き込む。iOS 18 から。
+    func saveMood(_ entry: HealthMoodEntry) async throws
 }
 
 public extension HealthDataSource {
     /// 読む口を持たないデータ源は「使えません」(既存の差し替え先を壊さない)。
     func daily(_ metric: HealthMetric, days: Int) async throws -> [HealthDailyValue] {
+        throw HealthDataError.unavailable
+    }
+
+    /// 気分の口を持たないデータ源は「使えません」。
+    func moods(from: Date, to: Date, kind: HealthMoodKind?) async throws -> [HealthMoodEntry] {
+        throw HealthDataError.unavailable
+    }
+
+    /// 気分の口を持たないデータ源は「使えません」。
+    func saveMood(_ entry: HealthMoodEntry) async throws {
         throw HealthDataError.unavailable
     }
 }
@@ -55,6 +69,54 @@ public enum HealthMetric: String, CaseIterable, Sendable {
     }
 }
 
+/// 気分(State of Mind・#2234)の種類。HealthKit の `HKStateOfMind.Kind` と 1 対 1。
+public enum HealthMoodKind: String, CaseIterable, Sendable {
+    /// その時の感情(「いま どう感じている?」)
+    case momentaryEmotion
+    /// 1 日の気分(「今日は どう感じていた?」)
+    case dailyMood
+}
+
+/// 気分に付ける言葉。HealthKit の `HKStateOfMind.Label`(iOS 18 の 38 種)と 1 対 1。
+public enum HealthMoodLabel: String, CaseIterable, Sendable {
+    case amazed, amused, angry, annoyed, anxious, ashamed, brave, calm, confident, content
+    case disappointed, discouraged, disgusted, drained, embarrassed, excited, frustrated
+    case grateful, guilty, happy, hopeful, hopeless, indifferent, irritated, jealous, joyful
+    case lonely, overwhelmed, passionate, peaceful, proud, relieved, sad, satisfied, scared
+    case stressed, surprised, worried
+}
+
+/// 気分 1 件。`valence` は -1(とても不快)〜+1(とても快)。
+/// 中身は要配慮の情報なので `description` にも出さない(ログ・クラッシュ報告に漏らさないため)。
+public struct HealthMoodEntry: Sendable, Equatable, Identifiable, CustomStringConvertible, CustomDebugStringConvertible {
+    public var date: Date
+    public var kind: HealthMoodKind
+    public var valence: Double
+    public var labels: [HealthMoodLabel]
+    public var id: Date { date }
+
+    public init(date: Date, kind: HealthMoodKind, valence: Double, labels: [HealthMoodLabel] = []) {
+        self.date = date
+        self.kind = kind
+        self.valence = valence
+        self.labels = labels
+    }
+
+    public var description: String { "HealthMoodEntry(非表示)" }
+    public var debugDescription: String { description }
+}
+
+/// valence が書き込める範囲(-1〜+1)に入っているか。NaN・無限は入っていないとみなす。
+func healthValenceIsInRange(_ valence: Double) -> Bool {
+    valence.isFinite && valence >= -1 && valence <= 1
+}
+
+/// 文字列から気分の言葉へ。知らない言葉は落とし、重なりは最初の 1 つだけ残す(並びは渡された順)。
+func healthMoodLabels(fromRawValues raws: [String]) -> [HealthMoodLabel] {
+    var seen: Set<HealthMoodLabel> = []
+    return raws.compactMap(HealthMoodLabel.init(rawValue:)).filter { seen.insert($0).inserted }
+}
+
 public struct HealthDailyValue: Sendable, Equatable, Identifiable {
     public var day: Date
     public var value: Double
@@ -70,11 +132,17 @@ public enum HealthDataError: LocalizedError, Equatable {
     case unavailable
     /// 許可されていない(モーションとフィットネス / ヘルスケア)
     case denied
+    /// iOS 18 より前の OS では気分(State of Mind)を使えない
+    case requiresIOS18
+    /// 値が書き込める範囲の外(気分の valence は -1〜+1)
+    case outOfRange
 
     public var errorDescription: String? {
         switch self {
         case .unavailable: L("この端末ではヘルスデータを使えません")
         case .denied: L("ヘルスケアへのアクセスが許可されていません")
+        case .requiresIOS18: L("気分の記録は iOS 18 以降で使えます")
+        case .outOfRange: L("気分の値が範囲の外です")
         }
     }
 }
@@ -169,6 +237,25 @@ public struct MockHealthData: HealthDataSource {
 
     public func daily(_ metric: HealthMetric, days: Int) async throws -> [HealthDailyValue] {
         Self.series(Self.dailySeries[metric] ?? [], days: days)
+    }
+
+    /// 固定の気分(古い順)。今から何時間前かで置く。
+    static let moodOffsets: [(hoursAgo: Double, kind: HealthMoodKind, valence: Double, labels: [HealthMoodLabel])] = [
+        (50, .dailyMood, -0.2, [.anxious, .drained]),
+        (26, .momentaryEmotion, 0.6, [.happy, .grateful]),
+        (3, .momentaryEmotion, 0.25, [.calm]),
+        (1, .dailyMood, 0.4, [.content, .satisfied]),
+    ]
+
+    public func moods(from: Date, to: Date, kind: HealthMoodKind?) async throws -> [HealthMoodEntry] {
+        let now = Date()
+        return Self.moodOffsets
+            .map { HealthMoodEntry(date: now.addingTimeInterval(-$0.hoursAgo * 3600), kind: $0.kind, valence: $0.valence, labels: $0.labels) }
+            .filter { $0.date >= from && $0.date <= to && (kind == nil || $0.kind == kind) }
+    }
+
+    public func saveMood(_ entry: HealthMoodEntry) async throws {
+        guard healthValenceIsInRange(entry.valence) else { throw HealthDataError.outOfRange }
     }
 
     static func series(_ values: [Double], days: Int) -> [HealthDailyValue] {
@@ -273,6 +360,25 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
         #endif
     }
 
+    public func moods(from: Date, to: Date, kind: HealthMoodKind?) async throws -> [HealthMoodEntry] {
+        #if os(iOS)
+        guard #available(iOS 18.0, *) else { throw HealthDataError.requiresIOS18 }
+        return try await readMoods(from: from, to: to, kind: kind)
+        #else
+        throw HealthDataError.unavailable
+        #endif
+    }
+
+    public func saveMood(_ entry: HealthMoodEntry) async throws {
+        #if os(iOS)
+        guard #available(iOS 18.0, *) else { throw HealthDataError.requiresIOS18 }
+        guard healthValenceIsInRange(entry.valence) else { throw HealthDataError.outOfRange }
+        try await writeMood(entry)
+        #else
+        throw HealthDataError.unavailable
+        #endif
+    }
+
     #if os(iOS)
     /// HealthMetric で読む値(すべて)。許可は 1 枚のシートでまとめて求める。
     private static let metricReadTypes: Set<HKObjectType> = [
@@ -330,6 +436,55 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
             if let q { byDay[Calendar.current.startOfDay(for: stats.startDate)] = q.doubleValue(for: unit) }
         }
         return starts.compactMap { d in byDay[d].map { HealthDailyValue(day: d, value: $0) } }
+    }
+
+    /// 気分を読む許可だけを求める(書き込みの許可は求めない)。
+    @available(iOS 18.0, *)
+    private func authorizeMoodRead() async throws {
+        guard HKHealthStore.isHealthDataAvailable() else { throw HealthDataError.unavailable }
+        do {
+            try await store.requestAuthorization(toShare: [], read: [HKObjectType.stateOfMindType()])
+        } catch {
+            throw HealthDataError.unavailable
+        }
+    }
+
+    /// 気分を書く許可だけを求める(読みの許可は求めない)。拒否されていれば `denied`。
+    @available(iOS 18.0, *)
+    private func authorizeMoodWrite() async throws {
+        guard HKHealthStore.isHealthDataAvailable() else { throw HealthDataError.unavailable }
+        let type = HKObjectType.stateOfMindType()
+        do {
+            try await store.requestAuthorization(toShare: [type], read: [])
+        } catch {
+            throw HealthDataError.unavailable
+        }
+        guard store.authorizationStatus(for: type) == .sharingAuthorized else { throw HealthDataError.denied }
+    }
+
+    @available(iOS 18.0, *)
+    private func readMoods(from: Date, to: Date, kind: HealthMoodKind?) async throws -> [HealthMoodEntry] {
+        try await authorizeMoodRead()
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.stateOfMind(HKQuery.predicateForSamples(withStart: from, end: to))],
+            // \.startDate のキーパスは Sendable でない(Swift 6 で error)。同じ並び(startDate の昇順)を NSSortDescriptor から作る
+            sortDescriptors: SortDescriptor(NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true), comparing: HKStateOfMind.self).map { [$0] } ?? [],
+            limit: HKObjectQueryNoLimit
+        )
+        return try await descriptor.result(for: store).compactMap { sample in
+            let k = HealthMoodKind(sample.kind)
+            guard kind == nil || k == kind else { return nil }
+            return HealthMoodEntry(date: sample.startDate, kind: k, valence: sample.valence,
+                                   labels: sample.labels.compactMap(HealthMoodLabel.init))
+        }
+    }
+
+    @available(iOS 18.0, *)
+    private func writeMood(_ entry: HealthMoodEntry) async throws {
+        try await authorizeMoodWrite()
+        let sample = HKStateOfMind(date: entry.date, kind: entry.kind.healthKitKind, valence: entry.valence,
+                                   labels: entry.labels.map(\.healthKitLabel), associations: [])
+        try await store.save(sample)
     }
 
     /// 初回だけ許可ダイアログが出る(決定済みなら何もしない)。読み取りの拒否は OS が隠すので、結果が空になるだけ。
@@ -390,4 +545,76 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
     }
     #endif
 }
+
+#if os(iOS)
+@available(iOS 18.0, *)
+extension HealthMoodKind {
+    init(_ kind: HKStateOfMind.Kind) {
+        switch kind {
+        case .dailyMood: self = .dailyMood
+        case .momentaryEmotion: self = .momentaryEmotion
+        @unknown default: self = .momentaryEmotion
+        }
+    }
+
+    var healthKitKind: HKStateOfMind.Kind {
+        switch self {
+        case .momentaryEmotion: .momentaryEmotion
+        case .dailyMood: .dailyMood
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+extension HealthMoodLabel {
+    /// 知らない言葉(将来の OS が足した値)は落とす。
+    init?(_ label: HKStateOfMind.Label) {
+        guard let match = Self.allCases.first(where: { $0.healthKitLabel == label }) else { return nil }
+        self = match
+    }
+
+    var healthKitLabel: HKStateOfMind.Label {
+        switch self {
+        case .amazed: .amazed
+        case .amused: .amused
+        case .angry: .angry
+        case .annoyed: .annoyed
+        case .anxious: .anxious
+        case .ashamed: .ashamed
+        case .brave: .brave
+        case .calm: .calm
+        case .confident: .confident
+        case .content: .content
+        case .disappointed: .disappointed
+        case .discouraged: .discouraged
+        case .disgusted: .disgusted
+        case .drained: .drained
+        case .embarrassed: .embarrassed
+        case .excited: .excited
+        case .frustrated: .frustrated
+        case .grateful: .grateful
+        case .guilty: .guilty
+        case .happy: .happy
+        case .hopeful: .hopeful
+        case .hopeless: .hopeless
+        case .indifferent: .indifferent
+        case .irritated: .irritated
+        case .jealous: .jealous
+        case .joyful: .joyful
+        case .lonely: .lonely
+        case .overwhelmed: .overwhelmed
+        case .passionate: .passionate
+        case .peaceful: .peaceful
+        case .proud: .proud
+        case .relieved: .relieved
+        case .sad: .sad
+        case .satisfied: .satisfied
+        case .scared: .scared
+        case .stressed: .stressed
+        case .surprised: .surprised
+        case .worried: .worried
+        }
+    }
+}
+#endif
 #endif

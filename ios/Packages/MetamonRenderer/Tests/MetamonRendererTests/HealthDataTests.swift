@@ -111,4 +111,130 @@ final class HealthDataTests: XCTestCase {
         }
         #endif
     }
+
+    // MARK: 気分(State of Mind・#2234)
+
+    func testValenceRange() {
+        XCTAssertTrue(healthValenceIsInRange(0))
+        XCTAssertTrue(healthValenceIsInRange(-1))
+        XCTAssertTrue(healthValenceIsInRange(1))
+        XCTAssertTrue(healthValenceIsInRange(-0.75))
+        XCTAssertFalse(healthValenceIsInRange(-1.0001))
+        XCTAssertFalse(healthValenceIsInRange(1.5))
+        XCTAssertFalse(healthValenceIsInRange(.nan))
+        XCTAssertFalse(healthValenceIsInRange(.infinity))
+    }
+
+    func testMoodLabelConversionDropsUnknownAndDuplicates() {
+        XCTAssertEqual(healthMoodLabels(fromRawValues: ["happy", "grateful"]), [.happy, .grateful])
+        XCTAssertEqual(healthMoodLabels(fromRawValues: ["calm", "きげんがいい", "calm", "sad"]), [.calm, .sad])
+        XCTAssertEqual(healthMoodLabels(fromRawValues: []), [])
+        XCTAssertEqual(healthMoodLabels(fromRawValues: ["Happy"]), []) // 大文字小文字は区別する
+        XCTAssertEqual(HealthMoodLabel.allCases.count, 38)
+        XCTAssertEqual(Set(HealthMoodLabel.allCases.map(\.rawValue)).count, 38)
+        XCTAssertEqual(healthMoodLabels(fromRawValues: HealthMoodLabel.allCases.map(\.rawValue)), HealthMoodLabel.allCases)
+    }
+
+    func testMoodKindRawValuesMatchHealthKitNames() {
+        XCTAssertEqual(HealthMoodKind.allCases.map(\.rawValue), ["momentaryEmotion", "dailyMood"])
+    }
+
+    func testMoodEntryDoesNotLeakTheMoodInItsDescription() {
+        let entry = HealthMoodEntry(date: t("2026-10-25T09:00:00"), kind: .dailyMood, valence: -0.8, labels: [.lonely, .sad])
+        for text in [entry.description, entry.debugDescription, "\(entry)"] {
+            XCTAssertFalse(text.contains("lonely"))
+            XCTAssertFalse(text.contains("sad"))
+            XCTAssertFalse(text.contains("0.8"))
+            XCTAssertFalse(text.contains("dailyMood"))
+        }
+    }
+
+    func testMockMoodsFilterByPeriodAndKind() async throws {
+        let mock = MockHealthData()
+        let now = Date()
+        let all = try await mock.moods(from: now.addingTimeInterval(-7 * 86400), to: now, kind: nil)
+        XCTAssertEqual(all.count, MockHealthData.moodOffsets.count)
+        XCTAssertEqual(all.map(\.date), all.map(\.date).sorted()) // 古い順
+        XCTAssertTrue(all.allSatisfy { healthValenceIsInRange($0.valence) })
+
+        let daily = try await mock.moods(from: now.addingTimeInterval(-7 * 86400), to: now, kind: .dailyMood)
+        XCTAssertEqual(daily.map(\.kind), [.dailyMood, .dailyMood])
+        let momentary = try await mock.moods(from: now.addingTimeInterval(-7 * 86400), to: now, kind: .momentaryEmotion)
+        XCTAssertEqual(momentary.map(\.kind), [.momentaryEmotion, .momentaryEmotion])
+
+        let lastHours = try await mock.moods(from: now.addingTimeInterval(-4 * 3600), to: now, kind: nil)
+        XCTAssertEqual(lastHours.count, 2)
+        let empty = try await mock.moods(from: now.addingTimeInterval(86400), to: now.addingTimeInterval(2 * 86400), kind: nil)
+        XCTAssertTrue(empty.isEmpty)
+    }
+
+    func testSaveMoodRejectsValenceOutOfRange() async {
+        let mock = MockHealthData()
+        do {
+            try await mock.saveMood(HealthMoodEntry(date: Date(), kind: .momentaryEmotion, valence: 0.5, labels: [.calm]))
+        } catch {
+            XCTFail("範囲内は通る: \(error)")
+        }
+        for bad in [1.2, -2.0, Double.nan] {
+            do {
+                try await mock.saveMood(HealthMoodEntry(date: Date(), kind: .momentaryEmotion, valence: bad))
+                XCTFail("範囲の外は断る: \(bad)")
+            } catch {
+                XCTAssertEqual(error as? HealthDataError, .outOfRange)
+            }
+        }
+    }
+
+    func testMoodErrorMessagesAreDistinct() {
+        let all: [HealthDataError] = [.unavailable, .denied, .requiresIOS18, .outOfRange]
+        let messages = all.map { $0.errorDescription ?? "" }
+        XCTAssertFalse(messages.contains(""))
+        XCTAssertEqual(Set(messages).count, all.count)
+    }
+
+    /// 気分の口を実装していない差し替え先は「使えません」を返す(既存のホストを壊さない)。
+    func testDataSourceWithoutMoodSupportIsUnavailable() async {
+        struct StepsOnly: HealthDataSource {
+            func steps(days: Int) async throws -> [HealthDailyValue] { [] }
+            func weights(days: Int) async throws -> [HealthDailyValue] { [] }
+            func saveWeight(kg: Double, at date: Date) async throws {}
+        }
+        let source = StepsOnly()
+        do {
+            _ = try await source.moods(from: .distantPast, to: Date(), kind: nil)
+            XCTFail("使えないはず")
+        } catch {
+            XCTAssertEqual(error as? HealthDataError, .unavailable)
+        }
+        do {
+            try await source.saveMood(HealthMoodEntry(date: Date(), kind: .dailyMood, valence: 0))
+            XCTFail("使えないはず")
+        } catch {
+            XCTAssertEqual(error as? HealthDataError, .unavailable)
+        }
+    }
+
+    /// iOS 18 未満 / iOS でない所では読み書きできない。
+    func testLiveMoodsRequireIOS18() async {
+        let live = LiveHealthData()
+        let expected: HealthDataError
+        #if os(iOS)
+        if #available(iOS 18.0, *) { return } // iOS 18 以降は許可ダイアログが要るのでここでは試さない
+        expected = .requiresIOS18
+        #else
+        expected = .unavailable
+        #endif
+        do {
+            _ = try await live.moods(from: .distantPast, to: Date(), kind: nil)
+            XCTFail("iOS 18 未満では使えない")
+        } catch {
+            XCTAssertEqual(error as? HealthDataError, expected)
+        }
+        do {
+            try await live.saveMood(HealthMoodEntry(date: Date(), kind: .dailyMood, valence: 0))
+            XCTFail("iOS 18 未満では使えない")
+        } catch {
+            XCTAssertEqual(error as? HealthDataError, expected)
+        }
+    }
 }
