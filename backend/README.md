@@ -16,7 +16,7 @@
 | `cmd/coin-initial-backfill` | 初回コインの付与の記録(`coin_initial_grants`)を、記録が無かった頃のアカウントに書く | 手元(人が 1 回だけ) | `go run ./cmd/coin-initial-backfill` | [coin-initial-backfill.md](../docs/infra/coin-initial-backfill.md) |
 | `cmd/dslgen` | JSON Schema から Android(Kotlin)の DSL の型を作る。生成物は commit し、古いと `TestGeneratedKotlinIsUpToDate` が落ちる | 手元 | `make dsl-gen` | [351-dsl-cross-platform.md](../docs/decisions/351-dsl-cross-platform.md) |
 | `cmd/feedback` | アプリ内のフィードバックを読む(一覧・1 件)。書かない | 手元(運用する人) | `make run-feedback` | [feedback.md](../docs/backend/features/feedback.md) |
-| `cmd/feedback-loop` | 自己改善ループの各段(取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・止める仕組み) | Cloud Run Job `feedback-loop-<段>`(Cloud Scheduler・既定は作らない)と手元 | `make run-feedback-loop`(エミュレータ・`LOOP_ARGS`) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `cmd/feedback-loop` | 自己改善ループの各段(取り込み・振り分け・Issue の下書き・Issue の自動の起票・直ったお知らせ・止める仕組み) | Cloud Run Job `feedback-loop-<段>`(Cloud Scheduler)と手元 | `make run-feedback-loop`(エミュレータ・`LOOP_ARGS`) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
 | `cmd/matching-age-backfill` | 18 歳以上の申告をした作者のマッチングのプロフィールに `ownerAgeConfirmed` を書く(既定は件数だけ) | 手元(人が 1 回だけ) | `go run ./cmd/matching-age-backfill` | [matching-age-backfill.md](../docs/infra/matching-age-backfill.md) |
 | `cmd/moderate` | 通報の一覧・処理と、掲載・共有アプリの公開の停止(運用する人の道具) | 手元(運用する人) | `make run-moderate` | [moderation.md](../docs/infra/moderation.md) |
 | `cmd/product-metrics` | ログの出力からプロダクトの指標(生成の成功・D1/D7 など)を週ごとの Markdown の表にする。API は呼ばない | 手元 | `go run ./cmd/product-metrics` | [product-metrics.md](../docs/metrics/product-metrics.md) |
@@ -61,9 +61,9 @@
 | `internal/gtfsstatic` | 静的な GTFS-JP の zip から、バスに要る部分(停留所・路線の名前・各便の予定時刻)を読む | [external-apis.md](../docs/backend/features/external-apis.md) |
 | `internal/httpx` | JSON 書き出し・エラー封筒(`WriteJSON` / `Error` / `ErrorWithDetails` / `DecodeBody`)・エラーのコードの一覧・RequestID・Log・Recover・`/health` | - |
 | `internal/loop` | 自己改善ループの土台(受け箱・止める仕組み・保存)。各段はサブパッケージ | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
-| `internal/loop/draft` | 振り分けたまとまりを Issue の下書きにし、人の確認を待つ | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/draft` | 振り分けたまとまりを Issue の下書きにし、検査を通ったものを自動で Issue にする(`auto-issue`)。人の承認の口も残す | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
 | `internal/loop/fixed` | 直った Issue のもとになった声の送り主に「あなたの声で直りました」を届ける | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
-| `internal/loop/github` | ループ用の小さな GitHub クライアント(人が承認した Issue を作る・閉じられ方を読む) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/github` | ループ用の小さな GitHub クライアント(Issue を作る・コメントを足す・閉じられ方を読む) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
 | `internal/loop/ingest` | 各取得先のフィードバックを共通の形にし、伏せてから受け箱に写す | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
 | `internal/loop/pii` | 保存の前にフィードバックの個人情報を伏せる(LLM は使わない) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
 | `internal/loop/triage` | 受け箱を LLM で分類・まとめ・優先度付けする | [feedback-loop-triage-agreement.md](../docs/backend/features/feedback-loop-triage-agreement.md) |
@@ -221,7 +221,7 @@ Firestore に繋ぐ cmd は、どれも `internal/fsenv` で同じ読み方を�
 ### cmd/appstore-reconcile・cmd/feedback-loop・cmd/purge(Cloud Run Job)
 
 - `cmd/appstore-reconcile`: `APPSTORE_API_*`(App Store Server API のキー)と appconfig と同じ `APPSTORE_*`。[app-store-notifications.md](../docs/infra/app-store-notifications.md#照合ジョブ)
-- `cmd/feedback-loop`: `LOOP_*`。[feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)
+- `cmd/feedback-loop`: `LOOP_*`。段のスイッチ `LOOP_<段>=on`(`INTAKE` / `TRIAGE` / `DRAFT` / `PUBLISH` / `ISSUE_AUTO` / `NOTIFY`)、Issue の自動の起票は `LOOP_ISSUE_AUTO=on` + `LOOP_PUBLISH=on` + `LOOP_ISSUE_REPO`、上限 `LOOP_ISSUE_AUTO_MAX_PER_RUN`(10)/ `LOOP_ISSUE_AUTO_MAX_PER_DAY`(30)。全部の表は [feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)
 - `cmd/purge`: 共通の物と `FIREBASE_AUTH_EMULATOR_HOST`(ローカルだけ)。消す期間はフラグ。[account-purge.md](../docs/infra/account-purge.md)
 
 ### 人が回す道具
