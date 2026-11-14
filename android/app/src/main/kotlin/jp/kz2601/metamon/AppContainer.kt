@@ -319,7 +319,7 @@ class AppContainer(
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
 
-    /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
+    /** フィードバックの画面の出し入れ(設定の入口・debug の自動で開く口) */
     val feedbackComposer = FeedbackComposerLauncher()
 
     /** sensorValue が読むセンサー(#1195)。`METAMON_MOCK=1` なら決まった波形(エミュレータでも値が出る)、それ以外は端末のセンサー(null)。 */
