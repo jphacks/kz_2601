@@ -17,6 +17,8 @@ import jp.kz2601.metamon.renderer.form.FormDraftStorage
 import jp.kz2601.metamon.renderer.components.location.LocationTracking
 import jp.kz2601.metamon.renderer.components.health.HealthSource
 import jp.kz2601.metamon.renderer.components.health.MockHealthSource
+import jp.kz2601.metamon.renderer.components.health.MockStepCounterSource
+import jp.kz2601.metamon.renderer.components.health.StepCounterSource
 import jp.kz2601.metamon.renderer.components.health.defaultHealthSource
 import jp.kz2601.metamon.renderer.components.sensors.MockSensorSource
 import jp.kz2601.metamon.renderer.components.sensors.SensorSource
@@ -319,7 +321,7 @@ class AppContainer(
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
 
-    /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
+    /** フィードバックの画面の出し入れ(設定の入口・debug の自動で開く口) */
     val feedbackComposer = FeedbackComposerLauncher()
 
     /** sensorValue が読むセンサー(#1195)。`METAMON_MOCK=1` なら決まった波形(エミュレータでも値が出る)、それ以外は端末のセンサー(null)。 */
@@ -327,6 +329,9 @@ class AppContainer(
 
     /** healthStat が読むヘルス(#870)。`METAMON_MOCK=1` なら固定値、それ以外は端末の Health Connect(null)。 */
     val healthSource: HealthSource? get() = healthSourceFor(knobs.mock)
+
+    /** healthStat の live(#3694)が前面で購読する歩数計。`METAMON_MOCK=1` なら 1 歩ずつ増える偽物、それ以外は端末の SensorManager(null)。 */
+    val stepCounterSource: StepCounterSource? get() = if (knobs.mock) MockStepCounterSource else null
 
     /** 使用量の口(「今日の残り」・設定の「使っている量」)。モックの構成は null、つまみ `METAMON_MOCK_USAGE` ならモック */
     val usageSource: PlanUsageSource? get() = DebugMocks.usage(knobs, appConfig as? PlanUsageSource)
