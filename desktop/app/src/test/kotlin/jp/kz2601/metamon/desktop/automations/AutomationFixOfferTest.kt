@@ -1,5 +1,8 @@
 package jp.kz2601.metamon.desktop.automations
 
+import jp.kz2601.metamon.services.automations.AppAutomations
+import jp.kz2601.metamon.services.automations.AutomationRule
+import jp.kz2601.metamon.services.automations.AutomationStop
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull

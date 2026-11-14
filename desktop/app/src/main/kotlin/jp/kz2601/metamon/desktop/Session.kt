@@ -22,6 +22,8 @@ import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.expr.DSLClock
+import java.time.Instant
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.dsl.records.RecordQuery
@@ -147,6 +149,24 @@ class DesktopSession(
         return true
     }
 
+    /** 一覧・表の行を消した直後の「元に戻す」(#3351)。null は帯を出さない。 */
+    var recordUndo: DeletionTicket? by mutableStateOf(null)
+        private set
+    private var undoSeq = 0L
+
+    /** 最後に消した行を戻す(帯の「元に戻す」・Ctrl+Z)。戻せたら true。 */
+    fun undoDelete(): Boolean {
+        val t = recordUndo ?: return false
+        recordUndo = null
+        store = RecordUndo.restore(store, t) ?: return false
+        return true
+    }
+
+    /** 帯を閉じる(時間切れ・×)。[ticket] が今の物の時だけ(後から消した分の帯を消さない)。 */
+    fun dismissRecordUndo(ticket: DeletionTicket? = recordUndo) {
+        if (recordUndo == ticket) recordUndo = null
+    }
+
     /** 起きたこと(適合テストの effects と同じ形)。 */
     val effects = mutableListOf<JsonElement>()
 
@@ -188,7 +208,13 @@ class DesktopSession(
     fun followWipe() {
         if (records.wipes == seenWipes) return
         seenWipes = records.wipes
+        returnToStart()
+    }
+
+    /** 下書きを捨てて最初の画面へ。詳細のウィンドウは閉じる(端末のデータを消した後・サインアウトの後 #2375)。 */
+    fun returnToStart() {
         drafts.clear()
+        recordUndo = null
         go(NavigationState.initial(dsl))
         if (detailRoot != null) {
             detailRoot = null
@@ -273,6 +299,9 @@ class DesktopSession(
     /** 下書きを持っている route の id(テスト用)。 */
     internal val draftRouteIds: Set<String> get() = drafts.keys.toSet()
 
+    /** 保存していないフォームがある(入力中)。この間はアプリの DSL を差し替えない(#2809)。 */
+    val hasUnsavedForms: Boolean get() = drafts.values.any { it.draft.hasUnsavedChanges }
+
     /**
      * 一覧のチェックなど、1 件の記録の field を書き換える。フォームと同じ記録の規則(作った人だけ・membersCanEdit)を通す。
      * 書けたら true。書けない時は理由を [message] に出す。
@@ -285,6 +314,16 @@ class DesktopSession(
         }
         store = store.save(entity, id, row.data + patch)
         return true
+    }
+
+    /**
+     * 会話(chatThread・#2214)に 1 通足す。フォームの保存と同じ道(端末に残し、送り先があれば送り待ちに積む)。
+     * 並びが崩れないよう作った時刻を付ける。足した行の id を返す。
+     */
+    fun postMessage(entity: String, data: Map<String, JSONValue>, now: Instant = DSLClock.now()): String {
+        val id = persistence?.newRecordId() ?: "new-${store.nextId}"
+        store = store.save(entity, null, data.mapValues { MockStore.cell(it.value) }, newId = id, createdAt = now.toString())
+        return id
     }
 
     /** 1 件書き換えられるか(フォームの読み取りだけと同じ規則)。 */
@@ -384,7 +423,10 @@ class DesktopSession(
                     message = Strings["desktop_delete_not_allowed"]
                     return
                 }
+                // 一覧・表の行から消した時だけ戻せる(フォームの削除ボタンは画面ごと閉じる)
+                val ticket = ctx.recordId?.let { RecordUndo.ticket(store, entity, it, ++undoSeq) }
                 store = store.delete(entity, id)
+                if (ticket != null) recordUndo = ticket
                 effects += obj("deleted" to obj("entity" to JsonPrimitive(entity), "recordId" to JsonPrimitive(id)))
                 if (ctx.recordId == null) {
                     drafts.entries.removeAll { it.value.draft === ctx.form }
@@ -395,7 +437,8 @@ class DesktopSession(
                 // OS の機能を呼ぶもの(URL・通知・書き出し・ライブアクティビティ・音声)は「何を頼んだか」を残し、ホストに渡す
                 effects += obj("request" to actionJson(action))
                 if (action.type == ActionType.RESET_FORM) ctx.form?.reset()
-                message = host?.request(action, ctx, this) ?: message
+                // null は「一言を変えない」(ホストが先に出した一言を、別スレッドの答えごと上書きしない)
+                host?.request(action, ctx, this)?.let { message = it }
             }
         }
     }

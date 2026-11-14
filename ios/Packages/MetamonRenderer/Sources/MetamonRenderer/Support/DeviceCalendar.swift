@@ -1,7 +1,8 @@
 import EventKit
 import Foundation
 
-/// 端末のカレンダーの予定・リマインダーを読む口(#1987・親 #1686)。部品・アクションはまだ無い(決定待ち)。
+/// 端末のカレンダーの予定・リマインダーを読む口(#1987・親 #1686)とリマインダーを足す口(#2222)。
+/// 部品・アクションはまだ無い(決定待ち)。
 /// `HealthDataSource` と同じ形: protocol + 実体(`LiveDeviceCalendar`)+ 偽物(`FakeDeviceCalendar`)。
 /// 予定の題名・メモ・場所はログ・クラッシュ報告・サーバーに出さない(`description` も伏せる)。
 public protocol DeviceCalendarSource: Sendable {
@@ -16,6 +17,10 @@ public protocol DeviceCalendarSource: Sendable {
     /// 読む先を選ぶ画面のため: 予定のカレンダー / リマインダーのリスト(名前順)。
     func calendars() async throws -> [DeviceCalendarInfo]
     func reminderLists() async throws -> [DeviceCalendarInfo]
+    /// リマインダーを 1 件足して、足したものの id を返す(#2222)。済みにする・消す口はまだ無い。
+    /// `listId` が nil なら既定のリスト。`due` があるときだけ期日を入れる(`dueHasTime: false` なら日付だけ)。
+    /// フルアクセスが無ければ `DeviceCalendarError.notAuthorized`、書けるリストが無ければ `.noReminderList`。
+    func addReminder(title: String, due: Date?, dueHasTime: Bool, notes: String?, listId: String?) async throws -> String
     /// 端末のカレンダー・リマインダーが変わった(`EKEventStoreChanged`)ことを知らせる。中身は渡さない。
     func changes() -> AsyncStream<Void>
 }
@@ -36,6 +41,9 @@ public enum DeviceCalendarAccess: String, Sendable, Equatable {
 
     public var canRead: Bool { self == .fullAccess }
 
+    /// リマインダーを足せるか。リマインダーには予定の `.writeOnly` にあたる「追加だけ」が無いのでフルアクセスが要る。
+    public var canAddReminder: Bool { self == .fullAccess }
+
     /// iOS 16 以前の `.authorized` はフルアクセスとして扱う。将来増えた値は「制限」(読まない)。
     public init(_ status: EKAuthorizationStatus) {
         switch status {
@@ -52,11 +60,17 @@ public enum DeviceCalendarAccess: String, Sendable, Equatable {
 public enum DeviceCalendarError: LocalizedError, Equatable {
     /// フルアクセスが無い(未決定・拒否・制限・書き込みだけ)
     case notAuthorized(DeviceCalendarAccess)
+    /// 書けるリマインダーのリストが 1 つも無い(既定のリストも取れない)
+    case noReminderList
+    /// 許可もリストもあるのに保存できなかった(EventKit の失敗)
+    case writeFailed
 
     public var errorDescription: String? {
         switch self {
         case .notAuthorized(.writeOnly): L("カレンダーの読み取りが許可されていません(追加だけ許可されています)")
         case .notAuthorized: L("カレンダー・リマインダーへのアクセスが許可されていません")
+        case .noReminderList: L("書き込めるリマインダーのリストがありません")
+        case .writeFailed: L("リマインダーを保存できませんでした")
         }
     }
 }
@@ -143,10 +157,50 @@ public struct DeviceReminder: Sendable, Equatable, Identifiable, CustomStringCon
     public var debugDescription: String { description }
 }
 
+/// リマインダーを足した結果。この 4 つだけ(単体テストの対象・`PhotoSaveResult` と同じ形)。
+public enum ReminderAddResult: Sendable, Equatable {
+    /// 「リマインダー」アプリに入った。id はあとで参照するため
+    case added(id: String)
+    /// フルアクセスが無い(未決定のまま拒否・拒否・制限・書き込みだけ)。設定へ案内できる
+    case notAuthorized(DeviceCalendarAccess)
+    /// 書けるリストが 1 つも無い(既定のリストも取れない)
+    case noList
+    /// 許可もリストもあるのに保存できなかった
+    case failed
+
+    public var addedId: String? {
+        if case let .added(id) = self { return id }
+        return nil
+    }
+}
+
 @MainActor
 public enum DeviceCalendar {
-    /// 読む口の実体。アプリ起動時に 1 回だけ差し替える(`METAMON_MOCK=1` は `FakeDeviceCalendar.sample`)。
+    /// 読み書きする口の実体。アプリ起動時に 1 回だけ差し替える(`METAMON_MOCK=1` は `FakeDeviceCalendar.sample`)。
     public static var source: any DeviceCalendarSource = LiveDeviceCalendar()
+
+    /// 許可を求めてからリマインダーを 1 件足す(#2222)。どの分岐でも落ちずに結果で返す。
+    public static func addReminder(title: String, due: Date? = nil, dueHasTime: Bool = true,
+                                   notes: String? = nil, listId: String? = nil) async -> ReminderAddResult {
+        await addReminder(title: title, due: due, dueHasTime: dueHasTime, notes: notes, listId: listId, to: source)
+    }
+
+    /// 書く先を差し替えられる形(単体テストはこちらを呼ぶ)。
+    public static func addReminder(title: String, due: Date?, dueHasTime: Bool, notes: String?, listId: String?,
+                                   to source: any DeviceCalendarSource) async -> ReminderAddResult {
+        let access = await source.authorization(for: .reminders, requesting: true)
+        guard access.canAddReminder else { return .notAuthorized(access) }
+        do {
+            let id = try await source.addReminder(title: title, due: due, dueHasTime: dueHasTime, notes: notes, listId: listId)
+            return .added(id: id)
+        } catch let DeviceCalendarError.notAuthorized(state) {
+            return .notAuthorized(state)
+        } catch DeviceCalendarError.noReminderList {
+            return .noList
+        } catch {
+            return .failed
+        }
+    }
 }
 
 // MARK: - 実体と偽物で共有する絞り込み(単体テストの対象)
@@ -195,6 +249,19 @@ enum DeviceCalendarQuery {
         return Array(sorted.prefix(DeviceCalendarLimits.maxItems))
     }
 
+    /// 期日を EventKit の形にする。期日なしは nil(= `dueDateComponents` を入れない)。時刻なしは年月日だけ。
+    static func dueComponents(due: Date?, hasTime: Bool, calendar: Calendar = .current) -> DateComponents? {
+        guard let due else { return nil }
+        let units: Set<Calendar.Component> = hasTime ? [.year, .month, .day, .hour, .minute] : [.year, .month, .day]
+        return calendar.dateComponents(units, from: due)
+    }
+
+    /// 書く先のリスト: id の指定があればそれ、無ければ既定、既定も無ければ名前順の先頭。1 つも無ければ nil。
+    static func writeTarget<T>(_ lists: [T], id: String?, defaultList: T?, identify: (T) -> String) -> T? {
+        if let id { return lists.first { identify($0) == id } }
+        return defaultList ?? lists.first
+    }
+
     static func sortedInfos(_ infos: [DeviceCalendarInfo]) -> [DeviceCalendarInfo] {
         infos.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
@@ -210,6 +277,14 @@ enum DeviceCalendarQuery {
 
 /// `METAMON_MOCK=1`・テスト・プレビュー用。中身と許可の状態を外から決められる。
 public struct FakeDeviceCalendar: DeviceCalendarSource {
+    /// 偽物が受け取った書き込み(単体テストで中身を確かめる)
+    public struct Written: Sendable, Equatable {
+        public var reminder: DeviceReminder
+        public var notes: String?
+        /// 期日なしなら nil
+        public var dueComponents: DateComponents?
+    }
+
     public var access: [DeviceCalendarEntity: DeviceCalendarAccess]
     /// `requesting: true` で未決定の時に、ダイアログで選ばれたことにする状態
     public var grantOnRequest: DeviceCalendarAccess
@@ -218,12 +293,19 @@ public struct FakeDeviceCalendar: DeviceCalendarSource {
     public var calendarList: [DeviceCalendarInfo]
     public var reminderListList: [DeviceCalendarInfo]
     public var now: @Sendable () -> Date
+    /// 許可もリストもあるのに保存に失敗する場合(`.writeFailed` を試す)
+    public var writeError: DeviceCalendarError?
+    private let writes = WrittenBox()
+    /// 足されたリマインダー(新しいものが後ろ)
+    public var written: [Written] { writes.items }
 
     public init(access: [DeviceCalendarEntity: DeviceCalendarAccess] = [.events: .fullAccess, .reminders: .fullAccess],
                 grantOnRequest: DeviceCalendarAccess = .fullAccess,
                 events: [DeviceCalendarEvent] = [], reminders: [DeviceReminder] = [],
                 calendars: [DeviceCalendarInfo] = [], reminderLists: [DeviceCalendarInfo] = [],
+                writeError: DeviceCalendarError? = nil,
                 now: @escaping @Sendable () -> Date = { Date() }) {
+        self.writeError = writeError
         self.access = access
         self.grantOnRequest = grantOnRequest
         self.allEvents = events
@@ -257,6 +339,21 @@ public struct FakeDeviceCalendar: DeviceCalendarSource {
     public func reminderLists() async throws -> [DeviceCalendarInfo] {
         try check(.reminders)
         return DeviceCalendarQuery.sortedInfos(reminderListList)
+    }
+
+    public func addReminder(title: String, due: Date?, dueHasTime: Bool, notes: String?, listId: String?) async throws -> String {
+        let state = access[.reminders] ?? .notDetermined
+        guard state.canAddReminder else { throw DeviceCalendarError.notAuthorized(state) }
+        if let writeError { throw writeError }
+        let lists = DeviceCalendarQuery.sortedInfos(reminderListList)
+        guard let list = DeviceCalendarQuery.writeTarget(lists, id: listId, defaultList: nil, identify: \.id) else {
+            throw DeviceCalendarError.noReminderList
+        }
+        let comps = DeviceCalendarQuery.dueComponents(due: due, hasTime: dueHasTime)
+        let reminder = DeviceReminder(id: "fake-added-\(writes.items.count + 1)", title: title, due: due,
+                                      dueHasTime: comps?.hour != nil, isCompleted: false, completedAt: nil, list: list)
+        writes.append(Written(reminder: reminder, notes: notes, dueComponents: comps))
+        return reminder.id
     }
 
     public func changes() -> AsyncStream<Void> { AsyncStream { $0.finish() } }
@@ -364,6 +461,27 @@ public final class LiveDeviceCalendar: DeviceCalendarSource, @unchecked Sendable
         return DeviceCalendarQuery.sortedInfos(store.calendars(for: .reminder).map(Self.info))
     }
 
+    public func addReminder(title: String, due: Date?, dueHasTime: Bool, notes: String?, listId: String?) async throws -> String {
+        let state = DeviceCalendarAccess(EKEventStore.authorizationStatus(for: .reminder))
+        guard state.canAddReminder else { throw DeviceCalendarError.notAuthorized(state) }
+        let lists = store.calendars(for: .reminder).filter(\.allowsContentModifications)
+        let fallback = store.defaultCalendarForNewReminders().flatMap { $0.allowsContentModifications ? $0 : nil }
+        guard let list = DeviceCalendarQuery.writeTarget(lists, id: listId, defaultList: fallback, identify: \.calendarIdentifier) else {
+            throw DeviceCalendarError.noReminderList
+        }
+        let reminder = EKReminder(eventStore: store)
+        reminder.calendar = list
+        reminder.title = title
+        reminder.notes = notes
+        reminder.dueDateComponents = DeviceCalendarQuery.dueComponents(due: due, hasTime: dueHasTime)
+        do {
+            try store.save(reminder, commit: true)
+        } catch {
+            throw DeviceCalendarError.writeFailed
+        }
+        return reminder.calendarItemIdentifier
+    }
+
     public func changes() -> AsyncStream<Void> {
         AsyncStream { continuation in
             let token = NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: nil) { _ in
@@ -422,6 +540,12 @@ public final class LiveDeviceCalendar: DeviceCalendarSource, @unchecked Sendable
             list: info(r.calendar)
         )
     }
+}
+
+/// 偽物は struct なので、書き込みの記録だけ参照で持つ。
+private final class WrittenBox: @unchecked Sendable {
+    private(set) var items: [FakeDeviceCalendar.Written] = []
+    func append(_ item: FakeDeviceCalendar.Written) { items.append(item) }
 }
 
 private final class ObserverBox: @unchecked Sendable {

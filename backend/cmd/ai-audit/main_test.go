@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"strings"
@@ -62,5 +63,53 @@ func TestMedicineStreakCase(t *testing.T) {
 	a, _ = load([]byte(noStreak))
 	if m, _ := need(a, "streak"); m == "○" {
 		t.Error("need streak should not be ○ without the streak op")
+	}
+}
+
+// #3392: the local check from PR #3104 as a test — a run file that is in the repo
+// goes through evaluate and report, and the tables come out. No API, no network.
+func TestAuditRawFixture(t *testing.T) {
+	raw, err := os.ReadFile("../../internal/ai/eval/audit_cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []auditCase
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+
+	runPath := "../../../docs/backend/ai-eval/raw/2026-10-24-claude-sonnet-5-5-low-audit3-before.json"
+	if _, err := os.Stat(runPath); err != nil {
+		t.Fatal(err)
+	}
+	res, rf := evaluate(cases, runPath)
+
+	var buf bytes.Buffer
+	report(&buf, cases, res, rf, nil)
+	out := buf.String()
+
+	for _, want := range []string{
+		"## 機械判定(" + rf.Model,
+		"| id | 生成 | needs ○/△/× | 欠落した needs | lint 件数 |",
+		"## needs 別の充足(○/△/×)",
+		"## lint 種別の件数",
+		"## ケース別の詳細",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "比較 run") {
+		t.Errorf("compare column without -compare:\n%s", out)
+	}
+
+	rows := 0
+	for _, c := range cases {
+		if strings.Contains(out, "| "+c.ID+" | ") {
+			rows++
+		}
+	}
+	if rows == 0 {
+		t.Errorf("no case row in the table:\n%s", out)
 	}
 }

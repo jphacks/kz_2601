@@ -4,7 +4,7 @@
 # エミュレータ試験の分も入れる時は README の「網羅率」を見る。COVER_PKGS で対象を絞れる。
 COVER_PKGS ?= ./...
 .PHONY: cover
-cover:
+cover: ## パッケージごとの網羅率を低い順の表で出す
 	@out=$$(mktemp); \
 	  go test -cover $(COVER_PKGS) > "$$out" 2>&1 || echo "note: some tests failed (lines below); coverage is still listed"; \
 	  grep -E '^(FAIL|--- FAIL|panic:)' "$$out" || true; \

@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/feeds"
 )
 
 // testdata/openbd_*.json are openBD v1 answers recorded 2026-11-08 (onix /
@@ -385,5 +387,38 @@ func TestCanceledCallerDoesNotPoisonCache(t *testing.T) {
 	}
 	if f.hits.Load() != 1 {
 		t.Errorf("source hit %d times, want 1", f.hits.Load())
+	}
+}
+
+// checkRedirect: the source's own scheme + host only, at most 3 hops, no
+// credentials in the URL.
+func TestBooksCheckRedirect(t *testing.T) {
+	s := New(Options{Endpoint: &Endpoint{GetURL: "https://source.example/v1/get"}})
+	req := func(raw string) *http.Request {
+		r, err := http.NewRequest(http.MethodGet, raw, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	via := func(n int) []*http.Request { return make([]*http.Request, n) }
+	for _, c := range []struct {
+		name    string
+		to      string
+		hops    int
+		blocked bool
+	}{
+		{"same host", "https://source.example/v1/get?isbn=1", 1, false},
+		{"last allowed hop", "https://source.example/v1/get", 2, false},
+		{"too many hops", "https://source.example/v1/get", 3, true},
+		{"other host", "https://other.example/v1/get", 1, true},
+		{"downgrade to http", "http://source.example/v1/get", 1, true},
+		{"other port", "https://source.example:8443/v1/get", 1, true},
+		{"credentials in URL", "https://user:pw@source.example/v1/get", 1, true},
+	} {
+		err := s.checkRedirect(req(c.to), via(c.hops))
+		if c.blocked != errors.Is(err, feeds.ErrRedirectBlocked) || (!c.blocked && err != nil) {
+			t.Errorf("%s: err = %v, blocked want %v", c.name, err, c.blocked)
+		}
 	}
 }
