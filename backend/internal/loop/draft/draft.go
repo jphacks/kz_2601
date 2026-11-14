@@ -421,6 +421,13 @@ func newID() string {
 	return "drf_" + hex.EncodeToString(b[:])
 }
 
+// Fixed lines of a draft body. auto.go swaps them for the automatic ones.
+const (
+	stepsPlaceholder = "(承認する人が書く: `feedback-loop drafts edit`)"
+	footerIssue      = "\n---\nフィードバックの要約から作った下書きを、人が確かめて出した Issue。原文と個人情報は載せていない(#367)。\n"
+	footerAppend     = "\n---\nこの Issue を出した後に届いたフィードバックの要約を、人が確かめて追記した。原文と個人情報は載せていない(#367)。\n"
+)
+
 // fill computes the draft's fields from all of its items.
 func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 	sort.SliceStable(items, func(i, j int) bool { return rank(items[i]) > rank(items[j]) })
@@ -445,7 +452,7 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 	sort.Strings(oses)
 	d.Count, d.AppVersions = count, versions
 	d.Sources = d.Sources[:0]
-	for _, s := range []loop.Source{loop.SourceInApp, loop.SourceStoreReview, loop.SourceGooglePlayReview, loop.SourceTestFlight, loop.SourceCrash, loop.SourceGenFailure} {
+	for _, s := range []loop.Source{loop.SourceInApp, loop.SourceStoreReview, loop.SourceGooglePlayReview, loop.SourceTestFlight, loop.SourceCrash, loop.SourceGenFailure, loop.SourceUnsupported} {
 		if bySource[s] > 0 {
 			d.Sources = append(d.Sources, string(s))
 		}
@@ -481,7 +488,7 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 		for _, e := range append([]string{rep.Summary}, examples...) {
 			b.WriteString("- " + strings.ReplaceAll(e, "\n", " ") + "\n")
 		}
-		b.WriteString("\n---\nこの Issue を出した後に届いたフィードバックの要約を、人が確かめて追記した。原文と個人情報は載せていない(#367)。\n")
+		b.WriteString(footerAppend)
 		d.Body = b.String()
 		d.UpdatedAt = now
 		return
@@ -495,9 +502,9 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 	}
 	b.WriteString("\n## 件数と入口\n\n")
 	counts(&b)
-	b.WriteString("\n## 再現の手順\n\n(承認する人が書く: `feedback-loop drafts edit`)\n")
+	b.WriteString("\n## 再現の手順\n\n" + stepsPlaceholder + "\n")
 	b.WriteString("\n## 完了の条件\n\n- 上の症状が、再現の手順で起きない\n- 同じ束のフィードバックが、直した版から 30 日間来ない\n")
-	b.WriteString("\n---\nフィードバックの要約から作った下書きを、人が確かめて出した Issue。原文と個人情報は載せていない(#367)。\n")
+	b.WriteString(footerIssue)
 	d.Body = b.String()
 	d.UpdatedAt = now
 }
@@ -557,7 +564,7 @@ func sourceLine(by map[loop.Source]int) string {
 	names := []struct {
 		s    loop.Source
 		name string
-	}{{loop.SourceInApp, "アプリ内"}, {loop.SourceStoreReview, "ストアのレビュー"}, {loop.SourceGooglePlayReview, "Google Play のレビュー"}, {loop.SourceTestFlight, "TestFlight"}, {loop.SourceCrash, "クラッシュ"}, {loop.SourceGenFailure, "生成の失敗"}}
+	}{{loop.SourceInApp, "アプリ内"}, {loop.SourceStoreReview, "ストアのレビュー"}, {loop.SourceGooglePlayReview, "Google Play のレビュー"}, {loop.SourceTestFlight, "TestFlight"}, {loop.SourceCrash, "クラッシュ"}, {loop.SourceGenFailure, "生成の失敗"}, {loop.SourceUnsupported, "無い機能の申告"}}
 	parts := []string{}
 	for _, n := range names {
 		if by[n.s] > 0 {

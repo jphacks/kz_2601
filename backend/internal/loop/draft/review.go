@@ -139,7 +139,7 @@ func (r *Reviewer) Approve(ctx context.Context, id, by string) (*loop.Draft, *gi
 	if r.Repo == "" {
 		return d, nil, nil
 	}
-	return r.publish(ctx, d)
+	return r.publish(ctx, d, r.Labels)
 }
 
 // Publish posts an approved draft (after a dry run, or a failed post).
@@ -151,10 +151,11 @@ func (r *Reviewer) Publish(ctx context.Context, id string) (*loop.Draft, *github
 	if r.Repo == "" {
 		return d, nil, errors.New("no target repository (LOOP_ISSUE_REPO): dry run")
 	}
-	return r.publish(ctx, d)
+	return r.publish(ctx, d, r.Labels)
 }
 
-func (r *Reviewer) publish(ctx context.Context, d *loop.Draft) (*loop.Draft, *github.Issue, error) {
+// publish posts d with labels (ignored for an append draft: a comment has none).
+func (r *Reviewer) publish(ctx context.Context, d *loop.Draft, labels []string) (*loop.Draft, *github.Issue, error) {
 	if r.BeforePublish != nil {
 		if err := r.BeforePublish(ctx); err != nil {
 			return d, nil, err
@@ -178,7 +179,7 @@ func (r *Reviewer) publish(ctx context.Context, d *loop.Draft) (*loop.Draft, *gi
 	if d.AppendIssue > 0 {
 		iss, err = r.appendTo(ctx, d)
 	} else {
-		iss, err = r.Publisher.CreateIssue(ctx, r.Repo, d.Title, d.Body, r.Labels)
+		iss, err = r.Publisher.CreateIssue(ctx, r.Repo, d.Title, d.Body, labels)
 	}
 	if err != nil {
 		return d, nil, err
