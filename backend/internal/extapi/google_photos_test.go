@@ -20,6 +20,9 @@ type fakePhotos struct {
 	body  map[string]any
 	query url.Values
 	set   bool
+	// deleted is the DELETE /sessions/{id} paths; gone answers them 404.
+	deleted []string
+	gone    bool
 }
 
 func newFakePhotos(t *testing.T) (*fakePhotos, map[string]Operation) {
@@ -59,13 +62,22 @@ func newFakePhotos(t *testing.T) (*fakePhotos, map[string]Operation) {
 		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		f.query = r.URL.Query()
+		if r.Method != http.MethodDelete {
+			f.query = r.URL.Query()
+		}
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/sessions":
 			b, _ := io.ReadAll(r.Body)
 			f.body = map[string]any{}
 			_ = json.Unmarshal(b, &f.body)
 			writeJSON(w, 200, session())
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v1/sessions/"):
+			f.deleted = append(f.deleted, r.URL.Path)
+			if f.gone {
+				gerr(w, 404, "NOT_FOUND")
+				return
+			}
+			writeJSON(w, 200, map[string]any{})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/sessions/sess_0123456789":
 			writeJSON(w, 200, session())
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/sessions/"):
@@ -142,6 +154,52 @@ func TestGooglePhotosPickedItems(t *testing.T) {
 	out, _ = ops["pickedItems"].Do(t.Context(), photosIn("access-1", args))
 	if len(out.Rows) != 2 || out.Rows[1] != (Row{Title: "(名前なし)", Subtitle: "動画", Value: "item_bbbbbbbb"}) {
 		t.Fatalf("rows %+v", out.Rows)
+	}
+}
+
+// pickedItems ends the session once the items are read (not before), and a
+// session already gone (404) does not fail the answer.
+func TestGooglePhotosPickedItemsDeletesSession(t *testing.T) {
+	f, ops := newFakePhotos(t)
+	args := map[string]string{"sessionId": "sess_0123456789"}
+	if _, err := ops["pickedItems"].Do(t.Context(), photosIn("access-1", args)); err != nil || len(f.deleted) != 0 {
+		t.Fatalf("not yet picked: %v deleted %v", err, f.deleted)
+	}
+	f.set = true
+	out, err := ops["pickedItems"].Do(t.Context(), photosIn("access-1", args))
+	if err != nil || len(out.Rows) != 2 {
+		t.Fatalf("picked: %v %+v", err, out)
+	}
+	if len(f.deleted) != 1 || f.deleted[0] != "/v1/sessions/sess_0123456789" {
+		t.Fatalf("deleted %v", f.deleted)
+	}
+	f.gone = true
+	out, err = ops["pickedItems"].Do(t.Context(), photosIn("access-1", args))
+	if err != nil || len(out.Rows) != 2 || len(f.deleted) != 2 {
+		t.Fatalf("404 on delete: %v %+v deleted %v", err, out, f.deleted)
+	}
+}
+
+// a transport failure is the shared upstream error (retryable, 502) and
+// carries no token.
+func TestGooglePhotosTransportError(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	srv.Close()
+	w := gcalWire{AuthURL: srv.URL + "/auth", TokenURL: srv.URL + "/token", RevokeURL: srv.URL + "/revoke", APIBase: srv.URL + "/v1", Client: srv.Client()}
+	p, err := newGooglePhotos(Secrets{ClientID: gcalTestID, ClientSecret: gcalTestSecret}, w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.pickedItems(t.Context(), photosIn("access-1", map[string]string{"sessionId": "sess_0123456789"}))
+	var pe *ProviderError
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream || StatusOf(Reason(err)) != http.StatusBadGateway {
+		t.Fatalf("transport: %v", err)
+	}
+	if strings.Contains(err.Error(), "access-1") {
+		t.Fatalf("token in the error: %v", err)
+	}
+	if _, err := p.g.Refresh(t.Context(), Token{RefreshToken: "refresh-1"}); Reason(err) != ReasonUpstream || strings.Contains(err.Error(), gcalTestSecret) {
+		t.Fatalf("token endpoint transport: %v", err)
 	}
 }
 

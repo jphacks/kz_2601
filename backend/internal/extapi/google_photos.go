@@ -25,7 +25,8 @@ import (
 // (openUrlButton) and keeps the id (Value) in a field. pickedItems answers
 // 「まだ選んでいません」 until the person is done, then one row an item (title
 // = the file name, subtitle = taken at (JST)・写真 / 動画・size, value = the
-// media item id). The bytes' baseUrl needs the person's token, so it never
+// media item id), and ends the session (DELETE: a later call is 「no such
+// session」). The bytes' baseUrl needs the person's token, so it never
 // goes back to the device. Nothing is cached (OAuth).
 //
 // Scope photospicker.mediaitems.readonly (sensitive: Google's verification
@@ -228,6 +229,10 @@ func (p *googlePhotos) pickedItems(ctx context.Context, in Input) (Output, error
 		}
 		rows = append(rows, it.row())
 	}
+	// the items are read: end the session (Google asks for it). Best effort:
+	// the answer is already in hand, and an unended session expires on its
+	// own (404 = already gone).
+	_ = p.do(ctx, in.Token, http.MethodDelete, "/sessions/"+url.PathEscape(id), nil, &struct{}{})
 	item := &Row{Title: strconv.Itoa(len(rows)) + " 件を選びました", Value: id}
 	return Output{Item: item, Rows: rows}, nil
 }
