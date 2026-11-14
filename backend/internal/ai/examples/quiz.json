@@ -83,9 +83,9 @@
         {
           "type": "section", "id": "board", "area": "A1:F5", "title": "合計点",
           "children": [
-            { "type": "table", "entity": "players",
-              "columns": [ { "field": "name", "title": "名前" }, { "field": "total", "title": "合計点" } ],
-              "sort": { "field": "total", "direction": "desc" } }
+            { "type": "list", "entity": "players", "item": { "title": "name", "trailing": "total" },
+              "sort": { "field": "total", "direction": "desc" }, "emptyText": "まだ参加者がいません",
+              "onItemTap": { "type": "navigate", "screen": "player_form", "presentation": "push" } }
           ]
         },
         {

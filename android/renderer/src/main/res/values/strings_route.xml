@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 道案内の部品(routeGuide・#868)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_route_choose_destination">行き先を選ぶ</string>
+    <string name="renderer_route_choose_place">場所を選ぶと、そこまで案内できます</string>
+    <string name="renderer_route_destination">目的地</string>
+    <string name="renderer_route_distance">現在地から直線で %1$s</string>
+    <string name="renderer_route_missing_destination">routeGuide は目的地(address か locationField)が必要です</string>
+    <string name="renderer_route_mode">移動手段</string>
+    <string name="renderer_route_mode_car">車</string>
+    <string name="renderer_route_mode_walk">徒歩</string>
+    <string name="renderer_route_no_app">地図を開けるアプリがありません</string>
+    <string name="renderer_route_no_places">場所を登録した行き先がまだありません</string>
+    <string name="renderer_route_opens_maps">案内は地図アプリで開きます。運転中は画面を操作しないでください</string>
+    <string name="renderer_route_start">地図アプリで案内</string>
+</resources>

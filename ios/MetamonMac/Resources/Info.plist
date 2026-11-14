@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
+	<!-- 表示名・Bundle ID・版は iOS と同じ build setting から(project.yml) -->
+	<key>CFBundleDisplayName</key>
+	<string>$(METAMON_DISPLAY_NAME)</string>
+	<!-- Siri の呼び名(#1034・iOS の Info.plist と同じ) -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テイラーイット</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テーラーイット</string>
+		</dict>
+	</array>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<!-- Mac はメニューバー(「〜について」「〜を終了」)に CFBundleName を出すので、内部名 Metamon でなく表示名にする -->
+	<key>CFBundleName</key>
+	<string>$(METAMON_DISPLAY_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<!-- 共有のリンク tailorit://import/<token>(#975)。iOS の Info.plist と同じ名前・スキーム -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>jp.kz2601.metamon.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tailorit</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- サービスメニューの「Tailor It に送る」(#1849)。ほかのアプリで選んだ文字を会話の入力欄に入れる(MacTextServiceProvider)。
+	     英語のメニュー名は ServicesMenu.xcstrings(キーは NSMenuItem の default)。NSRequiredContext を空で置くと初めから有効になる -->
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Tailor It に送る</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>sendToTailorIt</string>
+			<key>NSPortName</key>
+			<string>$(PRODUCT_NAME)</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.utf8-plain-text</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- 連係の Handoff(#1851): 開いている生成アプリの画面を iPhone ⇄ Mac で引き継ぐ。Shared/Runtime/HandoffActivity.swift の type と同じ -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>jp.kz2601.metamon.view</string>
+	</array>
+
+	<!-- 記録のコピー・貼り付け(#2251)のクリップボードの型。iOS の Info.plist・RecordClipboard.typeIdentifier と同じ -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>app.tailorit.record</string>
+			<key>UTTypeDescription</key>
+			<string>Tailor It Record</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+	</array>
+
+	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
+	<key>MetamonAIBaseURL</key>
+	<string>$(METAMON_AI_BASE_URL)</string>
+	<key>MetamonAppConfigBaseURL</key>
+	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+	<key>MetamonAppStoreURL</key>
+	<string>$(METAMON_APP_STORE_URL)</string>
+
+	<!-- WhisperKit のモデル名(#966)。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可(iOS と同じ) -->
+	<key>MetamonWhisperModel</key>
+	<string></string>
+
+	<!-- 声で頼む(#966)。Mac に無い機能(ドラレコ・閉じても続く記録)は書かない。英語は InfoPlist.xcstrings -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容をこの Mac の中で文字にしたり、ボイスメモや会議などを録音したりするために、マイクを使用します。</string>
+	<!-- 音声モデルの準備中だけ、Apple の端末内の音声認識(requiresOnDeviceRecognition)で仮に聞き取る(iOS の U5 と同じ) -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声モデルの準備ができるまでの間、話した内容をこの Mac の中で文字にするために、音声認識を使用します。声は Mac の外に送りません。</string>
+	<!-- カレンダーに追加(#978)。iOS は OS の画面(EventKitUI・別プロセス)なので説明文が要らないが、Mac は自前のシートから
+	     EventKit で書くので、書き込みだけの許可(requestWriteOnlyAccessToEvents)の説明を出す。中身は読まない -->
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>記録の日時を、内容を確かめたうえでカレンダーに予定として追加するために使用します。カレンダーの予定は読み取りません。</string>
+	<!-- musicPlayer(#960): Apple Music の検索と再生(MusicKit の ApplicationMusicPlayer) -->
+	<key>NSAppleMusicUsageDescription</key>
+	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
+	<!-- 現在地(#956)。Mac は閉じた後に記録を続けないので、その文は書かない。macOS は NSLocationUsageDescription も見るので同じ文にする -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。</string>
+	<key>NSLocationUsageDescription</key>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。</string>
+	<!-- 集中モード中か(#2328・#1990 の Mac・FocusStatusSource)。取れるのは「集中中か」だけでモードの名前は取れない。英語は InfoPlist.xcstrings。
+	     審査用の版は FocusStatusSources.make(reviewBuild: true) が偽物を返し許可を求めない -->
+	<key>NSFocusStatusUsageDescription</key>
+	<string>生成したアプリで、集中モードの間は表示や通知を控えめにするために、集中モード中かどうかを使用します。モードの名前は読み取らず、この Mac の外に送りません。</string>
+	<!-- 写真・動画の撮影(#1043)と QR の読み取り(#1045)。Mac に無い機能(ドラレコ・ビデオ通話)は書かない。英語は InfoPlist.xcstrings -->
+	<key>NSCameraUsageDescription</key>
+	<string>生成したアプリで写真や動画を撮影・記録したり、QR コードを読み取ったりするために、カメラを使用します。</string>
+	<!-- 近くの人に送る(#964): MultipeerConnectivity で近くの Tailor It と記録を送り合う。サービス名は NearbyService.serviceType と一致させる。
+	     すれ違い通信(_tailorit-pb)は Mac では使えないので書かない。英語は InfoPlist.xcstrings -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>近くにいる Tailor It の端末(iPhone・iPad・Mac)を見つけて、記録や曲のリクエストをその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tailorit-mc._tcp</string>
+		<string>_tailorit-mc._udp</string>
+	</array>
+</dict>
+</plist>

@@ -55,8 +55,7 @@ struct HealthStatLeaf: View {
     private var content: some View {
         switch phase {
         case .loading:
-            Text(isWeight ? "00.0 kg" : "0,000")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+            ScaledValueText(isWeight ? "00.0 kg" : "0,000", size: 34, monospacedDigit: false)
                 .redacted(reason: .placeholder)
         case .failed(let message):
             Label(message, systemImage: "heart.slash")
@@ -95,7 +94,7 @@ struct HealthStatLeaf: View {
             let rate = latest / target
             ProgressView(value: min(rate, 1))
                 .tint(rate >= 1 ? RenderTheme.Colors.positive : RenderTheme.Colors.brandA)
-            Text(L("目標 \(Self.stepsText(target)) 歩の \(Int((rate * 100).rounded()))%"))
+            Text(L("目標 \(Self.stepsText(target)) 歩の \(NumericInput.clampedInt(rate * 100))%"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -104,11 +103,9 @@ struct HealthStatLeaf: View {
 
     private func valueText(_ v: Double, size: CGFloat) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(isWeight ? String(format: "%.1f", v) : Self.stepsText(v))
-                .font(.system(size: size, weight: .bold, design: .rounded).monospacedDigit())
+            ScaledValueText(isWeight ? String(format: "%.1f", v) : Self.stepsText(v), size: size)
                 .contentTransition(.numericText())
-            Text(isWeight ? "kg" : L("歩"))
-                .font(.system(size: max(size * 0.4, 13), weight: .semibold, design: .rounded))
+            ScaledValueText(isWeight ? "kg" : L("歩"), size: max(size * 0.4, 13), weight: .semibold, monospacedDigit: false)
                 .foregroundStyle(.secondary)
         }
         .lineLimit(1)
@@ -163,7 +160,7 @@ struct HealthStatLeaf: View {
     }
 
     static func stepsText(_ v: Double) -> String {
-        Int(v.rounded()).formatted(.number.grouping(.automatic))
+        NumericInput.clampedInt(v).formatted(.number.grouping(.automatic))
     }
 
     // MARK: load

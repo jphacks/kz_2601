@@ -52,4 +52,25 @@ final class DuplicateAddControlTests: XCTestCase {
         let edges = ScreenGraph.edges(of: d).filter { $0.from == "home" && $0.to == "income_form" }
         XCTAssertFalse(edges.contains { if case .toolbar = $0.trigger { true } else { false } })
     }
+
+    // MARK: - 空の一覧の案内(M12)
+
+    private func emptyAdd(_ d: AppDSL) throws -> Action? {
+        DuplicateAddControl.emptyListAdd(entity: "log", on: try XCTUnwrap(d.screen("home")), in: d)
+    }
+
+    func testEmptyListAddUsesSameScreenAddButton() throws {
+        let action = try emptyAdd(dsl(toolbar: "", components: addButton))
+        XCTAssertEqual(action?.type, .navigate)
+        XCTAssertEqual(action?.screen, "form", "同じ画面の「記録を追加」と同じフォームを開く")
+        XCTAssertEqual(try emptyAdd(dsl(toolbar: plus, components: ""))?.screen, "form", "button が無ければ右上の＋と同じ")
+    }
+
+    func testEmptyListAddIsNilWithoutAddControl() throws {
+        XCTAssertNil(try emptyAdd(dsl(toolbar: "", components: "")), "追加の入口が無い画面では案内を押せない(文字のまま)")
+        let settingsButton = #"{"type":"button","label":"設定","action":{"type":"navigate","screen":"settings"}}"#
+        XCTAssertNil(try emptyAdd(dsl(toolbar: "", components: settingsButton)), "フォーム以外への移動は使わない")
+        let d = try dsl(toolbar: "", components: addButton)
+        XCTAssertNil(DuplicateAddControl.emptyListAdd(entity: "other", on: try XCTUnwrap(d.screen("home")), in: d), "別の entity のフォームは使わない")
+    }
 }

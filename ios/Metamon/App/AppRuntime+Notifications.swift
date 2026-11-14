@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import MetamonDSL
+import MetamonRenderer
 import MetamonServices
 
 /// 生成アプリのローカル通知(#228)。DSL の読み込み・レコードの変化・前面復帰で予約し直す。
@@ -19,7 +20,7 @@ extension AppRuntime {
         let appId = document.appId
         let specs = dsl.app.notifications
         var recs: [String: [Record]] = [:]
-        for entity in Set(specs.filter(\.isRecordBased).compactMap(\.entity)) {
+        for entity in Set(specs.compactMap(\.recordEntity)) {
             if let loaded = records[entity] {
                 recs[entity] = loaded
             } else {
@@ -74,21 +75,11 @@ extension AppRuntime {
     private func handleNotificationResult(_ result: NotificationSyncResult, appId: String, hasSpecs: Bool) {
         guard document.appId == appId else { return }
         upcomingNotifications = result.upcoming
+        // 許可が無い時は上のバー(`NotificationsOffBarHost`・設定を開くボタン付き)で伝える。トーストは 3 秒で消えるのでやめた(L3)
         notificationsDenied = result.denied && hasSpecs
-        if notificationsDenied, !warnedNotificationsDenied {
-            warnedNotificationsDenied = true
-            toast = L10n.tr("通知がオフのため届きません。設定アプリの「通知」で Tailor It を許可してください")
-        }
-    }
-}
-
-enum NotificationCopy {
-    /// 今日なら「7:00」、それ以外は「10/26(日) 7:00」(端末の言語の書式)。
-    static func when(_ d: Date, now: Date = .now) -> String {
-        let f = DateFormatter()
-        f.locale = .current
-        f.setLocalizedDateFormatFromTemplate(Calendar.current.isDate(d, inSameDayAs: now) ? "Hm" : "MdEEEHm")
-        return f.string(from: d)
+        notificationPlaces = result.places
+        // 場所の通知の位置情報の許可は聞き直さない・バーも出さない(設定画面の通知の欄に書くだけ)
+        placesLocationOff = result.locationOff && hasSpecs
     }
 }
 
@@ -99,6 +90,20 @@ final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterD
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        // 終わったタイマーが画面に見えている時は出さない(00:00 が見えている)。見えていなければ出す(#38)
+        let id = notification.request.identifier
+        if await MainActor.run(body: { TimerVisibility.isShowing(notificationId: id) }) { return [] }
+        return [.banner, .list, .sound]
+    }
+
+    /// 通知の応答。ボタン・文字入力(#2231)は `NotificationReplyInbox` へ。通知そのもののタップは、
+    /// プッシュなら本文の appId のアプリを開く(#269)。ローカル通知には appId が無いので今までどおり何もしない。
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let reply = NotificationReply(response: response)
+        await NotificationReplyInbox.shared.receive(reply)
+        #if !APP_STORE_REVIEW
+        guard reply.isPlainOpen, let appId = PushPayload.appId(from: response.notification.request.content.userInfo) else { return }
+        await PushHost.shared.open(appId: appId)
+        #endif
     }
 }

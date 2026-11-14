@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- リンクから開いたアプリを追加する前の確認。文言は iOS の AddShareSheet から -->
+<resources>
+    <string name="share_add_cancel">追加しない</string>
+    <string name="share_add_confirm">追加する</string>
+    <string name="share_add_note">追加すると、このアプリに切り替わります</string>
+    <string name="share_add_title">「%1$s」を追加しますか?</string>
+    <string name="share_add_title_unnamed">シェアされたアプリを追加しますか?</string>
+</resources>

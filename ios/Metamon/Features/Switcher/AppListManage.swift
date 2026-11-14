@@ -41,6 +41,7 @@ struct AppManageMenuItems: View {
             }
             .disabled(ui.duplicating.contains(app.id))
             .accessibilityIdentifier("switcher.duplicate")
+            AppGlanceMenu(app: app) // link-10 一覧に出す数字
         }
         if order.count > 1, let index {
             Section {
@@ -67,6 +68,7 @@ struct AppManageMenuItems: View {
     }
 
     private func move(to index: Int) {
+        rt.noteGesturePerformed(.switcherReorder) // #1441 メニューで並べ替えた(VoiceOver の代わりの操作)
         Task { await rt.moveApp(app.id, to: index) }
     }
 }
@@ -108,8 +110,38 @@ struct AppCardReorder: ViewModifier {
             .dropDestination(for: String.self) { ids, _ in
                 let order = rt.visibleApps.map(\.id)
                 guard let id = ids.first, id != app.id, order.contains(id), let to = order.firstIndex(of: app.id) else { return false }
+                rt.noteGesturePerformed(.switcherReorder) // #1441
                 Task { await rt.moveApp(id, to: to) }
                 return true
             }
+    }
+}
+
+/// 一覧のカードに出す数字を選ぶ(link-10)。選べる stat が無いアプリには出さない。
+struct AppGlanceMenu: View {
+    let app: AppSummary
+    @Environment(AppRuntime.self) private var rt
+    @State private var glance = AppGlanceStore.shared
+
+    var body: some View {
+        if let choices = glance.choices[app.id], !choices.isEmpty {
+            Menu {
+                Picker(selection: Binding(get: { app.glanceStat ?? "" }, set: { pick($0) })) {
+                    Text("おまかせ(最初の数字)").tag("")
+                    ForEach(choices, id: \.id) { c in
+                        Text(c.label.isEmpty ? c.id : c.label).tag(c.id)
+                    }
+                    Text("出さない").tag(AppGlance.hidden)
+                } label: { EmptyView() }
+                .pickerStyle(.inline)
+            } label: {
+                Label("一覧に出す数字を選ぶ", systemImage: "number")
+            }
+            .accessibilityIdentifier("switcher.glance")
+        }
+    }
+
+    private func pick(_ id: String) {
+        Task { await rt.setGlanceStat(app, to: id.isEmpty ? nil : id) }
     }
 }

@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-11-10T00:00:00Z",
+      "ending_at": "2026-11-11T00:00:00Z",
+      "results": [
+        {"uncached_input_tokens": 100, "cache_creation": {"ephemeral_1h_input_tokens": 0, "ephemeral_5m_input_tokens": 30}, "cache_read_input_tokens": 20, "output_tokens": 50, "model": "claude-sonnet-4-5"}
+      ]
+    }
+  ],
+  "has_more": true,
+  "next_page": "page_MjAyNi0xMS0xMQ"
+}

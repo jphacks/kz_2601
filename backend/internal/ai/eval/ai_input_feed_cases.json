@@ -1,0 +1,7 @@
+[
+  {"id": "aif_weather_pressure_health", "kind": "create", "group": "aiinputfeed", "transcript": "金沢の今日の天気と気圧から、体調のアドバイスを AI が出してくれるアプリ", "note": "tk_a_2518。feed weather + feed pressure + aiButton generate inputFeeds [両方]", "expect": {"has": ["feed", "aiButton"], "aiGenerate": "any", "aiInputFeeds": true, "feedRegion": "170000", "unreachable": 0}},
+  {"id": "aif_weather_outfit", "kind": "create", "group": "aiinputfeed", "transcript": "東京の天気予報を見て、AI が今日の服装を提案してくれるボタンがほしい", "note": "feed weather + aiButton generate inputFeeds", "expect": {"has": ["feed", "aiButton"], "feed": "weather", "aiInputFeeds": true}},
+  {"id": "aif_warnings_tips", "kind": "create", "group": "aiinputfeed", "transcript": "石川県に出ている警報を見て、AI が今日気をつけることを3つ教えてくれるアプリ", "note": "feed warnings + aiButton generate list inputFeeds", "expect": {"has": ["feed", "aiButton"], "feed": "warnings", "aiGenerate": "list", "aiInputFeeds": true}},
+  {"id": "aif_show_only", "kind": "create", "group": "aiinputfeed", "transcript": "大阪の週間天気と、今日の一言を AI が書いてくれるボタン", "note": "天気を材料にする話が無ければ inputFeeds を付けない(並べるだけ)", "expect": {"has": ["feed", "aiButton"], "feed": "weather", "aiInputFeeds": false}},
+  {"id": "aif_edit_add", "kind": "edit", "base": "aif_show_only", "group": "aiinputfeed", "transcript": "AI の一言は天気予報を見て書くようにして", "note": "既存の feed weather に id を付け、generate の aiButton に inputFeeds を足す patch", "expect": {"patch": true, "aiInputFeeds": true}}
+]

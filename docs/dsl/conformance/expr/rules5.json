@@ -1,0 +1,604 @@
+{
+  "description": "Patterns the prompt rules teach (fifth JPHACKS batch): share of child checks judged done with a zero guard, shelters reached at least once counted through a computed field, priority weight plus clamped days-until with coalesce and a stage from another computed field, months-ago from year and month of today and the date driving this / last month sums and a growth percent.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "manual",
+        "name": "手順書",
+        "fields": [
+          {"id": "title", "name": "題", "type": "string"},
+          {
+            "id": "rate",
+            "name": "できた割合",
+            "type": "integer",
+            "computed": {
+              "if": {
+                "op": "gt",
+                "args": [{"entity": "check", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "manual"}}, 0]
+              },
+              "then": {
+                "op": "round",
+                "args": [
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "entity": "check",
+                            "agg": "count",
+                            "filter": [
+                              {"value": {"ref": "id"}, "op": "eq", "field": "manual"},
+                              {"value": "できている", "op": "eq", "field": "result"}
+                            ]
+                          },
+                          {"entity": "check", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "manual"}}
+                        ]
+                      },
+                      100
+                    ]
+                  }
+                ]
+              },
+              "else": 0
+            }
+          }
+        ],
+        "titleField": "title"
+      },
+      {
+        "id": "check",
+        "name": "確認",
+        "fields": [
+          {"id": "manual", "name": "手順書", "type": "ref", "refEntity": "manual"},
+          {"id": "result", "name": "判定", "type": "enum", "options": ["できている", "一部できている", "できていない"]}
+        ],
+        "titleField": "result"
+      },
+      {
+        "id": "shelter",
+        "name": "避難所",
+        "fields": [
+          {"id": "name", "name": "避難所", "type": "string"},
+          {
+            "id": "reached",
+            "name": "着いた回数",
+            "type": "integer",
+            "computed": {
+              "entity": "drill",
+              "agg": "count",
+              "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "shelter"}, {"value": true, "op": "eq", "field": "arrived"}]
+            }
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "drill",
+        "name": "訓練",
+        "fields": [
+          {"id": "shelter", "name": "避難所", "type": "ref", "refEntity": "shelter"},
+          {"id": "arrived", "name": "着いた", "type": "boolean"}
+        ]
+      },
+      {
+        "id": "task",
+        "name": "タスク",
+        "fields": [
+          {"id": "title", "name": "タスク", "type": "string"},
+          {"id": "priority", "name": "優先度", "type": "enum", "options": ["高", "中", "低"]},
+          {"id": "due", "name": "期限", "type": "date"},
+          {
+            "id": "urgency",
+            "name": "急ぎ度",
+            "type": "integer",
+            "computed": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    10,
+                    {
+                      "if": {"op": "eq", "args": [{"ref": "priority"}, "高"]},
+                      "then": 3,
+                      "else": {"if": {"op": "eq", "args": [{"ref": "priority"}, "中"]}, "then": 2, "else": 1}
+                    }
+                  ]
+                },
+                {
+                  "op": "sub",
+                  "args": [
+                    10,
+                    {
+                      "op": "clamp",
+                      "args": [{"op": "coalesce", "args": [{"op": "daysUntil", "args": [{"ref": "due"}]}, 10]}, 0, 10]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "stage",
+            "name": "色",
+            "type": "string",
+            "computed": {
+              "if": {"op": "gte", "args": [{"ref": "urgency"}, 35]},
+              "then": "真っ赤",
+              "else": {
+                "if": {"op": "gte", "args": [{"ref": "urgency"}, 25]},
+                "then": "赤",
+                "else": {"if": {"op": "gte", "args": [{"ref": "urgency"}, 15]}, "then": "オレンジ", "else": "緑"}
+              }
+            }
+          }
+        ],
+        "titleField": "title"
+      },
+      {
+        "id": "store",
+        "name": "店",
+        "fields": [
+          {"id": "name", "name": "店", "type": "string"},
+          {
+            "id": "this_month",
+            "name": "今月",
+            "type": "integer",
+            "computed": {
+              "entity": "sale",
+              "agg": "sum",
+              "field": "amount",
+              "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "store"}, {"value": 0, "op": "eq", "field": "ago"}]
+            }
+          },
+          {
+            "id": "last_month",
+            "name": "先月",
+            "type": "integer",
+            "computed": {
+              "entity": "sale",
+              "agg": "sum",
+              "field": "amount",
+              "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "store"}, {"value": 1, "op": "eq", "field": "ago"}]
+            }
+          },
+          {
+            "id": "growth",
+            "name": "前月比",
+            "type": "integer",
+            "computed": {
+              "if": {"op": "gt", "args": [{"ref": "last_month"}, 0]},
+              "then": {
+                "op": "round",
+                "args": [{"op": "mul", "args": [{"op": "div", "args": [{"ref": "this_month"}, {"ref": "last_month"}]}, 100]}]
+              },
+              "else": 0
+            }
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "sale",
+        "name": "売上",
+        "fields": [
+          {"id": "store", "name": "店", "type": "ref", "refEntity": "store"},
+          {"id": "date", "name": "日付", "type": "date"},
+          {"id": "amount", "name": "売上", "type": "integer"},
+          {
+            "id": "ago",
+            "name": "何か月前",
+            "type": "integer",
+            "computed": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {"op": "mul", "args": [{"op": "year", "args": [{"op": "today", "args": []}]}, 12]},
+                    {"op": "month", "args": [{"op": "today", "args": []}]}
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    {"op": "mul", "args": [{"op": "year", "args": [{"ref": "date"}]}, 12]},
+                    {"op": "month", "args": [{"ref": "date"}]}
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "records": {
+      "check": [
+        {"id": "c1", "data": {"manual": "m1", "result": "できている"}},
+        {"id": "c2", "data": {"manual": "m1", "result": "一部できている"}},
+        {"id": "c3", "data": {"manual": "m1", "result": "できている"}}
+      ],
+      "drill": [
+        {"id": "d1", "data": {"arrived": true, "shelter": "s1"}},
+        {"id": "d2", "data": {"arrived": true, "shelter": "s1"}},
+        {"id": "d3", "data": {"arrived": false, "shelter": "s2"}},
+        {"id": "d4", "data": {"arrived": true, "shelter": "s3"}}
+      ],
+      "manual": [{"id": "m1", "data": {"title": "棚の組み立て"}}, {"id": "m2", "data": {"title": "掃除"}}],
+      "sale": [
+        {"id": "1", "data": {"amount": 30000, "date": "2026-10-03", "store": "a"}},
+        {"id": "2", "data": {"amount": 15000, "date": "2026-10-20", "store": "a"}},
+        {"id": "3", "data": {"amount": 40000, "date": "2026-09-30", "store": "a"}},
+        {"id": "4", "data": {"amount": 99000, "date": "2026-08-15", "store": "a"}},
+        {"id": "5", "data": {"amount": 12000, "date": "2026-10-01", "store": "b"}}
+      ],
+      "shelter": [{"id": "s1", "data": {"name": "小学校"}}, {"id": "s2", "data": {"name": "公民館"}}, {"id": "s3", "data": {"name": "公園"}}],
+      "store": [{"id": "a", "data": {"name": "駅前店"}}, {"id": "b", "data": {"name": "本店"}}]
+    }
+  },
+  "cases": [
+    {
+      "name": "rules5/rate-some-done",
+      "expr": {"ref": "rate"},
+      "row": {"entity": "manual", "record": {"id": "m1", "data": {"title": "棚の組み立て"}}},
+      "expected": {"type": "number", "value": 67, "text": "67"}
+    },
+    {
+      "name": "rules5/rate-no-checks",
+      "expr": {"ref": "rate"},
+      "row": {"entity": "manual", "record": {"id": "m2", "data": {"title": "掃除"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "rules5/reached-twice",
+      "expr": {"ref": "reached"},
+      "row": {"entity": "shelter", "record": {"id": "s1", "data": {"name": "小学校"}}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "rules5/reached-not-arrived",
+      "expr": {"ref": "reached"},
+      "row": {"entity": "shelter", "record": {"id": "s2", "data": {"name": "公民館"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "rules5/badges",
+      "expr": {"entity": "shelter", "agg": "count", "filter": {"value": 0, "op": "gt", "field": "reached"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "rules5/urgency-high-tomorrow",
+      "expr": {"ref": "urgency"},
+      "row": {"entity": "task", "record": {"id": "t1", "data": {"due": "2026-10-29", "priority": "高"}}},
+      "expected": {"type": "number", "value": 39, "text": "39"}
+    },
+    {
+      "name": "rules5/stage-high-tomorrow",
+      "expr": {"ref": "stage"},
+      "row": {"entity": "task", "record": {"id": "t1", "data": {"due": "2026-10-29", "priority": "高"}}},
+      "expected": {"type": "string", "value": "真っ赤", "text": "真っ赤"}
+    },
+    {
+      "name": "rules5/urgency-mid-far",
+      "expr": {"ref": "urgency"},
+      "row": {"entity": "task", "record": {"id": "t2", "data": {"due": "2026-11-20", "priority": "中"}}},
+      "expected": {"type": "number", "value": 20, "text": "20"}
+    },
+    {
+      "name": "rules5/stage-mid-far",
+      "expr": {"ref": "stage"},
+      "row": {"entity": "task", "record": {"id": "t2", "data": {"due": "2026-11-20", "priority": "中"}}},
+      "expected": {"type": "string", "value": "オレンジ", "text": "オレンジ"}
+    },
+    {
+      "name": "rules5/urgency-low-overdue",
+      "expr": {"ref": "urgency"},
+      "row": {"entity": "task", "record": {"id": "t3", "data": {"due": "2026-10-20", "priority": "低"}}},
+      "expected": {"type": "number", "value": 20, "text": "20"}
+    },
+    {
+      "name": "rules5/stage-low-overdue",
+      "expr": {"ref": "stage"},
+      "row": {"entity": "task", "record": {"id": "t3", "data": {"due": "2026-10-20", "priority": "低"}}},
+      "expected": {"type": "string", "value": "オレンジ", "text": "オレンジ"}
+    },
+    {
+      "name": "rules5/urgency-low-no-due",
+      "expr": {"ref": "urgency"},
+      "row": {"entity": "task", "record": {"id": "t4", "data": {"priority": "低"}}},
+      "expected": {"type": "number", "value": 10, "text": "10"}
+    },
+    {
+      "name": "rules5/stage-low-no-due",
+      "expr": {"ref": "stage"},
+      "row": {"entity": "task", "record": {"id": "t4", "data": {"priority": "低"}}},
+      "expected": {"type": "string", "value": "緑", "text": "緑"}
+    },
+    {
+      "name": "rules5/urgency-mid-in-3-days",
+      "expr": {"ref": "urgency"},
+      "row": {"entity": "task", "record": {"id": "t5", "data": {"due": "2026-10-31", "priority": "中"}}},
+      "expected": {"type": "number", "value": 27, "text": "27"}
+    },
+    {
+      "name": "rules5/stage-mid-in-3-days",
+      "expr": {"ref": "stage"},
+      "row": {"entity": "task", "record": {"id": "t5", "data": {"due": "2026-10-31", "priority": "中"}}},
+      "expected": {"type": "string", "value": "赤", "text": "赤"}
+    },
+    {
+      "name": "rules5/ago-last-month",
+      "expr": {"ref": "ago"},
+      "row": {"entity": "sale", "record": {"id": "3", "data": {"amount": 40000, "date": "2026-09-30", "store": "a"}}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "rules5/ago-this-month",
+      "expr": {"ref": "ago"},
+      "row": {"entity": "sale", "record": {"id": "1", "data": {"amount": 30000, "date": "2026-10-03", "store": "a"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "rules5/this-month-a",
+      "expr": {"ref": "this_month"},
+      "row": {"entity": "store", "record": {"id": "a", "data": {"name": "駅前店"}}},
+      "expected": {"type": "number", "value": 45000, "text": "45000"}
+    },
+    {
+      "name": "rules5/last-month-a",
+      "expr": {"ref": "last_month"},
+      "row": {"entity": "store", "record": {"id": "a", "data": {"name": "駅前店"}}},
+      "expected": {"type": "number", "value": 40000, "text": "40000"}
+    },
+    {
+      "name": "rules5/growth-a",
+      "expr": {"ref": "growth"},
+      "row": {"entity": "store", "record": {"id": "a", "data": {"name": "駅前店"}}},
+      "expected": {"type": "number", "value": 113, "text": "113"}
+    },
+    {
+      "name": "rules5/growth-no-last-month",
+      "expr": {"ref": "growth"},
+      "row": {"entity": "store", "record": {"id": "b", "data": {"name": "本店"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "rules5/growth-across-new-year",
+      "now": "2027-01-10T12:00:00+09:00",
+      "expr": {"ref": "growth"},
+      "row": {"entity": "store", "record": {"id": "a", "data": {"name": "駅前店"}}},
+      "entities": [
+        {
+          "id": "manual",
+          "name": "手順書",
+          "fields": [
+            {"id": "title", "name": "題", "type": "string"},
+            {
+              "id": "rate",
+              "name": "できた割合",
+              "type": "integer",
+              "computed": {
+                "if": {
+                  "op": "gt",
+                  "args": [{"entity": "check", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "manual"}}, 0]
+                },
+                "then": {
+                  "op": "round",
+                  "args": [
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "entity": "check",
+                              "agg": "count",
+                              "filter": [
+                                {"value": {"ref": "id"}, "op": "eq", "field": "manual"},
+                                {"value": "できている", "op": "eq", "field": "result"}
+                              ]
+                            },
+                            {"entity": "check", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "manual"}}
+                          ]
+                        },
+                        100
+                      ]
+                    }
+                  ]
+                },
+                "else": 0
+              }
+            }
+          ],
+          "titleField": "title"
+        },
+        {
+          "id": "check",
+          "name": "確認",
+          "fields": [
+            {"id": "manual", "name": "手順書", "type": "ref", "refEntity": "manual"},
+            {"id": "result", "name": "判定", "type": "enum", "options": ["できている", "一部できている", "できていない"]}
+          ],
+          "titleField": "result"
+        },
+        {
+          "id": "shelter",
+          "name": "避難所",
+          "fields": [
+            {"id": "name", "name": "避難所", "type": "string"},
+            {
+              "id": "reached",
+              "name": "着いた回数",
+              "type": "integer",
+              "computed": {
+                "entity": "drill",
+                "agg": "count",
+                "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "shelter"}, {"value": true, "op": "eq", "field": "arrived"}]
+              }
+            }
+          ],
+          "titleField": "name"
+        },
+        {
+          "id": "drill",
+          "name": "訓練",
+          "fields": [
+            {"id": "shelter", "name": "避難所", "type": "ref", "refEntity": "shelter"},
+            {"id": "arrived", "name": "着いた", "type": "boolean"}
+          ]
+        },
+        {
+          "id": "task",
+          "name": "タスク",
+          "fields": [
+            {"id": "title", "name": "タスク", "type": "string"},
+            {"id": "priority", "name": "優先度", "type": "enum", "options": ["高", "中", "低"]},
+            {"id": "due", "name": "期限", "type": "date"},
+            {
+              "id": "urgency",
+              "name": "急ぎ度",
+              "type": "integer",
+              "computed": {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "mul",
+                    "args": [
+                      10,
+                      {
+                        "if": {"op": "eq", "args": [{"ref": "priority"}, "高"]},
+                        "then": 3,
+                        "else": {"if": {"op": "eq", "args": [{"ref": "priority"}, "中"]}, "then": 2, "else": 1}
+                      }
+                    ]
+                  },
+                  {
+                    "op": "sub",
+                    "args": [
+                      10,
+                      {
+                        "op": "clamp",
+                        "args": [{"op": "coalesce", "args": [{"op": "daysUntil", "args": [{"ref": "due"}]}, 10]}, 0, 10]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "id": "stage",
+              "name": "色",
+              "type": "string",
+              "computed": {
+                "if": {"op": "gte", "args": [{"ref": "urgency"}, 35]},
+                "then": "真っ赤",
+                "else": {
+                  "if": {"op": "gte", "args": [{"ref": "urgency"}, 25]},
+                  "then": "赤",
+                  "else": {"if": {"op": "gte", "args": [{"ref": "urgency"}, 15]}, "then": "オレンジ", "else": "緑"}
+                }
+              }
+            }
+          ],
+          "titleField": "title"
+        },
+        {
+          "id": "store",
+          "name": "店",
+          "fields": [
+            {"id": "name", "name": "店", "type": "string"},
+            {
+              "id": "this_month",
+              "name": "今月",
+              "type": "integer",
+              "computed": {
+                "entity": "sale",
+                "agg": "sum",
+                "field": "amount",
+                "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "store"}, {"value": 0, "op": "eq", "field": "ago"}]
+              }
+            },
+            {
+              "id": "last_month",
+              "name": "先月",
+              "type": "integer",
+              "computed": {
+                "entity": "sale",
+                "agg": "sum",
+                "field": "amount",
+                "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "store"}, {"value": 1, "op": "eq", "field": "ago"}]
+              }
+            },
+            {
+              "id": "growth",
+              "name": "前月比",
+              "type": "integer",
+              "computed": {
+                "if": {"op": "gt", "args": [{"ref": "last_month"}, 0]},
+                "then": {
+                  "op": "round",
+                  "args": [{"op": "mul", "args": [{"op": "div", "args": [{"ref": "this_month"}, {"ref": "last_month"}]}, 100]}]
+                },
+                "else": 0
+              }
+            }
+          ],
+          "titleField": "name"
+        },
+        {
+          "id": "sale",
+          "name": "売上",
+          "fields": [
+            {"id": "store", "name": "店", "type": "ref", "refEntity": "store"},
+            {"id": "date", "name": "日付", "type": "date"},
+            {"id": "amount", "name": "売上", "type": "integer"},
+            {
+              "id": "ago",
+              "name": "何か月前",
+              "type": "integer",
+              "computed": {
+                "op": "sub",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      {"op": "mul", "args": [{"op": "year", "args": [{"op": "today", "args": []}]}, 12]},
+                      {"op": "month", "args": [{"op": "today", "args": []}]}
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      {"op": "mul", "args": [{"op": "year", "args": [{"ref": "date"}]}, 12]},
+                      {"op": "month", "args": [{"ref": "date"}]}
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "records": {
+        "sale": [
+          {"id": "6", "data": {"amount": 20000, "date": "2026-12-31", "store": "a"}},
+          {"id": "7", "data": {"amount": 25000, "date": "2027-01-05", "store": "a"}}
+        ],
+        "store": [{"id": "a", "data": {"name": "駅前店"}}, {"id": "b", "data": {"name": "本店"}}]
+      },
+      "expected": {"type": "number", "value": 125, "text": "125"}
+    },
+    {
+      "name": "rules5/ago-across-new-year",
+      "now": "2027-01-10T12:00:00+09:00",
+      "expr": {"ref": "ago"},
+      "row": {"entity": "sale", "record": {"id": "6", "data": {"amount": 20000, "date": "2026-12-31", "store": "a"}}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    }
+  ]
+}

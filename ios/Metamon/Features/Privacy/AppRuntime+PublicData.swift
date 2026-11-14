@@ -45,9 +45,10 @@ struct PublicDataPromptHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .task(id: rt.publicDataPrompt?.id) {
+            // H7: 要約バナーなど前のお知らせが閉じてから(`PostBuildNotice`)
+            .task(id: PromptTurn(id: rt.publicDataPrompt?.id, turn: rt.isNoticeTurn(.publicData))) {
                 shown = nil
-                guard rt.publicDataPrompt != nil else { return }
+                guard rt.publicDataPrompt != nil, rt.isNoticeTurn(.publicData) else { return }
                 try? await Task.sleep(for: .milliseconds(700))
                 guard !Task.isCancelled else { return }
                 shown = rt.publicDataPrompt

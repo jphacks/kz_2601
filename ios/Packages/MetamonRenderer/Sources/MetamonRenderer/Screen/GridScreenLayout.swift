@@ -5,6 +5,8 @@ import MetamonDSL
 /// - 横 6 列(A-F)= 可視幅 ÷ 6、縦 1 行 = 可視高さ ÷ 12。`area` を持つ直下の子は矩形に絶対配置(セル内でスクロール)。
 /// - `area` の無い子は「area で使われた最終行の次の行」から全幅で上から積む(フォールバック)。
 /// - 13 行目以降 or フォールバックがはみ出せば画面全体が縦スクロール。voiceInput 画面(初期状態)はスクロールしない。
+/// - 横向き(#625)は `GridMetrics`: 最大幅で中央寄せ・行の高さ固定・画面ごと縦スクロール(voiceInput 画面も)。
+/// - Mac(#938)は `GridMetrics.resolveDesktop`: 高さ × 3/4 の幅(480〜720)で中央寄せ・行の高さは高さ ÷ 12(低い時だけスクロール)。
 /// - 見た目: セル間ギャップ / 画面端余白は `RenderTheme.Spacing`、出現は index × stagger の遅延付きフェード(変身の受け側)。
 /// - 最下段(行 11〜12)の左端(A〜B 列)/ 右端(E〜F 列)に部品があれば、その上端(global 座標)を
 ///   `GridBottomObstructionKey` / `GridBottomTrailingObstructionKey` で上げる(ホストがマイク FAB を上に逃がすため・#83 / #52)。
@@ -20,6 +22,15 @@ public struct GridScreenLayout: View {
     /// フォーカスを得た入力欄(`keyboardAnchor` の id)。tick は同じ欄への再フォーカスでもスクロールさせるため
     @State private var focusRequest: (key: String, tick: Int)?
     @Environment(\.fabFrame) private var fabFrame
+    /// 横向き(#625)は `GridMetrics` で幅を絞って中央に寄せ、行の高さを固定して縦スクロール
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// 手で動かす編集モード(#1442)。この画面を編集している時だけ使う
+    @Environment(\.gridEditSession) private var editSession
+
+    private var editing: GridEditSession? {
+        guard let s = editSession, s.screenId == screen.id, screen.isGridEditable else { return nil }
+        return s
+    }
 
     public init(screen: Screen, ctx: RenderContext) {
         self.screen = screen
@@ -28,12 +39,23 @@ public struct GridScreenLayout: View {
 
     public var body: some View {
         GeometryReader { geo in
-            let cellW = (geo.size.width - inset * 2) / CGFloat(GridArea.columns)
             let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
-            let cellH = (layoutH - inset * 2) / CGFloat(GridArea.visibleRows)
-            let placement = screen.gridPlacement
+            #if os(macOS)
+            // Mac は横長で大きさが変わるウィンドウ。縦長の比率の幅で中央に寄せる(#938)
+            let metrics = GridMetrics.resolveDesktop(width: geo.size.width, height: layoutH, inset: inset,
+                                                     fabInGutter: MacFabExperiment.isEnabled()) // #2327 の試作(既定 off)
+            #else
+            let metrics = GridMetrics.resolve(width: geo.size.width, height: layoutH, inset: inset,
+                                              compactHeight: verticalSizeClass == .compact)
+            #endif
+            let cellW = metrics.cellW
+            let cellH = metrics.cellH
+            let editing = editing
+            // 編集中は動かした後の配置で描き、下に動かせるよう最低 12 行・最後の部品の 2 行下まで広げる
+            let placement = (editing.map { $0.draft.applied(to: screen) } ?? screen).gridPlacement
             let lastRow = placement.placed.map(\.area.row2).max() ?? 0
-            let gridHeight = CGFloat(lastRow) * cellH
+            let gridRows = editing == nil ? lastRow : min(GridArea.maxRows, max(GridArea.visibleRows, lastRow + 2))
+            let gridHeight = CGFloat(gridRows) * cellH
 
             let content = VStack(alignment: .leading, spacing: gap) {
                 if screen.entity != nil, !placement.placed.isEmpty {
@@ -42,39 +64,55 @@ public struct GridScreenLayout: View {
                     FormFlowLayout(placed: placement.placed, cellW: cellW, cellH: cellH, ctx: ctx)
                 } else if !placement.placed.isEmpty {
                     ZStack(alignment: .topLeading) {
-                        Color.clear.frame(width: geo.size.width - inset * 2, height: gridHeight)
+                        Color.clear.frame(width: metrics.frameWidth - inset * 2, height: gridHeight)
+                        if editing != nil { GridEditLines(cellW: cellW, cellH: cellH, rows: gridRows) }
                         ForEach(Array(placement.placed.enumerated()), id: \.element.component.id) { index, item in
                             let (c, a) = item
                             GridCell(component: c, ctx: ctx)
                                 .frame(width: CGFloat(a.colSpan) * cellW - gap, height: CGFloat(a.rowSpan) * cellH - gap)
-                                .staggeredAppear(index: index)
+                                .staggeredAppear(index: index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
                                 .offset(x: CGFloat(a.col1) * cellW + gap / 2, y: CGFloat(a.row1 - 1) * cellH + gap / 2)
+                                .allowsHitTesting(editing == nil) // 編集中は部品を押させない(枠のドラッグだけ)
+                                .accessibilityHidden(editing != nil) // VoiceOver も枠だけに止まる
                         }
+                        if let editing { GridEditLayer(session: editing, cellW: cellW, cellH: cellH, gap: gap) }
                     }
                 }
                 ForEach(Array(placement.stacked.enumerated()), id: \.element.id) { index, c in
                     DSLView(component: c, ctx: ctx)
-                        .staggeredAppear(index: placement.placed.count + index)
+                        .staggeredAppear(index: placement.placed.count + index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
+                        // area 無しで積んだ部品は v1 では動かせない。編集中は薄くして押させない
+                        .opacity(editing == nil ? 1 : 0.4)
+                        .allowsHitTesting(editing == nil)
+                        .accessibilityHidden(editing != nil)
                 }
             }
             .padding(inset)
-            .frame(width: geo.size.width, alignment: .topLeading)
+            .frame(width: metrics.frameWidth, alignment: .topLeading)
+            // 横向きは中央に寄せる(縦向きは frameWidth = 画面の幅なのでそのまま)
+            .frame(width: geo.size.width)
             // 入力欄の外(部品の無い所)をタップしたらキーボードを閉じる
             .background(Color.clear.contentShape(Rectangle()).onTapGesture { KeyboardState.dismiss() })
 
             Group {
-                if screen.isVoiceScreen {
+                // 横向きは voiceInput 画面も行が画面に収まらないのでスクロールに入れる
+                if screen.isVoiceScreen, !metrics.scrollsVertically {
                     content
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
                             // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。
                             // area だけの画面は高さぴったりなので足さない(足すと常に少しスクロールしてしまう)
+                            // 横向きで FAB が左右の余白に収まらない時は、area だけの画面も最下段を FAB の上へ出せるよう余白を足す
                             content
-                                .padding(.bottom, placement.stacked.isEmpty ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
+                                .padding(.bottom, placement.stacked.isEmpty && !(metrics.scrollsVertically && !metrics.fabInGutter)
+                                    ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
                         }
                         .scrollDismissesKeyboard(.interactively)
+                        .scrollDisabled(editing?.isDragging == true) // 枠を動かしている間は画面ごと流れない
                         .scrollBounceBehavior(.basedOnSize)
+                        .modifier(RequiredFieldScroller(screen: screen, form: ctx.form, proxy: proxy))
+                        .modifier(MacFormTabReveal(proxy: proxy)) // Mac: Tab の渡し先が遅延の入れ物で出ていなければ先にスクロール(#2065)
                         // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
                         .task(id: focusRequest?.tick) {
                             guard let key = focusRequest?.key else { return }
@@ -91,8 +129,12 @@ public struct GridScreenLayout: View {
                     }
                 }
             }
-            .preference(key: GridBottomObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
-            .preference(key: GridBottomTrailingObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
+            // 横向きはグリッドがスクロールするので「最下段の上端」で FAB を押し上げない(余白か末尾の余白で避ける)
+            .preference(key: GridBottomObstructionKey.self, value: metrics.scrollsVertically ? [:] : bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
+            .preference(key: GridBottomTrailingObstructionKey.self, value: metrics.scrollsVertically ? [:] : bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
+            #if os(macOS)
+            .preference(key: GridColumnWidthKey.self, value: metrics.frameWidth) // 保存バーを中央の列に揃える(#1337)
+            #endif
         }
         .background {
             GeometryReader { full in
@@ -243,8 +285,8 @@ struct GridCell: View {
         if hasLocalGrid { return false }
         return switch component.type {
         // hstack は通常サイズでは器に収める(stat を横に並べる定番。スクロールにすると高さが無制限になり、stat の数値がセル高さで縮まず下が切れる・#89)
-        case .list, .section, .vstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar, .gridTable, .settlement, .matchList: true
-        case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput, .chatThread, .dashcam, .qrCode, .flashcards: false
+        case .list, .section, .vstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar, .gridTable, .settlement, .matchList, .feed: true
+        case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput, .chatThread, .aiChat, .dashcam, .qrCode, .flashcards, .bracket: false
         // 読み取り(#418)の操作と結果の分だけ背が伸びるので、セルに収まらなければ中でスクロール
         case .photoField: !component.analyze.isEmpty || typeSize.isAccessibilitySize
         default: typeSize.isAccessibilitySize
@@ -354,17 +396,53 @@ private struct ContentFrameKey: PreferenceKey {
 
 /// 画面が差し替わった直後、各セルが index × stagger の遅延で薄く小さい状態から出現する。
 /// RootView 側が `.id(document.version)` でツリーを作り直すので、変身のたびに onAppear が走る。Reduce Motion ではスキップ。
+/// 編集の直後(`changeHighlight` にこの画面がある・#626)は、変わった部品だけを少し遅れて置き直して光らせ、
+/// 変わっていない部品は待たせずに出す。Reduce Motion では動かさず光の淡いフェードだけ。
 private struct StaggeredAppear: ViewModifier {
     let index: Int
+    var highlightKey: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.changeHighlight) private var highlight
     @State private var shown = false
+    @State private var glow: Double = 0
+
+    private var screenHighlighted: Bool {
+        guard let key = highlightKey, let screen = key.split(separator: "/").first else { return false }
+        return highlight.screens.contains(String(screen))
+    }
+    private var isChanged: Bool { highlightKey.map(highlight.components.contains) ?? false }
 
     func body(content: Content) -> some View {
         content
             .opacity(shown || reduceMotion ? 1 : 0)
-            .scaleEffect(shown || reduceMotion ? 1 : RenderTheme.Motion.appearScale)
+            .scaleEffect(shown || reduceMotion ? 1 : (isChanged ? 0.9 : RenderTheme.Motion.appearScale))
+            .overlay {
+                if glow > 0 {
+                    RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous)
+                        .strokeBorder(RenderTheme.Colors.brandB, lineWidth: 2)
+                        .shadow(color: RenderTheme.Colors.brandB.opacity(0.6), radius: 8)
+                        .opacity(glow)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
             .onAppear {
-                guard !shown, !reduceMotion else { return }
+                guard !shown else { return }
+                if screenHighlighted {
+                    if isChanged {
+                        glow = 1
+                        if reduceMotion {
+                            shown = true
+                        } else {
+                            withAnimation(.spring(duration: 0.5, bounce: 0.3).delay(0.15)) { shown = true }
+                        }
+                        withAnimation(.easeOut(duration: 1.1).delay(0.5)) { glow = 0 }
+                    } else {
+                        shown = true
+                    }
+                    return
+                }
+                guard !reduceMotion else { return }
                 withAnimation(RenderTheme.Motion.appear.delay(Double(min(index, 12)) * RenderTheme.Motion.stagger)) {
                     shown = true
                 }
@@ -373,5 +451,7 @@ private struct StaggeredAppear: ViewModifier {
 }
 
 private extension View {
-    func staggeredAppear(index: Int) -> some View { modifier(StaggeredAppear(index: index)) }
+    func staggeredAppear(index: Int, highlightKey: String? = nil) -> some View {
+        modifier(StaggeredAppear(index: index, highlightKey: highlightKey))
+    }
 }

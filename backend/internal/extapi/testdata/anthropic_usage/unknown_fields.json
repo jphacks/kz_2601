@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-11-10T00:00:00+09:00",
+      "ending_at": "2026-11-11T00:00:00+09:00",
+      "new_bucket_field": {"x": 1},
+      "results": [
+        {"uncached_input_tokens": 5, "output_tokens": 6, "model": null, "inference_geo": "us", "new_counter": 99, "cache_creation": {"ephemeral_1h_input_tokens": 1, "ephemeral_5m_input_tokens": 1, "ephemeral_24h_input_tokens": 7}}
+      ]
+    }
+  ],
+  "has_more": false,
+  "next_page": null,
+  "new_top_field": "ignored"
+}

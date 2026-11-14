@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -262,18 +263,28 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 // would send, on a fresh copy of the base DSL.
 func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base []byte, res *ai.ChatResult, all bool) *ChatGenRecord {
 	g := &ChatGenRecord{}
-	switch {
-	case res.Kind == "proposal" && all && res.MultiSelect:
-		g.Instruction = joinInstructions(res.Options)
-	case res.Kind == "proposal" && len(res.Options) > 0:
-		g.Instruction = res.Options[0].Instruction
-	case res.Kind == "ready":
-		g.Instruction = res.Transcript
-	default:
-		g.Error = "nothing to generate (kind " + res.Kind + ")"
+	instruction, err := chatInstruction(res, all)
+	if err != nil {
+		g.Error = err.Error()
 		return g
 	}
+	g.Instruction = instruction
 	return runGenerate(ctx, svc, caseID, base, g, res.Locale)
+}
+
+// chatInstruction picks the /generate instruction a chat turn leads to
+// (no AI call): all multi-select options joined, else the first proposal,
+// else the ready transcript.
+func chatInstruction(res *ai.ChatResult, all bool) (string, error) {
+	switch {
+	case res.Kind == "proposal" && all && res.MultiSelect:
+		return joinInstructions(res.Options), nil
+	case res.Kind == "proposal" && len(res.Options) > 0:
+		return res.Options[0].Instruction, nil
+	case res.Kind == "ready":
+		return res.Transcript, nil
+	}
+	return "", errors.New("nothing to generate (kind " + res.Kind + ")")
 }
 
 // generateWith runs /generate (edit) with a fixed instruction (#230 GenSay).

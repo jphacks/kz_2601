@@ -12,6 +12,6 @@ struct ImageLeaf: View {
 
     var body: some View {
         let value = c.field.flatMap { ctx.form?.values[$0] } ?? .null
-        PhotoView(value: value, height: height)
+        PhotoView(value: value, height: height, menuTitle: [c.label, c.title].compactMap { $0 }.first { !$0.isEmpty } ?? L("写真"))
     }
 }

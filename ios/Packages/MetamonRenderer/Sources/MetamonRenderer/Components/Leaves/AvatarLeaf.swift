@@ -24,9 +24,9 @@ struct AvatarLeaf: View {
     var body: some View {
         ZStack {
             if let img = PhotoCodec.image(from: photo) {
-                Image(uiImage: img).resizable().scaledToFill()
-            } else if let s = photo.stringValue, s.hasPrefix("http"), let url = URL(string: s) {
-                AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { placeholder }
+                Image(platformImage: img).resizable().scaledToFill()
+            } else if let url = ImageHostPolicy.loadableURL(photo.stringValue) {
+                RemoteImage(url: url) { placeholder }
             } else {
                 placeholder
             }
@@ -35,7 +35,7 @@ struct AvatarLeaf: View {
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
         .frame(maxWidth: .infinity)
-        .accessibilityLabel(c.name ?? "avatar")
+        .accessibilityLabel(c.name ?? L("アバター")) // 名前が無い時も訳のある文言で読む(#941)
     }
 
     private var placeholder: some View {

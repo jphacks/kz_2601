@@ -1,0 +1,6 @@
+[
+  {"id": "cal_event", "kind": "create", "group": "calendar", "transcript": "ポスターで見つけたイベントを記録して、iPhone のカレンダーにも入れられるアプリ", "note": "os_2407 Eventpix。datetime の field + addToCalendar のボタン", "expect": {"addToCalendar": true, "substitution": false}},
+  {"id": "cal_deadline", "kind": "create", "group": "calendar", "transcript": "レポートの締切を管理して、前の日に知らせてくれるように Google カレンダーにも登録したい", "note": "OL_2303 系。alertMinutes 1440", "expect": {"addToCalendar": true, "calendarAlert": true}},
+  {"id": "cal_plain", "kind": "create", "group": "calendar", "transcript": "推しのライブの予定を月のカレンダーで見たい", "note": "C_2207 推し隊。アプリ内の calendar 部品だけ。頼まれていないので addToCalendar は付けない", "expect": {"calendar": true, "addToCalendar": false}},
+  {"id": "cal_plain_add", "kind": "edit", "base": "cal_plain", "group": "calendar", "transcript": "ライブの予定を iPhone のカレンダーにも入れられるようにして", "note": "既存のフォームに addToCalendar のボタンを add", "expect": {"patch": true, "addToCalendar": true, "calendar": true}}
+]

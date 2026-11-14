@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="coach_mark_fab_drag_body">Press and drag it to move it to either side. Push it to the edge to tuck it away, leaving just a handle.</string>
+    <string name="coach_mark_fab_drag_talkback">Use “Move to the other side” or “Tuck to the edge” in this button\'s actions to change where it sits.</string>
+    <string name="coach_mark_fab_drag_title">You can move this button</string>
+    <string name="coach_mark_fab_long_press_body">Press and hold this button to go back to the apps you\'ve made.</string>
+    <string name="coach_mark_fab_long_press_talkback">Choose “Your apps” from this button\'s actions to go back to the apps you\'ve made.</string>
+    <string name="coach_mark_fab_long_press_title">Press and hold for your apps</string>
+    <string name="coach_mark_got_it">Got it</string>
+    <string name="coach_mark_never_again">Don\'t show again</string>
+    <string name="coach_mark_replay">Show gesture tips again</string>
+</resources>

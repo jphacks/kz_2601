@@ -3,7 +3,9 @@ package dsl
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // Lint reports content problems in a document that already passes Validate:
@@ -18,19 +20,36 @@ import (
 //   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
 //     year) but the filter is missing or another period
 //   - screen graph (nav.go): unreachable screens, fullScreen without a way back
+//   - a form shown as a tab/home whose saveRecord has nowhere to go (root_form.go)
 //   - a toolbar item opening the same form as a button on the screen (#416)
+//   - a date/datetime defaultValue other than "now" or a date ("today" is
+//     saved as the text "today", which no date filter matches)
+//   - a match "profile" field that looks like contact info or identity
+//     (phone, email, LINE/SNS, address, age, school, real name, gender)
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
 		l.entities[a.Entities[i].ID] = &a.Entities[i]
 	}
 	l.computed()
+	l.dateDefaults()
 	l.screens()
 	l.entityReach()
+	l.savedRecordReach() // saved_record.go
 	l.navGraph()
+	l.rootFormSave() // root_form.go
 	l.micSeat()
+	l.goalTarget()
+	l.progressTargetDefault() // progress_target.go
 	l.dupAddControls()
 	l.privateChat()
+	l.matchProfileFields() // matching_lint.go
+	l.optionalTitle()
+	l.settingMaxMin()
+	l.photoIllustrate()        // photo_illustrate.go
+	l.dupCallButtons()         // call_button.go
+	l.shareText()              // open_app.go
+	l.encryptedNotifications() // encrypted.go
 	return l.out
 }
 
@@ -56,6 +75,26 @@ func (l *linter) computed() {
 	}
 }
 
+var dayLiteral = regexp.MustCompile(`^[0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2}$`)
+
+// dateDefaults: iOS (FieldCoding.defaultValue) turns only "now" into the
+// current date; any other default is saved as is.
+func (l *linter) dateDefaults() {
+	for _, e := range l.app.Entities {
+		for _, f := range e.Fields {
+			if (f.Type != FieldDate && f.Type != FieldDatetime) || f.DefaultValue == nil {
+				continue
+			}
+			if s, ok := f.DefaultValue.(string); ok {
+				if _, err := time.Parse(time.RFC3339, s); s == "now" || dayLiteral.MatchString(s) || err == nil {
+					continue
+				}
+			}
+			l.add(`entity %q field %q: defaultValue %s is not a date; use "now" (today) or a fixed date such as "2026-04-01", or remove it`, e.ID, f.ID, quoteLit(f.DefaultValue))
+		}
+	}
+}
+
 func (l *linter) screens() {
 	for _, s := range l.app.Screens {
 		for i := range s.Components {
@@ -76,6 +115,9 @@ func (l *linter) component(where string, c *Component) {
 	if c.Type == CompStat && c.Value != nil {
 		l.constExpr(where+".value", c.Value)
 		l.exprFilters(where+".value", c.Value)
+	}
+	if c.Type == CompStat && c.Aggregate != "" && c.Format == "percent" {
+		l.add(`%s: format percent is for value (a 0..1 ratio, shown x100); the result of aggregate %q is not a 0..1 ratio. Compute the ratio in value instead, e.g. {"op":"div","args":[{"agg":"sum","entity":...,"field":...},<target>]} with percent, or drop format`, where, c.Aggregate)
 	}
 	switch c.Type {
 	case CompStat, CompProgressBar, CompGauge:
@@ -347,7 +389,7 @@ func isTargetLabel(label string) bool {
 // listTypes show an entity's records one by one.
 var listTypes = map[ComponentType]bool{
 	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true, CompGridTable: true,
-	CompChatThread: true, CompMatchList: true, CompFlashcards: true,
+	CompChatThread: true, CompMatchList: true, CompFlashcards: true, CompAiChat: true, CompBracket: true,
 }
 
 func (l *linter) entityReach() {
@@ -470,6 +512,9 @@ func (l *linter) settingEntities() map[string]bool {
 		}
 	}
 	out := map[string]bool{}
+	for _, id := range l.app.SingleEntities() {
+		out[id] = true // #267: edited on its form, read with {"setting": ...}
+	}
 	for id := range scalar {
 		if !other[id] {
 			out[id] = true
@@ -479,7 +524,7 @@ func (l *linter) settingEntities() map[string]bool {
 }
 
 // usesPickAgg: the stat reads one record (aggregate latest/earliest, or an
-// agg latest/earliest somewhere in value).
+// agg latest/earliest or a setting somewhere in value).
 func usesPickAgg(c *Component) bool {
 	if IsPickAgg(c.Aggregate) {
 		return true
@@ -487,8 +532,8 @@ func usesPickAgg(c *Component) bool {
 	found := false
 	if c.Type == CompStat && c.Value != nil {
 		walkExpr(c.Value, func(x *Expr) {
-			if x.Kind == ExprAgg && x.Agg != nil && IsPickAgg(x.Agg.Agg) {
-				found = true
+			if (x.Kind == ExprAgg && x.Agg != nil && IsPickAgg(x.Agg.Agg)) || x.Kind == ExprSetting {
+				found = true // a setting is the current value too (#267)
 			}
 		})
 	}

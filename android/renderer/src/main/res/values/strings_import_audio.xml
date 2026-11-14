@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- fileImport の録音ファイルの文字起こし(#1180・iOS の FileImportAudioViews / FileImportLeaf)。英語は values-en。 -->
+<resources>
+    <string name="renderer_import_audio_progress">録音を文字にしています…</string>
+    <string name="renderer_import_audio_percent">%1$d%%</string>
+    <string name="renderer_import_audio_foreground">端末の中で文字にしています。終わるまでアプリを開いたままにしてください</string>
+    <string name="renderer_import_audio_cancel">キャンセル</string>
+    <string name="renderer_import_audio_preparing">録音ファイル用の音声モデルを準備しています…</string>
+    <string name="renderer_import_audio_downloading">録音ファイル用の音声モデルを準備しています…(%1$d%%)</string>
+    <string name="renderer_import_audio_prepare">録音ファイル用の音声モデルを用意する</string>
+    <string name="renderer_import_audio_no_host">この画面では録音ファイルを文字にできません</string>
+    <string name="renderer_import_audio_unsupported">この端末では録音ファイルを文字にできません</string>
+    <string name="renderer_import_audio_not_ready">音声モデルの準備ができていません。準備ができてから、もう一度選んでください</string>
+    <string name="renderer_import_audio_not_heard">録音から声を聞き取れませんでした</string>
+    <string name="renderer_import_audio_left_app">アプリを離れたので文字起こしをやめました。もう一度選んでください</string>
+    <string name="renderer_import_audio_stopped">文字起こしをやめました</string>
+    <string name="renderer_import_audio_unreadable">この録音ファイルは読めませんでした</string>
+    <string name="renderer_import_audio_failed">文字起こしに失敗しました。もう一度選んでください</string>
+    <plurals name="renderer_import_audio_too_long">
+        <item quantity="other">録音が長すぎます(%1$d 分まで)。分けた録音を選んでください</item>
+    </plurals>
+    <string name="renderer_import_audio_length">録音の長さ: %1$s</string>
+    <string name="renderer_import_audio_minutes_seconds">%1$d 分 %2$d 秒</string>
+    <string name="renderer_import_audio_seconds">%1$d 秒</string>
+    <string name="renderer_import_audio_download_title">音声モデルをダウンロードしますか？</string>
+    <string name="renderer_import_audio_download_message">録音ファイルを端末の中で文字にするため、音声モデル(約 %1$d MB)をダウンロードします。Wi-Fi でのダウンロードをおすすめします。音声も文字も端末の外には送りません。</string>
+    <string name="renderer_import_audio_download">ダウンロード</string>
+    <string name="renderer_import_audio_failed_network">音声モデルをダウンロードできませんでした。通信を確かめて、もう一度お試しください</string>
+    <string name="renderer_import_audio_failed_storage">端末の空きが足りないため、音声モデルを保存できませんでした(約 %1$d MB 必要です)</string>
+    <string name="renderer_import_audio_failed_checksum">ダウンロードした音声モデルが壊れていました。もう一度お試しください</string>
+    <string name="renderer_import_audio_failed_other">音声モデルを用意できませんでした。もう一度お試しください</string>
+    <string name="renderer_import_audio_retry">もう一度ダウンロードする</string>
+</resources>

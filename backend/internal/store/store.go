@@ -39,7 +39,8 @@ type App struct {
 	CreatedAt      time.Time       `json:"createdAt"`
 	UpdatedAt      time.Time       `json:"updatedAt"`
 	DSL            json.RawMessage `json:"dsl,omitempty"`
-	SortIndex      int             `json:"sortIndex,omitempty"` // manual list position (1 = first, 0 = never reordered, #277)
+	SortIndex      int             `json:"sortIndex,omitempty"`  // manual list position (1 = first, 0 = never reordered, #277)
+	GlanceStat     string          `json:"glanceStat,omitempty"` // stat shown on the app list card: component id, "-" = none, "" = first stat
 }
 
 // Source mirrors VersionSource in openapi-appconfig.yaml.
@@ -50,6 +51,8 @@ type Source struct {
 	Summary      string `json:"summary,omitempty"`
 	Model        string `json:"model,omitempty"`
 	RestoredFrom int    `json:"restoredFrom,omitempty"`
+	// PromptVersion: the prompt that generated an ai version (#372, ai.PromptVersion).
+	PromptVersion string `json:"promptVersion,omitempty"`
 }
 
 // Version is users/{uid}/apps/{appId}/versions/{n} (full snapshot).
@@ -73,8 +76,23 @@ type Record struct {
 	Author     string         `json:"author,omitempty"`     // uid of the poster (shared/public)
 	AuthorName string         `json:"authorName,omitempty"` // display name chosen by the poster
 	MarkCounts map[string]int `json:"markCounts,omitempty"` // mark id -> how many people set it (#255, marks.go)
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
+	// Origin is set on records a server rule created (#341, runner_write.go).
+	// Not part of the API.
+	Origin *RecordOrigin `json:"-"`
+	// UniqueKey is the entity.unique claim the record holds (#273, unique.go).
+	// Not part of the API.
+	UniqueKey string `json:"-"`
+	// Readers are the uids that may read an addressed record (#271: author
+	// and recipients, set when it is created). Empty = everyone who may read
+	// the entity. Not part of the API.
+	Readers []string `json:"-"`
+	// OwnerAgeConfirmed marks a profile record of a matching app whose
+	// author made the 18+ declaration (#507, users/{uid}.ageConfirmedAt).
+	// false = not known from the record: read the author's declaration.
+	// Not part of the API.
+	OwnerAgeConfirmed bool      `json:"-"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
 // RecordSet locates one record collection (architecture.md §3):
@@ -122,6 +140,70 @@ type Commit struct {
 	Name        string // app name to set (dsl.app.name); "" keeps
 	Patch       []dsl.PatchOp
 	Source      *Source
+	// Publish, when set, updates apps_public/{appId} in the same transaction
+	// as the commit, so the mirror never lags behind the creator's version.
+	Publish *CommitPublish
+	// Events are outbox events stored in the same transaction (#342:
+	// rules_changed). An event with Version 0 gets the new version. nil
+	// stores nothing (the commit costs what it did before).
+	Events []OutboxEvent
+	// HeldLimit > 0: a commit on a blank app (version HeldVersion) makes it
+	// held (#630 app slots), so it fails with *HeldLimitError when uid
+	// already holds HeldLimit apps. Counted in the same transaction, which
+	// also writes users/{uid}.heldAppsAt so two such commits of one uid run
+	// one after the other (the second counts the first). 0 = not checked.
+	HeldLimit int
+}
+
+// commitEvents gives c's events the new version n and validates them.
+func commitEvents(c Commit, n int, now time.Time) ([]OutboxEvent, error) {
+	if len(c.Events) == 0 {
+		return nil, nil
+	}
+	events := append([]OutboxEvent(nil), c.Events...)
+	for i := range events {
+		if events[i].Version == 0 {
+			events[i].Version = n
+		}
+	}
+	if err := prepareOutbox(events, now); err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+// CommitPublish is how a commit touches apps_public/{appId}. Nothing is
+// published unless app_owners names the committer as the creator (Claim
+// records them first when no creator is known). A mirror the committer owns
+// is updated even when no shared entity is left (sharing was withdrawn); a
+// missing one is created only when Shared. A mirror owned by another uid is
+// left alone, and moderation fields are kept.
+type CommitPublish struct {
+	Shared bool // the DSL has a shared / public entity
+	Claim  bool // record the committer as the creator when none is recorded
+}
+
+// publishAction is what a commit does to apps_public/{appId}.
+type publishAction int
+
+const (
+	publishNone publishAction = iota
+	publishCreate
+	publishUpdate
+)
+
+// decidePublish: owner is the recorded creator after any claim ("" none),
+// mirrorOwner the current mirror's owner ("" when there is no mirror).
+func decidePublish(p *CommitPublish, uid, owner, mirrorOwner string, mirror bool) publishAction {
+	switch {
+	case p == nil || owner != uid:
+		return publishNone
+	case mirror && mirrorOwner == uid:
+		return publishUpdate
+	case !mirror && p.Shared:
+		return publishCreate
+	}
+	return publishNone
 }
 
 // Store is what the handlers depend on. All methods are scoped by uid.
@@ -135,6 +217,9 @@ type Store interface {
 	// has (unknown ids are skipped, unlisted apps keep theirs). It does not
 	// touch updatedAt, which stays "last changed".
 	ReorderApps(ctx context.Context, uid string, ids []string) error
+	// SetAppGlance sets GlanceStat ("" removes it). Like ReorderApps it does
+	// not touch updatedAt.
+	SetAppGlance(ctx context.Context, uid, appID, glance string) (*App, error)
 	CommitVersion(ctx context.Context, uid, appID string, c Commit) (*Version, error)
 	ListVersions(ctx context.Context, uid, appID string, limit, offset int) ([]Version, error)
 	GetVersion(ctx context.Context, uid, appID string, n int) (*Version, error)
@@ -163,13 +248,24 @@ type Store interface {
 	Purger          // physical app deletion (purge.go)
 	AccountPurger   // physical erasure of deleted accounts (account_purge.go)
 	Marks           // per-user like / save toggles on shared records (marks.go)
+	Follows         // whom people follow in shared apps (follow.go, #270)
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
+	Devices         // push tokens of users' devices (device.go, #269)
+	NotifyConsents  // recipients' consent to others' notifications (device.go, #339)
+	Outbox          // record writes that queue runner triggers (outbox.go, #341)
+	Schedules       // runner schedules and per-app state (schedule.go, #342)
+	RunnerActivity  // read-only rule statuses and stops for the creator (rule_status.go, #347)
+	UniqueRecords   // writes that keep entity.unique (unique.go, #273)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
 const MaxRecordsPerEntity = 2000
+
+// Now is the current UTC time at the microsecond precision Firestore keeps,
+// so a value returned right after a write equals what a later read returns.
+func Now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 
 // NewID returns a time-ordered random id with prefix (ULID-like, Crockford base32).
 func NewID(prefix string) string {

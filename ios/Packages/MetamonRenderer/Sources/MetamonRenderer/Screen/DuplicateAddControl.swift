@@ -22,4 +22,15 @@ enum DuplicateAddControl {
             return !buttons.contains(Opener(screen: target, prefillRef: a.prefillRef))
         }
     }
+
+    /// 空の一覧の「最初の 1 件を追加しましょう」を押した時の動き(M12)。同じ画面にある、その entity のフォーム画面を開く
+    /// button(先)/ toolbar(出している分)と同じ navigate を返す。無ければ nil(案内はただの文字のまま)。
+    static func emptyListAdd(entity: String, on screen: Screen, in dsl: AppDSL) -> Action? {
+        let opens: (Action?) -> Bool = { a in
+            guard let a, a.type == .navigate, let target = a.screen else { return false }
+            return dsl.screen(target)?.entity == entity
+        }
+        if let button = screen.allComponents.first(where: { $0.type == .button && opens($0.action) }) { return button.action }
+        return toolbar(of: screen, in: dsl).first { opens($0.action) }?.action
+    }
 }

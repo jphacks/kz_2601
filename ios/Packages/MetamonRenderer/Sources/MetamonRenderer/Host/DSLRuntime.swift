@@ -8,6 +8,8 @@ import MetamonDSL
 @MainActor
 public protocol DSLRuntime: AnyObject, Observable {
     var dsl: AppDSL { get }
+    /// 表示中のアプリの appId(端末内に残す状態のキー・タイマー #38)。名前は重なり得るので使わない
+    var appId: String { get }
     /// スタック名(main / tab:xxx / sheet / full)→ push 済み Route
     var paths: [String: [Route]] { get }
     /// タブ表示時に選択中のタブ(= tab.screen)
@@ -32,25 +34,31 @@ public protocol DSLRuntime: AnyObject, Observable {
     var currentUserId: String? { get }
     /// 変更できないレコード(他人の共有レコード)を触った時。ホストが「作った人だけが変更できます」を出す。
     func notifyReadOnly(entity: String)
+    /// 楽観的に描いた変更(一覧のチェック・単語カード・トーナメントの勝者)が保存できず戻した時。ホストが「保存できませんでした」を出す。
+    /// 1 回の操作につき 1 回だけ呼ぶ(`OptimisticSave`)。変更できない記録で止まった時は `notifyReadOnly` が出るので呼ばない。
+    func notifySaveFailed(entity: String)
 }
 
 public extension DSLRuntime {
     func load(entities: Set<String>) async { await load(entities: entities, force: false) }
+    /// テスト・プレビューのホスト用(アプリ本体の `AppRuntime` は document.appId を返す)
+    var appId: String { "" }
     var failed: Set<String> { [] }
     /// 既定は保存しない(プレビュー・テスト用のランタイム)。
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool { false }
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool { false }
     var currentUserId: String? { nil }
     func notifyReadOnly(entity: String) {}
+    func notifySaveFailed(entity: String) {}
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {
         RecordPermission.canEdit(record, in: dsl.entity(entity), uid: currentUserId)
     }
 
-    /// 自分が削除できるレコードか。共有レコードは作った人だけ。
+    /// 自分が削除できるレコードか。共有レコードは作った人だけ(entity.deleteBy で管理者も・#272)。
     func canDelete(entity: String, record: Record) -> Bool {
-        RecordPermission.canDelete(record, in: dsl.entity(entity), uid: currentUserId)
+        RecordPermission.canDelete(record, in: dsl.entity(entity), uid: currentUserId, isAdmin: viewerIsAdmin)
     }
 
     /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。

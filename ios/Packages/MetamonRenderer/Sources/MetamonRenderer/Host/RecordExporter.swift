@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// 書き出したファイル(#421)。ホストが共有シートに渡す。
@@ -7,6 +11,28 @@ public struct ExportFile: Identifiable, Equatable, Sendable {
     public var url: URL
     public var id: URL { url }
     public init(url: URL) { self.url = url }
+}
+
+/// 書き出したファイルの置き場(一時フォルダ/export)。中身は記録の写しなので、次の書き出しとアカウント削除で消す。
+public enum ExportFiles {
+    public static var directory: URL {
+        FileManager.default.temporaryDirectory.appending(path: "export", directoryHint: .isDirectory)
+    }
+
+    public static func removeAll() {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    /// 1 回の書き出しのフォルダ(`file` の親)だけを消す。ほかのウインドウの共有・行のドラッグの写しは残す。
+    /// 置き場が空になったら置き場も消す。置き場の外のファイルには触らない
+    public static func remove(_ file: URL) {
+        let fm = FileManager.default
+        let folder = file.deletingLastPathComponent()
+        guard folder.deletingLastPathComponent().resolvingSymlinksInPath().path == directory.resolvingSymlinksInPath().path
+        else { return }
+        try? fm.removeItem(at: folder)
+        if (try? fm.contentsOfDirectory(atPath: directory.path))?.isEmpty == true { try? fm.removeItem(at: directory) }
+    }
 }
 
 public enum ExportError: Error, Equatable {
@@ -32,7 +58,7 @@ public extension DSLRuntime {
     }
 
     /// 画面にある同じ entity の chart を画像に(PDF の表の上に置く)。
-    func exportChartImages(screen: String?, entity: String, width: CGFloat = ExportPDF.contentWidth) -> [UIImage] {
+    func exportChartImages(screen: String?, entity: String, width: CGFloat = ExportPDF.contentWidth) -> [PlatformImage] {
         guard let screen, let s = dsl.screen(screen) else { return [] }
         return s.allComponents.filter { $0.type == .chart && $0.entity == entity }.compactMap { c in
             let view = ChartLeaf(c: c)
@@ -42,12 +68,15 @@ public extension DSLRuntime {
                 .environment(\.colorScheme, .light)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
-            return renderer.uiImage
+            return renderer.platformImage
         }
     }
 
-    /// CSV / PDF を一時フォルダに書き、共有シートに渡すファイルを返す。
-    func makeExportFile(_ action: Action, screen: String?, now: Date = Date()) throws -> ExportFile {
+    /// CSV / PDF を一時フォルダ(書き出しごとのフォルダ)に書き、共有シートに渡すファイルを返す。
+    /// `clearingPrevious`: 前回までの書き出しを全部消す(iOS)。複数のウインドウで同時に共有する Mac は false にし、
+    /// 書き出しごとに `ExportFiles.remove` で消す
+    func makeExportFile(_ action: Action, screen: String?, now: Date = Date(),
+                        clearingPrevious: Bool = true) throws -> ExportFile {
         let table = try exportTable(action, now: now)
         let data: Data
         let ext: String
@@ -61,9 +90,8 @@ public extension DSLRuntime {
         default:
             throw ExportError.unknownFormat
         }
-        let dir = FileManager.default.temporaryDirectory
-            .appending(path: "export", directoryHint: .isDirectory)
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        if clearingPrevious { ExportFiles.removeAll() } // 前回までの書き出し(記録の写し)を残さない。共有シートは閉じてから次を押す
+        let dir = ExportFiles.directory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appending(path: RecordExport.fileName(table.title, ext: ext))
         try data.write(to: url, options: .atomic)
@@ -110,45 +138,44 @@ public enum ExportPDF {
     static let rowHeight: CGFloat = 20
     static let cellPad: CGFloat = 4
 
-    public static func data(_ table: ExportTable, charts: [UIImage] = []) -> Data {
-        let renderer = UIGraphicsPDFRenderer(bounds: page, format: format(table.title))
-        return renderer.pdfData { ctx in
+    public static func data(_ table: ExportTable, charts: [PlatformImage] = []) -> Data {
+        PlatformPDF.data(page: page, title: table.title) { beginPage in
             var y = margin
             var pageNo = 0
             func newPage() {
-                ctx.beginPage()
+                beginPage()
                 pageNo += 1
                 y = margin
                 draw("\(pageNo)", in: CGRect(x: margin, y: page.height - margin + 12, width: contentWidth, height: 14),
-                     font: .systemFont(ofSize: 9), color: .secondaryLabel, align: .center)
+                     font: .systemFont(ofSize: 9), color: PlatformPDF.secondaryLabelColor, align: .center)
             }
             newPage()
 
             y += draw(table.title, in: CGRect(x: margin, y: y, width: contentWidth, height: 60),
-                      font: .boldSystemFont(ofSize: 20), color: .label, wraps: true) + 6
+                      font: .boldSystemFont(ofSize: 20), color: PlatformPDF.labelColor, wraps: true) + 6
             for note in table.notes {
                 y += draw(note, in: CGRect(x: margin, y: y, width: contentWidth, height: 40),
-                          font: .systemFont(ofSize: 10), color: .secondaryLabel, wraps: true) + 2
+                          font: .systemFont(ofSize: 10), color: PlatformPDF.secondaryLabelColor, wraps: true) + 2
             }
             y += 10
 
             for img in charts {
                 let h = min(260, contentWidth * img.size.height / max(img.size.width, 1))
                 if y + h > page.height - margin { newPage() }
-                img.draw(in: CGRect(x: margin, y: y, width: contentWidth, height: h))
+                img.drawUpright(in: CGRect(x: margin, y: y, width: contentWidth, height: h))
                 y += h + 12
             }
 
             let widths = columnWidths(table)
             func header() {
-                UIColor.secondarySystemBackground.resolvedColor(with: .init(userInterfaceStyle: .light)).setFill()
-                UIRectFill(CGRect(x: margin, y: y, width: contentWidth, height: rowHeight))
+                PlatformPDF.light(PlatformPDF.headerFillColor).setFill()
+                PlatformPDF.fill(CGRect(x: margin, y: y, width: contentWidth, height: rowHeight))
                 drawRow(table.headers, y: y, widths: widths, numeric: table.numericColumns, bold: true)
                 y += rowHeight
             }
             if table.rows.isEmpty {
                 draw(L("記録がありません"), in: CGRect(x: margin, y: y, width: contentWidth, height: 20),
-                     font: .systemFont(ofSize: 11), color: .secondaryLabel)
+                     font: .systemFont(ofSize: 11), color: PlatformPDF.secondaryLabelColor)
                 return
             }
             if y + rowHeight * 2 > page.height - margin { newPage() }
@@ -160,8 +187,8 @@ public enum ExportPDF {
                 }
                 drawRow(row, y: y, widths: widths, numeric: table.numericColumns, bold: false)
                 y += rowHeight
-                UIColor.separator.resolvedColor(with: .init(userInterfaceStyle: .light)).setFill()
-                UIRectFill(CGRect(x: margin, y: y - 0.5, width: contentWidth, height: 0.5))
+                PlatformPDF.light(PlatformPDF.separatorColor).setFill()
+                PlatformPDF.fill(CGRect(x: margin, y: y - 0.5, width: contentWidth, height: 0.5))
             }
         }
     }
@@ -169,7 +196,7 @@ public enum ExportPDF {
     /// 内容の長さに応じた列幅(見出しと先頭 50 行で測る)。合計を本文幅に合わせ、細すぎる列は 36pt を下限に。
     static func columnWidths(_ table: ExportTable) -> [CGFloat] {
         guard !table.headers.isEmpty else { return [] }
-        let font = UIFont.systemFont(ofSize: 10)
+        let font = PlatformFont.systemFont(ofSize: 10)
         let natural = table.headers.indices.map { i -> CGFloat in
             let cells = [table.headers[i]] + table.rows.prefix(50).map { i < $0.count ? $0[i] : "" }
             let w = cells.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
@@ -185,7 +212,7 @@ public enum ExportPDF {
             let text = i < cells.count ? cells[i] : ""
             let right = i < numeric.count && numeric[i]
             draw(text, in: CGRect(x: x + cellPad, y: y + 4, width: w - cellPad * 2, height: rowHeight - 4),
-                 font: bold ? .boldSystemFont(ofSize: 10) : .systemFont(ofSize: 10), color: .label,
+                 font: bold ? .boldSystemFont(ofSize: 10) : .systemFont(ofSize: 10), color: PlatformPDF.labelColor,
                  align: right ? .right : .left)
             x += w
         }
@@ -193,25 +220,19 @@ public enum ExportPDF {
 
     /// 描いた高さを返す。wraps でなければ 1 行で末尾を「…」に。
     @discardableResult
-    private static func draw(_ text: String, in rect: CGRect, font: UIFont, color: UIColor,
+    private static func draw(_ text: String, in rect: CGRect, font: PlatformFont, color: PlatformColor,
                              align: NSTextAlignment = .left, wraps: Bool = false) -> CGFloat {
         let style = NSMutableParagraphStyle()
         style.alignment = align
         style.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font, .paragraphStyle: style,
-            .foregroundColor: color.resolvedColor(with: .init(userInterfaceStyle: .light)),
+            .foregroundColor: PlatformPDF.light(color),
         ]
         let s = text as NSString
-        let options: NSStringDrawingOptions = wraps ? [.usesLineFragmentOrigin] : [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
+        let options: PlatformStringDrawingOptions = wraps ? [.usesLineFragmentOrigin] : [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
         let box = wraps ? rect : CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: font.lineHeight)
         s.draw(with: box, options: options, attributes: attrs, context: nil)
         return ceil(s.boundingRect(with: box.size, options: options, attributes: attrs, context: nil).height)
-    }
-
-    private static func format(_ title: String) -> UIGraphicsPDFRendererFormat {
-        let f = UIGraphicsPDFRendererFormat()
-        f.documentInfo = [kCGPDFContextTitle as String: title, kCGPDFContextCreator as String: "Tailor It"]
-        return f
     }
 }

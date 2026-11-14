@@ -5,8 +5,16 @@ import MetamonDSL
 /// 対応表は `docs/ios/design-system.md` §2.6。
 enum FieldIcon {
     static func infer(component c: Component, field: Field?) -> String {
-        if let icon = c.icon, !icon.isEmpty { return icon }
-        return infer(field: field, hint: [c.field ?? "", c.label ?? "", field?.name ?? ""].joined(separator: " "))
+        let inferred = { infer(field: field, hint: [c.field ?? "", c.label ?? "", field?.name ?? ""].joined(separator: " ")) }
+        if let icon = c.icon, !icon.isEmpty {
+            #if os(macOS)
+            // Mac で描けない名前は言い換え、それも無ければ型からの推定(#941)
+            return PlatformSymbol.name(icon, fallback: inferred())
+            #else
+            return icon
+            #endif
+        }
+        return inferred()
     }
 
     static func infer(field: Field?, hint: String = "") -> String {

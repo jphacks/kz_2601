@@ -7,9 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/coins"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
@@ -20,17 +22,19 @@ import (
 //
 // POST /v1/generate?stream=1 answers with Server-Sent Events instead of one
 // JSON body: `event: app` / `event: summary` (an Event, as soon as the first
-// block of the model output is complete), then `event: result` (the same
+// block of the model output is complete), `event: component` per part of the
+// first visible screen and `event: restart` before a regeneration (create
+// turns, #636), then `event: result` (the same
 // GenerateResponse as the JSON mode) or `event: error` (the same error body).
 func NewHandler(svc *Service) http.Handler {
 	mux := http.NewServeMux()
-	health := func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}
+	health := httpx.Health(httpx.HealthInfoFromEnv(os.Getenv)) // env / database / version (#290)
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
-	mux.HandleFunc("POST /v1/generate", func(w http.ResponseWriter, r *http.Request) {
+	// /v1/chat: the caller (if the token verifies) owns the conversation (#286)
+	caller := auth.Optional(svc.Verifier, svc.AuthMode)
+	// /v1/generate: the caller pays the coins (#630); the rate limiter verified it first
+	mux.Handle("POST /v1/generate", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
 			svc.writeErr(w, r, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "cannot read body"})
@@ -42,29 +46,42 @@ func NewHandler(svc *Service) http.Handler {
 			return
 		}
 		ctx := callerContext(r)
+		// the hold comes before the stream starts: a 402 is a plain JSON answer
+		var bill *coinBill
+		if op := generateCoinOp(req.Mode); op != "" {
+			ctx, bill, err = svc.reserveCoins(ctx, callerPayment(ctx, op, req.AppID))
+			if err != nil {
+				refuseBeforeClaude(ctx)
+				svc.writeErr(w, r, err)
+				return
+			}
+		}
 		if q := r.URL.Query().Get("stream"); q == "1" || q == "true" {
 			serveSSE(w, func(emit func(string, any)) {
 				res, err := svc.GenerateStream(ctx, req, func(ev Event) { emit(ev.Type, ev) })
 				if err != nil {
+					bill.settle(ctx, true)
 					ge := asError(err)
 					// the stream already answered 200: tell the limiter (#548)
 					ratelimit.ReportStatus(ctx, ge.Status)
 					emit("error", svc.errBody(ctx, ge))
 					return
 				}
+				res.Meta.CoinCharge = bill.settle(ctx, res.Source == "restore")
 				emit("result", res)
 			})
 			return
 		}
 		res, err := svc.Generate(ctx, req)
 		if err != nil {
+			bill.settle(ctx, true)
 			svc.writeErr(w, r, err)
 			return
 		}
+		res.Meta.CoinCharge = bill.settle(ctx, res.Source == "restore")
+		res.Meta.setHeaders(w)
 		writeJSON(w, http.StatusOK, res)
-	})
-	// /v1/chat: the caller (if the token verifies) owns the conversation (#286)
-	caller := auth.Optional(svc.Verifier, svc.AuthMode)
+	})))
 	mux.Handle("POST /v1/chat", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
@@ -77,11 +94,20 @@ func NewHandler(svc *Service) http.Handler {
 			return
 		}
 		ctx := callerContext(r) // edit mode reads the current DSL
-		res, err := svc.Chat(ctx, req)
+		ctx, bill, err := svc.reserveCoins(ctx, callerPayment(ctx, coins.OpChat, req.AppID))
 		if err != nil {
+			refuseBeforeClaude(ctx)
 			svc.writeErr(w, r, err)
 			return
 		}
+		res, err := svc.Chat(ctx, req)
+		if err != nil {
+			bill.settle(ctx, true)
+			svc.writeErr(w, r, err)
+			return
+		}
+		res.Meta.CoinCharge = bill.settle(ctx, false)
+		res.Meta.setHeaders(w)
 		writeJSON(w, http.StatusOK, res)
 	})))
 	mux.Handle("POST /v1/text", caller(textHandler(svc))) // #417 aiButton generate (text.go)
@@ -158,6 +184,9 @@ func (s *Service) logger() *slog.Logger {
 // line carries the request's trace and requestId (#295).
 func (s *Service) errBody(ctx context.Context, ge *Error) map[string]any {
 	details := map[string]any{}
+	for k, v := range ge.Details {
+		details[k] = v
+	}
 	if len(ge.Problems) > 0 {
 		details["problems"] = ge.Problems
 	}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play の In-App Updates: 新しい版を裏で落とし終わった時のバナー -->
+<resources>
+    <string name="inapp_update_ready">アップデートの準備ができました</string>
+    <string name="inapp_update_restart">再起動して更新</string>
+</resources>

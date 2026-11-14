@@ -1,54 +1,25 @@
 import SwiftUI
 import MetamonDSL
 
-/// 生成中の経過段階(docs/backend/ai-eval 2026-10-24 §5 と 01 §4 の予算に対応)。
-/// - 0〜10s  normal   : create p50 6.6s / p95 8.7s。数秒ごとに文言を回す
-/// - 10〜20s slow     : 「もう少しかかっています」(area 再生成 1 回 ≒ +7s)
-/// - 20〜30s warning  : 警告色。backend は 20s で警告ライン
-/// - 30s〜   fallback : backend がテンプレ DSL にフォールバック中。キャンセルを出す(HTTP は 45s で timeout)
-enum GeneratingStage: Equatable {
-    case normal, slow, warning, fallback
-
-    init(elapsed: TimeInterval) {
-        switch elapsed {
-        case ..<10: self = .normal
-        case ..<20: self = .slow
-        case ..<30: self = .warning
-        default: self = .fallback
-        }
-    }
-
-    /// 文言表(docs/ios/architecture.md §6 と同期)
-    static var normalMessages: [String] { [
-        L10n.pick(L10n.tr("どんなアプリにするか考えています…"), review: L10n.tr("どんな記録帳にするか考えています…")),
-        L10n.tr("必要な画面とデータを決めています…"),
-        L10n.tr("画面を組み立てています…"),
-        L10n.tr("細部を整えています…"),
-    ] }
-
-    func message(elapsed: TimeInterval, edit: Bool) -> String {
-        switch self {
-        case .normal:
-            if edit { return L10n.tr("変更を反映しています…") }
-            let i = Int(elapsed / 3) % Self.normalMessages.count
-            return Self.normalMessages[i]
-        case .slow: return L10n.tr("もう少しかかっています…")
-        case .warning: return L10n.tr("時間がかかっています。もう少しだけお待ちください")
-        case .fallback: return L10n.tr("混み合っています。安全なテンプレートに切り替えています…")
-        }
-    }
-}
-
 /// create(初期状態からの生成)の全画面「変身中」演出。
-/// 見出し = 認識テキスト、段階文言、6×12 のスケルトングリッド(セルが順に光り、数秒ごとにレイアウト案が入れ替わる)。
+/// 見出し = 認識テキスト、段階文言、組み立て台(#626: パーツ箱から部品を選んで空の画面に置く・入れ替える・並べ直す)。
+/// 結果が届いたら(`reveal`)本物の部品を上から置いて組み上げ、RootView が本物の画面に切り替える。
 struct GeneratingView: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let job: AppRuntime.MorphJob
+    /// 結果の組み上げ中(#626)。nil なら待っている間
+    var reveal: BuildReveal? = nil
 
     @State private var elapsed: TimeInterval = 0
 
     private var stage: GeneratingStage { GeneratingStage(elapsed: elapsed) }
+    /// 待っている間の台本(依頼文から部品を当てる)
+    private var script: BuildChoreography.WaitingScript { BuildChoreography.WaitingScript(transcript: job.transcript) }
+    /// 段階文言。組み上げ中は「画面を組み立てています…」
+    private var message: String { reveal != nil ? L10n.tr("画面を組み立てています…") : stage.message(elapsed: elapsed, edit: false) }
+    private var warn: Bool { reveal == nil && (stage == .warning || stage == .fallback) }
 
     var body: some View {
         ZStack {
@@ -57,17 +28,18 @@ struct GeneratingView: View {
 
             VStack(spacing: Theme.Spacing.lg) {
                 header
-                SkeletonGrid(elapsed: elapsed)
-                    .frame(maxWidth: 240)
-                    .aspectRatio(6.0 / 9.0, contentMode: .fit)
+                BuildStageView(script: script, elapsed: elapsed, plan: reveal?.plan, live: job.draft)
                     .padding(.horizontal, Theme.Spacing.lg)
                 footer
             }
             .padding(.vertical, Theme.Spacing.xl)
             .padding(.horizontal, Theme.Spacing.lg)
         }
+        // 組み上げ中は触ると飛ばして本物の画面へ(待たせない)
+        .contentShape(Rectangle())
+        .onTapGesture { if reveal != nil { rt.finishBuildReveal() } }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("generating.create") // UI テスト(#182)
+        .accessibilityIdentifier("generating.create") // UI テスト(#182)。組み上げ中も「作成中」のまま
         #if DEBUG
         .onAppear { MorphProbe.generatingAppeared += 1 }
         #endif
@@ -89,12 +61,21 @@ struct GeneratingView: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(Theme.brandGradient)
+            // SSE で届いたアプリ名(#636・仮置き)
+            if let name = job.draft.appName {
+                Text(name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.brandGradient)
+                    .lineLimit(1)
+                    .transition(.opacity)
+            }
             Text("「\(displayTranscript)」")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: job.draft.appName)
     }
 
     /// 見出しには「別のアプリ。」などの切替キーワードを出さない(VoiceIntent.newAppPrefixes と同じ語)。
@@ -108,31 +89,44 @@ struct GeneratingView: View {
     private var footer: some View {
         VStack(spacing: Theme.Spacing.md) {
             HStack(spacing: Theme.Spacing.sm) {
-                ProgressView().tint(stage == .warning || stage == .fallback ? Theme.Colors.warning : nil)
-                Text(stage.message(elapsed: elapsed, edit: false))
+                ProgressView().tint(warn ? Theme.Colors.warning : nil)
+                Text(message)
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(stage == .warning || stage == .fallback ? Theme.Colors.warning : .secondary)
+                    .foregroundStyle(warn ? Theme.Colors.warning : .secondary)
                     .contentTransition(.opacity)
             }
-            .animation(.easeInOut(duration: 0.3), value: stage.message(elapsed: elapsed, edit: false))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: message)
 
             Text(elapsedLabel)
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
 
-            if stage == .fallback {
-                Button(role: .cancel) { rt.cancelMorph() } label: {
-                    Text("キャンセル").font(.subheadline.weight(.semibold))
+            // M6: 最初から小さく出し、30 秒を過ぎたら枠付きにする
+            if reveal == nil {
+                if stage.cancelIsProminent {
+                    Button(role: .cancel) { rt.cancelMorph() } label: {
+                        Text("キャンセル").font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                } else {
+                    Button(role: .cancel) { rt.cancelMorph() } label: {
+                        Text("キャンセル").font(.footnote)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44) // タップ領域 44pt
                 }
-                .buttonStyle(.bordered)
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: stage)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: stage)
     }
 
+    /// 「3 秒・ふつう 10 秒ほど」(目安は最初の段だけ・M6)
     private var elapsedLabel: String {
-        L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
+        let seconds = L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
+        guard reveal == nil, let estimate = stage.estimate(edit: false) else { return seconds }
+        return seconds + " · " + estimate
     }
 }
 
@@ -149,69 +143,9 @@ enum MorphProbe {
 }
 #endif
 
-/// 6×12 のスケルトングリッド。セルが波のように順に光り、3 秒ごとに「レイアウト案」(ブロック)が入れ替わる。
-/// TimelineView(20fps) + 単純な sin で軽量に。
-struct SkeletonGrid: View {
-    let elapsed: TimeInterval
-
-    private static let cols = GridArea.columns
-    private static let rows = GridArea.visibleRows
-    /// レイアウト案(area 文字列)。実 DSL と同じ記法。
-    private static let layouts: [[String]] = [
-        ["A1:F3", "A4:C7", "D4:F7", "A8:F12"],
-        ["A1:F2", "A3:F8", "A9:C12", "D9:F12"],
-        ["A1:B4", "C1:F4", "A5:F9", "A10:F12"],
-        ["A1:F4", "A5:B12", "C5:F8", "C9:F12"],
-    ]
-
-    private var layoutIndex: Int { Int(elapsed / 3) % Self.layouts.count }
-
-    /// n セル分の長さ(間の gap 込み)。0 未満にしない
-    private static func span(_ n: Int, cell: CGFloat, gap: CGFloat) -> CGFloat {
-        max(0, CGFloat(n) * (cell + gap) - gap)
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            let gap: CGFloat = 6
-            // 出し入れの途中は geo.size が 0 になり得る。負の幅は "Invalid frame dimension" になるので 0 で止める
-            let cw = max(0, (geo.size.width - gap * CGFloat(Self.cols - 1)) / CGFloat(Self.cols))
-            let ch = max(0, (geo.size.height - gap * CGFloat(Self.rows - 1)) / CGFloat(Self.rows))
-            TimelineView(.periodic(from: .now, by: 1.0 / 20)) { tl in
-                let t = tl.date.timeIntervalSinceReferenceDate
-                ZStack(alignment: .topLeading) {
-                    // ドット(全セル): 斜めに走る光
-                    ForEach(0..<(Self.cols * Self.rows), id: \.self) { i in
-                        let c = i % Self.cols, r = i / Self.cols
-                        let phase = t * 2.2 - Double(c + r) * 0.35
-                        let glow = max(0, sin(phase))
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(Theme.Colors.brandA.opacity(0.05 + 0.28 * glow * glow))
-                            .frame(width: cw, height: ch)
-                            .offset(x: CGFloat(c) * (cw + gap), y: CGFloat(r) * (ch + gap))
-                    }
-                    // ブロック(レイアウト案)
-                    ForEach(Self.layouts[layoutIndex], id: \.self) { a in
-                        if let area = GridArea(a) {
-                            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                                .fill(Theme.brandGradient.opacity(0.14))
-                                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                                    .strokeBorder(Theme.Colors.brandB.opacity(0.5), lineWidth: 1))
-                                .frame(width: Self.span(area.colSpan, cell: cw, gap: gap),
-                                       height: Self.span(area.rowSpan, cell: ch, gap: gap))
-                                .offset(x: CGFloat(area.col1) * (cw + gap), y: CGFloat(area.row1 - 1) * (ch + gap))
-                                .transition(.opacity)
-                        }
-                    }
-                }
-                .animation(.easeInOut(duration: 0.35), value: layoutIndex)
-            }
-        }
-    }
-}
-
 /// edit(2 回目以降)の軽いインジケータ。現在の画面は RootView 側で薄くし、上部に小さなカプセルを出す。
 struct EditingIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppRuntime.self) private var rt
     let job: AppRuntime.MorphJob
     @State private var elapsed: TimeInterval = 0
@@ -222,7 +156,11 @@ struct EditingIndicator: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             HStack(spacing: Theme.Spacing.sm) {
-                ProgressView().controlSize(.small).tint(warn ? Theme.Colors.warning : nil)
+                if warn {
+                    ProgressView().controlSize(.small).tint(Theme.Colors.warning)
+                } else {
+                    EditShuffleGlyph(elapsed: elapsed) // #626 部品を並べ直している感じ
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(stage.message(elapsed: elapsed, edit: true))
                         .font(.footnote.weight(.semibold))
@@ -232,12 +170,11 @@ struct EditingIndicator: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                if stage == .fallback {
-                    Button("中止") { rt.cancelMorph() }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                }
+                // M6: 最初から出す(言い間違いに気づいたらすぐ止められる)
+                Button("中止") { rt.cancelMorph() }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)
@@ -247,7 +184,7 @@ struct EditingIndicator: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("generating.edit") // UI テスト(#182)
         }
-        .animation(.easeInOut(duration: 0.3), value: stage)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: stage)
         .task(id: job.startedAt) {
             while !Task.isCancelled {
                 elapsed = Date.now.timeIntervalSince(job.startedAt)

@@ -1,0 +1,6 @@
+[
+  {"name": "projects/fake-project/locations/asia-northeast1/backups/b-old", "database": "projects/fake-project/databases/(default)", "snapshotTime": "2026-11-11T18:00:00Z", "state": "READY"},
+  {"name": "projects/fake-project/locations/asia-northeast1/backups/b-new", "database": "projects/fake-project/databases/(default)", "snapshotTime": "2026-11-12T18:00:00.123456Z", "state": "READY"},
+  {"name": "projects/fake-project/locations/asia-northeast1/backups/b-creating", "database": "projects/fake-project/databases/(default)", "snapshotTime": "2026-11-12T23:00:00Z", "state": "CREATING"},
+  {"name": "projects/fake-project/locations/asia-northeast1/backups/b-other", "database": "projects/fake-project/databases/restore-1", "snapshotTime": "2026-11-12T23:30:00Z", "state": "READY"}
+]

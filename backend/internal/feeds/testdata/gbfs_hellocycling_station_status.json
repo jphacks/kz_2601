@@ -1,0 +1,124 @@
+{
+ "ttl": 60,
+ "data": {
+  "stations": [
+   {
+    "is_renting": true,
+    "station_id": "17",
+    "is_installed": true,
+    "is_returning": true,
+    "last_reported": 1794417903,
+    "num_bikes_available": 3,
+    "num_docks_available": 5,
+    "vehicle_docks_available": [
+     {
+      "count": 5,
+      "vehicle_type_ids": [
+       "2"
+      ]
+     }
+    ],
+    "vehicle_types_available": [
+     {
+      "count": 3,
+      "vehicle_type_id": "2"
+     }
+    ]
+   },
+   {
+    "is_renting": true,
+    "station_id": "4499",
+    "is_installed": true,
+    "is_returning": true,
+    "last_reported": 1794417907,
+    "num_bikes_available": 4,
+    "num_docks_available": 2,
+    "vehicle_docks_available": [
+     {
+      "count": 2,
+      "vehicle_type_ids": [
+       "2"
+      ]
+     }
+    ],
+    "vehicle_types_available": [
+     {
+      "count": 4,
+      "vehicle_type_id": "2"
+     }
+    ]
+   },
+   {
+    "is_renting": true,
+    "station_id": "4760",
+    "is_installed": true,
+    "is_returning": true,
+    "last_reported": 1794417907,
+    "num_bikes_available": 3,
+    "num_docks_available": 2,
+    "vehicle_docks_available": [
+     {
+      "count": 2,
+      "vehicle_type_ids": [
+       "2"
+      ]
+     }
+    ],
+    "vehicle_types_available": [
+     {
+      "count": 3,
+      "vehicle_type_id": "2"
+     }
+    ]
+   },
+   {
+    "is_renting": false,
+    "station_id": "4781",
+    "is_installed": true,
+    "is_returning": false,
+    "last_reported": 1794417907,
+    "num_bikes_available": 1,
+    "num_docks_available": 18,
+    "vehicle_docks_available": [
+     {
+      "count": 18,
+      "vehicle_type_ids": [
+       "2"
+      ]
+     }
+    ],
+    "vehicle_types_available": [
+     {
+      "count": 1,
+      "vehicle_type_id": "2"
+     }
+    ]
+   },
+   {
+    "is_renting": true,
+    "station_id": "23067",
+    "is_installed": true,
+    "is_returning": true,
+    "last_reported": 1794417934,
+    "num_bikes_available": 2,
+    "num_docks_available": 0,
+    "vehicle_docks_available": [
+     {
+      "count": 0,
+      "vehicle_type_ids": [
+       "2"
+      ]
+     }
+    ],
+    "vehicle_types_available": [
+     {
+      "count": 2,
+      "vehicle_type_id": "2"
+     }
+    ]
+   }
+  ]
+ },
+ "version": "2.3",
+ "last_updated": 1794417946
+}

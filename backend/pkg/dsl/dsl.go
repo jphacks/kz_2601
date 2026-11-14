@@ -20,6 +20,9 @@ type App struct {
 	InitialScreen string   `json:"initialScreen"`
 	Entities      []Entity `json:"entities"`
 	Screens       []Screen `json:"screens"`
+	// ServerRules (#340): automatic server actions (trigger -> condition ->
+	// actions). iOS does not render them; server_rules.go validates them.
+	ServerRules []ServerRule `json:"serverRules,omitempty"`
 }
 
 // AppMeta describes the whole app.
@@ -56,10 +59,26 @@ type Notification struct {
 	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
 	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
 	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
+	// Alarm: ring until stopped (iOS 26.1+ AlarmKit). Older iOS / no
+	// permission / the review build post a normal notification at the same time.
+	Alarm bool `json:"alarm,omitempty"`
 	// When (#265, app.notifications only): a boolean screen-scalar Expr. iOS
 	// posts once when it turns false -> true after a record save / delete /
 	// sync on that device. Exclusive with the time and record triggers.
 	When *Expr `json:"when,omitempty"`
+	// Near (app.notifications only): fire on arriving near a record's
+	// location (iOS region monitoring, on device). Its own trigger.
+	Near *NotificationNear `json:"near,omitempty"`
+	// JitterMinutes shifts each occurrence of a time trigger by a random
+	// ±N minutes (stable per occurrence on iOS). Time triggers only.
+	JitterMinutes int `json:"jitterMinutes,omitempty"`
+}
+
+// NotificationNear: the places are the LocationField values of Entity's records.
+type NotificationNear struct {
+	Entity        string `json:"entity"`
+	LocationField string `json:"locationField"`
+	RadiusM       int    `json:"radiusM,omitempty"` // 0 = DefaultNearRadiusM
 }
 
 // VoiceEntry is how the user re-enters voice mode.
@@ -91,8 +110,17 @@ type Entity struct {
 	// (from createdAt); 0 = keep forever. Shared/public: each user's own only.
 	RetentionDays int `json:"retentionDays,omitempty"`
 	// Match (#507): the entity's role in a matching app (matching.go).
-	Match  EntityMatch `json:"match,omitempty"`
-	Fields []Field     `json:"fields"`
+	Match EntityMatch `json:"match,omitempty"`
+	// Single (#267): the entity holds one record of settings (single.go).
+	Single bool `json:"single,omitempty"`
+	// Unique (#273): no two records share these values (data_rules.go).
+	Unique []string `json:"unique,omitempty"`
+	// DeleteBy (#272): who may delete a shared/public record (data_rules.go).
+	DeleteBy EntityDeleteBy `json:"deleteBy,omitempty"`
+	// AddressedTo (#271): the member / members field naming who may read a
+	// record besides its author (addressed.go).
+	AddressedTo string  `json:"addressedTo,omitempty"`
+	Fields      []Field `json:"fields"`
 }
 
 // EntityEdit says who may update a shared/public record. Deleting is always
@@ -171,6 +199,11 @@ type Field struct {
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
 	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
+	// EditableBy "admins": only the app's admins set it (#272, data_rules.go).
+	EditableBy string `json:"editableBy,omitempty"`
+	// Encrypted: iOS stores the value sealed with the user's key
+	// ("enc:v1:..."), so servers only ever see ciphertext (encrypted.go).
+	Encrypted bool `json:"encrypted,omitempty"`
 }
 
 // Screen is one navigable page.
@@ -205,6 +238,8 @@ const (
 	ActionExport        ActionType = "export"
 	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
 	ActionEndActivity   ActionType = "endActivity"
+	ActionAddCalendar   ActionType = "addToCalendar" // system "new event" sheet (calendar_event.go)
+	ActionLookupBook    ActionType = "lookupBook"    // fill the form from an ISBN (book_lookup.go)
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -223,6 +258,12 @@ type Action struct {
 	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
 	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
 	Activity       *Activity     `json:"activity,omitempty"`       // startActivity (#423)
+
+	// addToCalendar: the record fields that become the event (calendar_event.go)
+	CalendarEvent *CalendarEvent `json:"calendarEvent,omitempty"`
+
+	// lookupBook: ISBN field and the fields the book info goes to (book_lookup.go)
+	BookLookup *BookLookup `json:"bookLookup,omitempty"`
 }
 
 // ComponentType discriminates Component.
@@ -266,6 +307,7 @@ const (
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
 	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
 	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
+	CompPlaceSearch    ComponentType = "placeSearch"    // MapKit nearby places -> form fields (place_search.go)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
 	CompQrCode         ComponentType = "qrCode"         // CoreImage QR from text / field / value (#422)
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
@@ -294,6 +336,10 @@ const (
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
 	// random pick (#263): one record per button press, not saved
 	CompRandomPicker ComponentType = "randomPicker"
+	// tournament bracket (bracket.go): rounds from entrants + their wins field
+	CompBracket ComponentType = "bracket"
+	// file import (file_import.go): CSV rows / text / PDF body -> records, on the device
+	CompFileImport ComponentType = "fileImport"
 	// on-device AI (#78)
 	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field; task generate may fall back to /v1/text (#417)
 	// peer-to-peer
@@ -302,6 +348,8 @@ const (
 	CompLocationTracker ComponentType = "locationTracker"
 	// chat (#260): bubbles oldest-first + a pinned input bar that saves a record
 	CompChatThread ComponentType = "chatThread"
+	// AI conversation (ai_chat.go): bubbles + input bar, each turn a record, the reply from /v1/text task chat
+	CompAiChat ComponentType = "aiChat"
 	// dashcam (#410): rear camera loop recording, impact save, auto start
 	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
@@ -314,6 +362,10 @@ const (
 	CompMatchList ComponentType = "matchList"
 	// flashcards (#264): one card at a time, tap to flip, swipe to mark learned
 	CompFlashcards ComponentType = "flashcards"
+	// external feed (#348): read-only list from an allowlisted public source via appconfig
+	CompFeed ComponentType = "feed"
+	// voice / video call of a shared app's participants (#447, call_button.go)
+	CompCallButton ComponentType = "callButton"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -358,6 +410,10 @@ type Component struct {
 	Source      string  `json:"source,omitempty"`      // photoField / videoField: camera|library|both
 	MaxDuration int     `json:"maxDuration,omitempty"` // videoField: recording limit in seconds (default 60)
 	Height      string  `json:"height,omitempty"`      // image: small|medium|large
+	// VisibleTo "admins": only the app's admins see the button (#272, data_rules.go).
+	VisibleTo string `json:"visibleTo,omitempty"`
+	// Highlight marks words inside a text (text_highlight.go).
+	Highlight *TextHighlight `json:"highlight,omitempty"`
 
 	// data-bound (list / stat / chart)
 	Entity        string    `json:"entity,omitempty"`
@@ -392,7 +448,7 @@ type Component struct {
 	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
 	LiveActivity  bool    `json:"liveActivity,omitempty"`  // timerDisplay: mirror to the lock screen / Dynamic Island (#423)
-	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
+	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord|x|mail (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
 	Min      *float64 `json:"min,omitempty"`      // slider / stepper / gauge
@@ -404,7 +460,7 @@ type Component struct {
 	Name          string        `json:"name,omitempty"`          // icon: SF Symbols name / avatar: initials source
 	Color         string        `json:"color,omitempty"`         // SemanticColor enum
 	Value         *Expr         `json:"value,omitempty"`         // stat: Expr / progressBar (0..1) & gauge: number literal
-	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	Target        *Expr         `json:"target,omitempty"`        // progressBar entity mode denominator: number or {"setting"} (progress_target.go) / healthStat: number
 	Tone          string        `json:"tone,omitempty"`          // progressBar: positive (goal) | negative (budget)
 	URL           string        `json:"url,omitempty"`           // link
 	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
@@ -420,13 +476,21 @@ type Component struct {
 	BalanceField string `json:"balanceField,omitempty"`
 
 	// aiButton (#78). Label / Prompt / Entity / Limit are shared with the fields above.
-	Task    string   `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
-	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
-	Output  string   `json:"output,omitempty"`  // form field the result is written to
-	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
-	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
-	Count   int      `json:"count,omitempty"`   // generate list: number of items
-	Items   []string `json:"items,omitempty"`   // generate fields: item names
+	Task    string    `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
+	Input   string    `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
+	Output  string    `json:"output,omitempty"`  // form field the result is written to
+	Options []string  `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+	Shape   string    `json:"shape,omitempty"`   // generate (#417): line|list|fields
+	Count   int       `json:"count,omitempty"`   // generate list: number of items
+	Items   []string  `json:"items,omitempty"`   // generate fields: item names
+	Length  string    `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
+	SaveTo  *AISaveTo `json:"saveTo,omitempty"`  // generate list: one record per item (ai_save_to.go)
+	// InputPhoto is a photo field of the form sent with the call (cloud only, ai_button_photo.go).
+	InputPhoto string `json:"inputPhoto,omitempty"`
+	// InputFeeds are ids of feeds on the same screen whose rows go with the call (ai_input_feed.go).
+	InputFeeds []string `json:"inputFeeds,omitempty"`
+	// Outputs maps generate fields item names to form fields they fill (ai_outputs.go).
+	Outputs map[string]string `json:"outputs,omitempty"`
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
@@ -439,9 +503,20 @@ type Component struct {
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
 
+	// bracket (bracket.go). Entity / TitleField / Title are shared.
+	WinsField    string `json:"winsField,omitempty"`    // integer: rounds won (0 = in round 1)
+	SeedField    string `json:"seedField,omitempty"`    // integer / number: seed order, low first (else creation order)
+	StartedField string `json:"startedField,omitempty"` // datetime: when the first result was recorded (freezes the draw)
+
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
 	PhotoField string `json:"photoField,omitempty"` // optional photo field
+	// aiChat (ai_chat.go). Entity / TextField / Length / Placeholder / EmptyText are shared.
+	RoleField string `json:"roleField,omitempty"` // user|assistant per turn (optional)
+	Persona   string `json:"persona,omitempty"`   // who the AI is (≤ 500 chars)
+	Speak     bool   `json:"speak,omitempty"`     // read each new AI reply aloud (on-device voice)
+	// InputEntity: the user's own records of it go with each turn as reference (ai_chat_input.go). Limit is shared.
+	InputEntity string `json:"inputEntity,omitempty"`
 	// dashcam (#410). Title is shared. Zero = iOS default.
 	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
 	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)
@@ -454,6 +529,16 @@ type Component struct {
 	Threshold *SensorThreshold `json:"threshold,omitempty"`
 	// photoField (#418): on-device reading of the picked photo into other fields.
 	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+	// photoField: also offer an illustration made on the device (Apple Image
+	// Playground) from the record's title, saved like a picked photo.
+	Illustrate bool `json:"illustrate,omitempty"`
+	// openUrlButton (open_app.go): open an app / service by name instead of
+	// a fixed url; To is the place in it (link, username, address, number).
+	App string `json:"app,omitempty"`
+	To  string `json:"to,omitempty"`
+	// fileImport (file_import.go). Entity / Field / Label are shared.
+	Accept []string       `json:"accept,omitempty"` // csv|text|pdf
+	Map    []ImportColumn `json:"map,omitempty"`    // csv: column header -> field id
 
 	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
 	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
@@ -470,15 +555,38 @@ type Component struct {
 	Front  string `json:"front,omitempty"`  // field on the card's face
 	Back   string `json:"back,omitempty"`   // field shown when flipped
 	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
+
+	// feed (#348). Title / Limit / EmptyText are shared. Never a URL (feed.go).
+	Provider string `json:"provider,omitempty"` // FeedProviders
+	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
+	FeedID   string `json:"feedId,omitempty"`   // rss / arxiv: allowlisted id (FeedIDTable)
+
+	// placeSearch (place_search.go). Label / NameField / LocationField are shared.
+	Query        string `json:"query,omitempty"`        // fixed search words (placeSearch, feed diet)
+	Category     string `json:"category,omitempty"`     // PlaceCategories
+	Near         string `json:"near,omitempty"`         // "" | current
+	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field
+	Pins         bool   `json:"pins,omitempty"`         // also pin the results on a small map
+
+	// callButton (#447, call_button.go). Label is shared.
+	Video bool   `json:"video,omitempty"` // also offer the camera (audio only otherwise)
+	Room  string `json:"room,omitempty"`  // a separate room of the app ("" = the app's room)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
 // form field it goes into (Into).
 type PhotoAnalyze struct {
-	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle|label|labels|barcode|peopleCount|color
 	Into    string   `json:"into"`
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
 	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
+}
+
+// ImportColumn is one fileImport.map entry: the CSV column whose header is
+// Column goes into Field.
+type ImportColumn struct {
+	Column string `json:"column"`
+	Field  string `json:"field"`
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

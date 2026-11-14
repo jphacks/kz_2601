@@ -53,3 +53,27 @@ func TestCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestIsProdDatabase(t *testing.T) {
+	cases := []struct {
+		name string
+		env  map[string]string
+		want bool
+	}{
+		{"prod default db", map[string]string{"GOOGLE_CLOUD_PROJECT": ProdProject}, true},
+		{"prod with APP_ENV=stg", map[string]string{"GOOGLE_CLOUD_PROJECT": ProdProject, "APP_ENV": "stg"}, true},
+		{"named stg db", map[string]string{"GOOGLE_CLOUD_PROJECT": ProdProject, "FIRESTORE_DATABASE": "stg"}, false},
+		{"other project", map[string]string{"GOOGLE_CLOUD_PROJECT": "tailorit-stg"}, false},
+		{"emulator", map[string]string{"GOOGLE_CLOUD_PROJECT": ProdProject, "FIRESTORE_EMULATOR_HOST": "127.0.0.1:8089"}, false},
+		{"configured prod project", map[string]string{"GOOGLE_CLOUD_PROJECT": "tailorit-prod", "PROD_FIRESTORE_PROJECT": "tailorit-prod"}, true},
+		{"configured prod database", map[string]string{"GOOGLE_CLOUD_PROJECT": ProdProject, "FIRESTORE_DATABASE": "prod", "PROD_FIRESTORE_DATABASE": "prod"}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			getenv := envOf(c.env)
+			if got := IsProdDatabase(FromEnv(getenv), getenv); got != c.want {
+				t.Fatalf("want %v, got %v", c.want, got)
+			}
+		})
+	}
+}

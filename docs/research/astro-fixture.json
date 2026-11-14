@@ -1,0 +1,1205 @@
+{
+  "meta": {
+    "description": "Shared fixture for sunrise/sunset, civil twilight and moon age/phase (#1659). Every platform (backend, iOS, Android, Mac) checks the same rows.",
+    "version": 1,
+    "timeFormat": "HH:MM in the row's tz; empty string when the event does not happen",
+    "toleranceMinutes": 1,
+    "moonAgeToleranceDays": 0.1,
+    "definitions": {
+      "sunrise": "upper limb on the horizon, standard refraction (sun centre at -0.833 deg in the NOAA equations)",
+      "civilTwilight": "sun centre at -6 deg",
+      "moonAge": "days since the latest new moon, at local noon (NAOJ convention)",
+      "moonPhaseDay": "a principal phase when its instant falls within the local day, otherwise the intermediate phase between the surrounding principal phases"
+    },
+    "sources": {
+      "sun": "NAOJ 暦計算室 各地のこよみ 日の出入り 2026 (Sapporo/Tokyo/Naha), e.g. https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1306.html; URL per row in sunSource",
+      "moonAge": "NAOJ 暦計算室 各地のこよみ 月の出入り 2026 東京 (正午月齢), https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1301.html",
+      "moonPhaseInstants": "NAOJ 暦要項 2026 朔弦望, https://eco.mtk.nao.ac.jp/koyomi/yoko/2026/rekiyou263.html",
+      "moonPhaseDays": "derived from moonPhaseInstants with the moonPhaseDay definition",
+      "civilTwilightAndPolar": "computed, not externally verified (NOAA Solar Calculator equations, https://gml.noaa.gov/grad/solcalc/calcdetails.html, as implemented in backend/pkg/astro)"
+    },
+    "fetched": "2026-11-12"
+  },
+  "sun": [
+    {
+      "id": "sapporo-2026-03-01",
+      "place": "sapporo",
+      "date": "2026-03-01",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:11",
+      "sunset": "17:23",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0003.html",
+      "civilDawn": "05:43",
+      "civilDusk": "17:52",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-03-20",
+      "place": "sapporo",
+      "date": "2026-03-20",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:39",
+      "sunset": "17:46",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0003.html",
+      "civilDawn": "05:10",
+      "civilDusk": "18:15",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-06-01",
+      "place": "sapporo",
+      "date": "2026-06-01",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "03:58",
+      "sunset": "19:07",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0006.html",
+      "civilDawn": "03:24",
+      "civilDusk": "19:41",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-06-21",
+      "place": "sapporo",
+      "date": "2026-06-21",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "03:55",
+      "sunset": "19:18",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0006.html",
+      "civilDawn": "03:20",
+      "civilDusk": "19:53",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-09-01",
+      "place": "sapporo",
+      "date": "2026-09-01",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "04:58",
+      "sunset": "18:10",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0009.html",
+      "civilDawn": "04:29",
+      "civilDusk": "18:40",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-09-23",
+      "place": "sapporo",
+      "date": "2026-09-23",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:22",
+      "sunset": "17:31",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0009.html",
+      "civilDawn": "04:54",
+      "civilDusk": "17:59",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-12-01",
+      "place": "sapporo",
+      "date": "2026-12-01",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:46",
+      "sunset": "16:01",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0012.html",
+      "civilDawn": "06:14",
+      "civilDusk": "16:33",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "sapporo-2026-12-22",
+      "place": "sapporo",
+      "date": "2026-12-22",
+      "lat": 43.0667,
+      "lng": 141.35,
+      "tz": "Asia/Tokyo",
+      "sunrise": "07:03",
+      "sunset": "16:03",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s0012.html",
+      "civilDawn": "06:31",
+      "civilDusk": "16:35",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-03-01",
+      "place": "tokyo",
+      "date": "2026-03-01",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:11",
+      "sunset": "17:36",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1303.html",
+      "civilDawn": "05:46",
+      "civilDusk": "18:01",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-03-20",
+      "place": "tokyo",
+      "date": "2026-03-20",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:45",
+      "sunset": "17:52",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1303.html",
+      "civilDawn": "05:20",
+      "civilDusk": "18:18",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-06-01",
+      "place": "tokyo",
+      "date": "2026-06-01",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "04:27",
+      "sunset": "18:51",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1306.html",
+      "civilDawn": "03:57",
+      "civilDusk": "19:21",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-06-21",
+      "place": "tokyo",
+      "date": "2026-06-21",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "04:25",
+      "sunset": "19:00",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1306.html",
+      "civilDawn": "03:55",
+      "civilDusk": "19:30",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-09-01",
+      "place": "tokyo",
+      "date": "2026-09-01",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:13",
+      "sunset": "18:09",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1309.html",
+      "civilDawn": "04:47",
+      "civilDusk": "18:35",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-09-23",
+      "place": "tokyo",
+      "date": "2026-09-23",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:29",
+      "sunset": "17:37",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1309.html",
+      "civilDawn": "05:04",
+      "civilDusk": "18:03",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-12-01",
+      "place": "tokyo",
+      "date": "2026-12-01",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:32",
+      "sunset": "16:28",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1312.html",
+      "civilDawn": "06:04",
+      "civilDusk": "16:56",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "tokyo-2026-12-22",
+      "place": "tokyo",
+      "date": "2026-12-22",
+      "lat": 35.6581,
+      "lng": 139.7414,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:47",
+      "sunset": "16:32",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s1312.html",
+      "civilDawn": "06:19",
+      "civilDusk": "17:00",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-03-01",
+      "place": "naha",
+      "date": "2026-03-01",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:53",
+      "sunset": "18:31",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4803.html",
+      "civilDawn": "06:30",
+      "civilDusk": "18:54",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-03-20",
+      "place": "naha",
+      "date": "2026-03-20",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:34",
+      "sunset": "18:40",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4803.html",
+      "civilDawn": "06:11",
+      "civilDusk": "19:03",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-06-01",
+      "place": "naha",
+      "date": "2026-06-01",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:37",
+      "sunset": "19:17",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4806.html",
+      "civilDawn": "05:11",
+      "civilDusk": "19:43",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-06-21",
+      "place": "naha",
+      "date": "2026-06-21",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "05:37",
+      "sunset": "19:25",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4806.html",
+      "civilDawn": "05:11",
+      "civilDusk": "19:51",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-09-01",
+      "place": "naha",
+      "date": "2026-09-01",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:09",
+      "sunset": "18:49",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4809.html",
+      "civilDawn": "05:46",
+      "civilDusk": "19:13",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-09-23",
+      "place": "naha",
+      "date": "2026-09-23",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:18",
+      "sunset": "18:25",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4809.html",
+      "civilDawn": "05:55",
+      "civilDusk": "18:48",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-12-01",
+      "place": "naha",
+      "date": "2026-12-01",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "06:59",
+      "sunset": "17:37",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4812.html",
+      "civilDawn": "06:34",
+      "civilDusk": "18:02",
+      "civilSource": "computed, not externally verified"
+    },
+    {
+      "id": "naha-2026-12-22",
+      "place": "naha",
+      "date": "2026-12-22",
+      "lat": 26.2167,
+      "lng": 127.6667,
+      "tz": "Asia/Tokyo",
+      "sunrise": "07:13",
+      "sunset": "17:43",
+      "sunSource": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/s4812.html",
+      "civilDawn": "06:47",
+      "civilDusk": "18:08",
+      "civilSource": "computed, not externally verified"
+    }
+  ],
+  "polar": [
+    {
+      "id": "tromso-2026-06-21",
+      "place": "tromso",
+      "date": "2026-06-21",
+      "lat": 69.6492,
+      "lng": 18.9553,
+      "tz": "Europe/Oslo",
+      "polarDay": true,
+      "polarNight": false,
+      "civilAllNight": true,
+      "civilNone": false,
+      "civilDawn": "",
+      "civilDusk": "",
+      "source": "computed, not externally verified"
+    },
+    {
+      "id": "tromso-2026-12-21",
+      "place": "tromso",
+      "date": "2026-12-21",
+      "lat": 69.6492,
+      "lng": 18.9553,
+      "tz": "Europe/Oslo",
+      "polarDay": false,
+      "polarNight": true,
+      "civilAllNight": false,
+      "civilNone": false,
+      "civilDawn": "09:31",
+      "civilDusk": "13:53",
+      "source": "computed, not externally verified"
+    },
+    {
+      "id": "longyearbyen-2026-06-21",
+      "place": "longyearbyen",
+      "date": "2026-06-21",
+      "lat": 78.2232,
+      "lng": 15.6267,
+      "tz": "Arctic/Longyearbyen",
+      "polarDay": true,
+      "polarNight": false,
+      "civilAllNight": true,
+      "civilNone": false,
+      "civilDawn": "",
+      "civilDusk": "",
+      "source": "computed, not externally verified"
+    },
+    {
+      "id": "longyearbyen-2026-12-21",
+      "place": "longyearbyen",
+      "date": "2026-12-21",
+      "lat": 78.2232,
+      "lng": 15.6267,
+      "tz": "Arctic/Longyearbyen",
+      "polarDay": false,
+      "polarNight": true,
+      "civilAllNight": false,
+      "civilNone": true,
+      "civilDawn": "",
+      "civilDusk": "",
+      "source": "computed, not externally verified"
+    },
+    {
+      "id": "mcmurdo-2026-12-21",
+      "place": "mcmurdo",
+      "date": "2026-12-21",
+      "lat": -77.8463,
+      "lng": 166.6682,
+      "tz": "Antarctica/McMurdo",
+      "polarDay": true,
+      "polarNight": false,
+      "civilAllNight": true,
+      "civilNone": false,
+      "civilDawn": "",
+      "civilDusk": "",
+      "source": "computed, not externally verified"
+    }
+  ],
+  "moonAge": [
+    {
+      "date": "2026-01-01",
+      "tz": "Asia/Tokyo",
+      "age": 12.1,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1301.html"
+    },
+    {
+      "date": "2026-01-10",
+      "tz": "Asia/Tokyo",
+      "age": 21.1,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1301.html"
+    },
+    {
+      "date": "2026-01-19",
+      "tz": "Asia/Tokyo",
+      "age": 0.3,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1301.html"
+    },
+    {
+      "date": "2026-01-26",
+      "tz": "Asia/Tokyo",
+      "age": 7.3,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1301.html"
+    },
+    {
+      "date": "2026-02-02",
+      "tz": "Asia/Tokyo",
+      "age": 14.3,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1302.html"
+    },
+    {
+      "date": "2026-02-17",
+      "tz": "Asia/Tokyo",
+      "age": 29.3,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1302.html"
+    },
+    {
+      "date": "2026-02-24",
+      "tz": "Asia/Tokyo",
+      "age": 6.6,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1302.html"
+    },
+    {
+      "date": "2026-03-03",
+      "tz": "Asia/Tokyo",
+      "age": 13.6,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1303.html"
+    },
+    {
+      "date": "2026-03-11",
+      "tz": "Asia/Tokyo",
+      "age": 21.6,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1303.html"
+    },
+    {
+      "date": "2026-03-19",
+      "tz": "Asia/Tokyo",
+      "age": 0.1,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1303.html"
+    },
+    {
+      "date": "2026-03-26",
+      "tz": "Asia/Tokyo",
+      "age": 7.1,
+      "source": "https://eco.mtk.nao.ac.jp/koyomi/dni/2026/m1303.html"
+    }
+  ],
+  "moonPhaseInstants": [
+    {
+      "phase": "full",
+      "jst": "2026-01-03T19:03+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-01-11T00:48+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-01-19T04:52+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-01-26T13:47+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-02-02T07:09+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-02-09T21:43+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-02-17T21:01+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-02-24T21:28+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-03-03T20:38+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-03-11T18:39+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-03-19T10:23+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-03-26T04:18+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-04-02T11:12+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-04-10T13:52+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-04-17T20:52+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-04-24T11:32+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-05-02T02:23+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-05-10T06:10+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-05-17T05:01+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-05-23T20:11+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-05-31T17:45+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-06-08T19:01+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-06-15T11:54+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-06-22T06:55+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-06-30T08:57+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-07-08T04:29+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-07-14T18:44+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-07-21T20:06+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-07-29T23:36+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-08-06T11:21+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-08-13T02:37+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-08-20T11:46+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-08-28T13:19+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-09-04T16:51+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-09-11T12:27+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-09-19T05:44+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-09-27T01:49+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-10-03T22:25+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-10-11T00:50+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-10-19T01:13+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-10-26T13:12+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-11-02T05:28+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-11-09T16:02+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-11-17T20:48+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-11-24T23:54+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-12-01T15:09+09:00"
+    },
+    {
+      "phase": "new",
+      "jst": "2026-12-09T09:52+09:00"
+    },
+    {
+      "phase": "first_quarter",
+      "jst": "2026-12-17T14:43+09:00"
+    },
+    {
+      "phase": "full",
+      "jst": "2026-12-24T10:28+09:00"
+    },
+    {
+      "phase": "last_quarter",
+      "jst": "2026-12-31T03:59+09:00"
+    }
+  ],
+  "moonPhaseDays": [
+    {
+      "date": "2026-01-03",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-01-07",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-01-11",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-01-15",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-01-19",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-01-22",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-01-26",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-01-29",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-02-02",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-02-05",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-02-09",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-02-13",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-02-17",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-02-20",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-02-24",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-02-27",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-03-03",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-03-07",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-03-11",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-03-15",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-03-19",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-03-22",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-03-26",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-03-29",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-04-02",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-04-06",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-04-10",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-04-13",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-04-17",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-04-20",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-04-24",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-04-28",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-05-02",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-05-06",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-05-10",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-05-13",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-05-17",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-05-20",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-05-23",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-05-27",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-05-31",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-06-04",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-06-08",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-06-11",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-06-15",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-06-18",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-06-22",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-06-26",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-06-30",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-07-04",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-07-08",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-07-11",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-07-14",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-07-17",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-07-21",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-07-25",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-07-29",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-08-02",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-08-06",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-08-09",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-08-13",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-08-16",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-08-20",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-08-24",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-08-28",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-08-31",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-09-04",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-09-07",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-09-11",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-09-15",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-09-19",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-09-23",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-09-27",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-09-30",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-10-03",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-10-07",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-10-11",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-10-15",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-10-19",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-10-22",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-10-26",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-10-29",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-11-02",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-11-05",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-11-09",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-11-13",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-11-17",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-11-20",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-11-24",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-11-27",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-12-01",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    },
+    {
+      "date": "2026-12-05",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_crescent"
+    },
+    {
+      "date": "2026-12-09",
+      "tz": "Asia/Tokyo",
+      "phase": "new"
+    },
+    {
+      "date": "2026-12-13",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_crescent"
+    },
+    {
+      "date": "2026-12-17",
+      "tz": "Asia/Tokyo",
+      "phase": "first_quarter"
+    },
+    {
+      "date": "2026-12-20",
+      "tz": "Asia/Tokyo",
+      "phase": "waxing_gibbous"
+    },
+    {
+      "date": "2026-12-24",
+      "tz": "Asia/Tokyo",
+      "phase": "full"
+    },
+    {
+      "date": "2026-12-27",
+      "tz": "Asia/Tokyo",
+      "phase": "waning_gibbous"
+    },
+    {
+      "date": "2026-12-31",
+      "tz": "Asia/Tokyo",
+      "phase": "last_quarter"
+    }
+  ]
+}

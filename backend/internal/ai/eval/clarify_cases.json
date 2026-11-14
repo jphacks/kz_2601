@@ -1,0 +1,11 @@
+[
+  {"id": "cl_gen_water_word", "kind": "create", "group": "clarify-defaults", "transcript": "水分補給の記録", "note": "2026-11 察し: 種類だけ → 表の形(量 ml・今日の合計)。頼まれていないグラフ・通知は足さない", "expect": {"chart": false, "oneAdd": true}},
+  {"id": "cl_gen_water_remind", "kind": "create", "group": "clarify-defaults", "transcript": "毎日の水分を記録して、飲み忘れないようにリマインドして", "note": "2026-11 察し: 時刻が無い通知を省かない(表の 10:00・15:00・20:00)", "expect": {"notification": "any", "noOmission": true}},
+  {"id": "cl_gen_weight_morning", "kind": "create", "group": "clarify-defaults", "transcript": "体重を記録したい。毎朝リマインドして", "note": "2026-11 察し: 「朝」だけの時刻は 07:00", "expect": {"notification": "07:00", "chart": false}},
+  {"id": "cl_gen_study_goal", "kind": "create", "group": "clarify-defaults", "transcript": "勉強時間を記録して、1日の目標まであと何分か見たい", "note": "2026-11 察し: 目標の数が無ければ 1日60分で残りを計算", "expect": {"calc": true, "statValue": true}},
+  {"id": "cl_gen_medicine", "kind": "create", "group": "clarify-defaults", "transcript": "薬の飲み忘れを防ぎたい", "note": "2026-11 察し: 「飲み忘れ」= 通知の依頼。毎日リセットのチェックと薬ごとの時刻", "expect": {"notification": "any", "noOmission": true}},
+  {"id": "cl_gen_habit_word", "kind": "create", "group": "clarify-defaults", "transcript": "習慣トラッカー", "note": "2026-11 察し: 表の形(毎日リセットのチェック・連続日数)", "expect": {"computed": true, "chart": false}},
+  {"id": "cl_gen_shopping_word", "kind": "create", "group": "clarify-defaults", "transcript": "買い物リスト", "note": "2026-11 察し: 表の形(買ったのチェック)。グラフ・通知は足さない", "expect": {"chart": false, "oneAdd": true}},
+  {"id": "cl_gen_diary_word", "kind": "create", "group": "clarify-defaults", "transcript": "日記", "note": "2026-11 察し: 写真・気分は言われた時だけ", "expect": {"photo": false, "chart": false}},
+  {"id": "cl_gen_water_en", "kind": "create", "group": "clarify-defaults", "locale": "en", "transcript": "A water tracker that reminds me in the evening", "note": "2026-11 察し: 英語でも表(evening = 夜 21:00)", "expect": {"notification": "21:00"}}
+]

@@ -50,12 +50,17 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
 
     /// Renderer に渡す形。
     public var record: Record {
-        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName, marks: marks)
+        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName, marks: marks,
+               unsent: pendingOp == .create)
     }
 
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。
     public static func temporaryId(clientId: String) -> String { "local-\(clientId)" }
     public var isTemporary: Bool { recordId.hasPrefix("local-") }
+    /// 今の id か、作成を送る前の仮 id なら true。
+    public func isKnown(as id: String) -> Bool {
+        recordId == id || clientId.map(Self.temporaryId(clientId:)) == id
+    }
 }
 
 /// レコードのローカル DB。
@@ -92,12 +97,24 @@ public actor RecordStore {
             .map(\.record)
     }
 
+    /// createdAt 降順。文字列ではなく時刻で比べる(小数秒の桁が違う `.1Z` と `.123456Z`・オフセット付きを取り違えない)。
+    /// 同じ時刻は後から入った行を先に出す(表は古い → 新しいの順に持つ。`replace` 参照)。読めない・無い createdAt は末尾。
     public func rows(appId: String, entity: String) -> [LocalRecord] {
-        table(appId, entity).sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
+        let parser = CreatedAtKey.Parser()
+        return table(appId, entity).enumerated()
+            .map { (key: parser.key($0.element.createdAt), index: $0.offset, row: $0.element) }
+            .sorted { $0.key != $1.key ? $0.key > $1.key : $0.index > $1.index }
+            .map(\.row)
     }
 
     public func row(appId: String, entity: String, recordId: String) -> LocalRecord? {
         table(appId, entity).first { $0.recordId == recordId }
+    }
+
+    /// `row` と同じだが、作成の送信で id が替わった後でも仮 id で引ける。
+    public func current(appId: String, entity: String, recordId: String) -> LocalRecord? {
+        row(appId: appId, entity: entity, recordId: recordId)
+            ?? table(appId, entity).first { $0.isKnown(as: recordId) }
     }
 
     /// 同期済み行の最大 updatedAt(差分取得の基準。サーバーに `updatedAfter` が無い間は未使用)。
@@ -124,13 +141,22 @@ public actor RecordStore {
         save(appId, entity, t)
     }
 
+    /// 行を削除待ちにする。読んでから書く間に作成が届いても、古い仮 id の行を書き戻さない。
+    public func markDeleting(appId: String, entity: String, recordId: String) {
+        var t = table(appId, entity)
+        guard let i = t.firstIndex(where: { $0.isKnown(as: recordId) }) else { return }
+        t[i].pendingOp = .delete
+        save(appId, entity, t)
+    }
+
     /// サーバーの全件で置き換える(サーバーが正)。未送信(`pendingOp != none`)の行だけは残す。
     /// - create 待ちの仮行: そのまま残す
     /// - update/delete 待ちの行: ローカルの内容を優先(送信後に次の pull でサーバー版になる)
     @discardableResult
     public func replace(appId: String, entity: String, with server: [Record]) -> [Record] {
         let pending = table(appId, entity).filter { $0.pendingOp != .none }
-        var t = server.map { LocalRecord(appId: appId, entity: entity, server: $0) }
+        // サーバーは新しい順(同時刻は id 降順)で返す。表は古い順に持つので逆にして入れる(同時刻の並びがサーバーと揃う)
+        var t = server.reversed().map { LocalRecord(appId: appId, entity: entity, server: $0) }
         for p in pending {
             if let i = t.firstIndex(where: { $0.recordId == p.recordId }) { t[i] = p } else { t.append(p) }
         }
@@ -139,14 +165,25 @@ public actor RecordStore {
     }
 
     /// 同期完了: 仮 id の行をサーバーのレコードに差し替える(create)/ pendingOp を落とす(update)。
-    public func markSynced(appId: String, entity: String, localId: String, server: Record) {
+    /// 送信中に消された行は削除待ちのまま残す(列の delete が送られるまで一覧に戻さない)。
+    /// - Parameter keepingLocalChanges: 送っている間にもう一度書いた(次の update が列にある)。サーバーの応答で端末の内容を
+    ///   戻さず、update 待ちのまま残す(#3667: 保存の直後に前の内容へ戻らない)
+    public func markSynced(appId: String, entity: String, localId: String, server: Record, keepingLocalChanges: Bool = false) {
         var t = table(appId, entity)
-        let kept = t.first { $0.recordId == localId }?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
+        let local = t.first { $0.recordId == localId }
+        let kept = local?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
         t.removeAll { $0.recordId == localId }
         t.removeAll { $0.recordId == server.id }
         var row = LocalRecord(appId: appId, entity: entity, server: server)
         row.clientId = localId.hasPrefix("local-") ? String(localId.dropFirst("local-".count)) : nil
         if row.marks == nil { row.marks = kept }
+        if local?.pendingOp == .delete {
+            row.pendingOp = .delete
+        } else if keepingLocalChanges, let local {
+            row.data = server.data.merging(local.data) { _, mine in mine }
+            row.updatedAt = local.updatedAt
+            row.pendingOp = .update
+        }
         t.append(row)
         save(appId, entity, t)
     }
@@ -221,6 +258,37 @@ public actor RecordStore {
 
     private func url(_ appId: String, _ entity: String) -> URL {
         directory.appendingPathComponent(Self.safe(appId), isDirectory: true).appendingPathComponent("\(Self.safe(entity)).json")
+    }
+
+    /// createdAt の比較キー(秒 + ナノ秒)。読めない・無いものは最小。
+    struct CreatedAtKey: Comparable {
+        static let missing = CreatedAtKey(seconds: .min, nanos: 0)
+        let seconds: Int64
+        let nanos: Int
+
+        static func < (a: Self, b: Self) -> Bool { (a.seconds, a.nanos) < (b.seconds, b.nanos) }
+
+        /// ISO-8601(`Z` / `±hh:mm`、小数秒は 0〜9 桁)。小数秒は Date(Double)を通さず桁のまま持つ。
+        struct Parser {
+            private let formatter: ISO8601DateFormatter = {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime]
+                return f
+            }()
+
+            func key(_ s: String?) -> CreatedAtKey {
+                guard var s, !s.isEmpty else { return .missing }
+                var nanos = 0
+                if let t = s.firstIndex(of: "T"), let dot = s[t...].firstIndex(of: ".") {
+                    let digits = s[s.index(after: dot)...].prefix { $0.isASCII && $0.isNumber }
+                    guard !digits.isEmpty, digits.count <= 9 else { return .missing }
+                    nanos = Int(digits.padding(toLength: 9, withPad: "0", startingAt: 0)) ?? 0
+                    s.removeSubrange(dot..<s.index(dot, offsetBy: digits.count + 1))
+                }
+                guard let date = formatter.date(from: s) else { return .missing }
+                return CreatedAtKey(seconds: Int64(date.timeIntervalSince1970.rounded()), nanos: nanos)
+            }
+        }
     }
 
     static func safe(_ s: String) -> String {

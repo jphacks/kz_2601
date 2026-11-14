@@ -9,23 +9,29 @@ import (
 )
 
 // #413 / #424: the decline rules reach the generation prompt and chat lists
-// both as limits with the allowed alternative.
+// both as limits with the allowed alternative. The call decline is only for
+// a build without callButton (#447, call_button_rules_test.go).
 func TestPaymentCallRulesReachPrompts(t *testing.T) {
-	for _, want := range []string{"## お金のやり取り・通話(#413・#424)", paywallNoteJA, paywallNoteEN, callNoteJA, callNoteEN, "paypay:// などの独自スキームは使わない"} {
+	for _, want := range []string{"## お金のやり取り・通話(#413・#424)", paywallNoteJA, paywallNoteEN, paypaySchemeRule} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
 	}
 	for name, p := range map[string]string{"edit": chatEditSystemPrompt, "create": chatCreateSystemPrompt} {
-		for _, want := range []string{"払ったら有料の中身が開く仕組み", "PayPay の請求リンク", "アプリの中での通話・ビデオ通話", "tel:"} {
+		for _, want := range []string{"払ったら有料の中身が開く仕組み", "PayPay の請求リンク"} {
 			if !strings.Contains(p, want) {
 				t.Errorf("%s chat prompt lacks %q", name, want)
 			}
 		}
 	}
+	for _, want := range []string{callNoteJA, callNoteEN, "tel:番号"} {
+		if !strings.Contains(callDeclineRule, want) {
+			t.Errorf("callDeclineRule lacks %q", want)
+		}
+	}
 }
 
-// #413: paypay:// stays off the openUrlButton allowlist (https links only).
+// #413: paypay:// stays off the openUrlButton url allowlist (PayPay is opened by app, #989).
 func TestPaymentNoPayPayScheme(t *testing.T) {
 	for _, s := range dsl.OpenURLSchemes {
 		if s == "paypay" {
@@ -39,11 +45,12 @@ func TestPaymentNoPayPayScheme(t *testing.T) {
 func TestPaymentCallRulesKeptWhenRestricted(t *testing.T) {
 	var allowed []string
 	for typ := range knownComponentTypes {
-		if typ != "openUrlButton" {
+		if typ != "openUrlButton" && typ != "callButton" {
 			allowed = append(allowed, typ)
 		}
 	}
-	got := restrictPrompt(withRestriction(context.Background(), NewRestriction(allowed, nil)), systemPrompt)
+	r := NewClientRestriction(allowed, []string{"sharedData"}, featuresWithout(FeatureCallButton))
+	got := restrictPrompt(withRestriction(context.Background(), r), systemPrompt)
 	for _, want := range []string{paywallNoteJA, callNoteJA} {
 		if !strings.Contains(got, want) {
 			t.Errorf("restricted prompt lost %q", want)
@@ -52,7 +59,7 @@ func TestPaymentCallRulesKeptWhenRestricted(t *testing.T) {
 }
 
 func TestPaymentCallOmissions(t *testing.T) {
-	app := &dsl.App{}
+	app := &dsl.App{} // no callButton: a build without calls stripped it
 	ids := func(tr, honest string) string {
 		return strings.Join(omissionIDs(omissions(tr, app, honest, true)), ",")
 	}

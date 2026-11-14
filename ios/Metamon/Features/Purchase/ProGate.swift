@@ -12,8 +12,6 @@ enum PaywallReason: Equatable {
     case limitReached
     /// 共有・オンラインなどの有料機能を使うアプリを作る / 直す(features が空なら「みんなで共有するデータ」)
     case paidFeature([PaidFeature])
-    /// 記録を共有するアプリ・公開アプリに参加する
-    case join(appName: String)
 }
 
 /// 課金画面の表示要求。`placement` = どこの View が present するか(チャットの確認カードは音声シートの中にもあるので、その場で出す)。
@@ -36,7 +34,15 @@ final class ProGate {
 
     let store: ProEntitlementStore
     @ObservationIgnored let usage: CreationUsageStore
-    let quota: CreationQuota
+    private let baseQuota: CreationQuota
+    /// 1 日の無料回数。stg の版は開発用メニューの回数(#2080)を先に見る
+    var quota: CreationQuota {
+        #if METAMON_STG
+        DebugPlanState.shared.observe()
+        if let n = DebugPlanKnobs.freeLimit { return CreationQuota(dailyFreeLimit: n) }
+        #endif
+        return baseQuota
+    }
     /// いま出している課金画面(nil = 出していない)
     private(set) var paywall: PaywallRequest?
     @ObservationIgnored private var paywallWaiter: CheckedContinuation<Bool, Never>?
@@ -59,7 +65,7 @@ final class ProGate {
          limitDisabled: Bool? = nil) {
         self.store = store ?? ProEntitlementStore(mode: Self.storeMode)
         self.usage = usage
-        self.quota = quota
+        self.baseQuota = quota
         self.usedToday = usage.used()
         self.limitDisabled = limitDisabled
             ?? (UserDefaults.standard.object(forKey: Self.disabledKey) as? Bool) ?? Self.defaultLimitDisabled
@@ -70,23 +76,31 @@ final class ProGate {
         store.start()
     }
 
-    var isPro: Bool { store.isPro }
+    /// Pro か。stg の版は開発用メニューの「無料 / Pro として見る」(#2080)を先に見る(端末だけ・サーバーは実際のまま)
+    var isPro: Bool {
+        #if METAMON_STG
+        DebugPlanState.shared.observe()
+        if let pro = DebugPlanKnobs.proOverride { return pro }
+        #endif
+        return store.isPro
+    }
     var isEnforced: Bool { Self.forceEnforce || !limitDisabled }
     /// 有料機能の前に課金画面を出すか(`PaidGate.needsPaywall`)
     var needsPaywall: Bool { PaidGate.needsPaywall(isPro: isPro, enforced: isEnforced) }
 
     var decision: CreationQuota.Decision {
-        quota.decide(used: usedToday, isPro: store.isPro, limitDisabled: !isEnforced)
+        quota.decide(used: usedToday, isPro: isPro, limitDisabled: !isEnforced)
     }
 
-    /// 新規作成の前に呼ぶ。枠切れなら上限シートを出して false(呼び出し側は送らない)。
-    /// 音声シートなど別のシートが閉じ終わるのを待ってから出す。
-    func admitNewApp() -> Bool {
+    /// 新規作成の前に呼ぶ。枠切れなら上限シートを出し、閉じるまで待つ。戻り値 = 作ってよいか(枠がある・買った)。
+    /// false なら呼び出し側は送らない(会話は残す・H3)。音声シートなど別のシートが閉じ終わるのを `after` だけ待ってから出す。
+    func admitNewApp(after delay: Duration = .milliseconds(450)) async -> Bool {
         usedToday = usage.used()
         guard decision == .blocked else { return true }
         print("[Metamon] IAP: daily free limit reached (\(usedToday)/\(quota.dailyFreeLimit)) → paywall")
-        Task { _ = await requestPro(.limitReached, after: .milliseconds(450)) }
-        return false
+        let bought = await requestPro(.limitReached, after: delay)
+        usedToday = usage.used()
+        return bought || decision != .blocked
     }
 
     /// 課金画面を出し、閉じるまで待つ。戻り値 = 閉じた時に Pro か(買った / 復元した)。Pro ならすぐ true。
@@ -122,13 +136,13 @@ final class ProGate {
     func recordNewApp() {
         usage.record()
         usedToday = usage.used()
-        print("[Metamon] IAP: creations today=\(usedToday) pro=\(store.isPro) enforced=\(isEnforced)")
+        print("[Metamon] IAP: creations today=\(usedToday) pro=\(isPro) enforced=\(isEnforced)")
     }
 
     // MARK: - 起動時の設定
 
     /// DEBUG ビルドは既定で制限なし(デモ端末で上限に当たらない)。Release は既定で制限あり。
-    private static var defaultLimitDisabled: Bool {
+    static var defaultLimitDisabled: Bool {
         #if DEBUG
         true
         #else
@@ -136,11 +150,11 @@ final class ProGate {
         #endif
     }
 
-    /// StoreKit かモックか(#414)。DEBUG の `METAMON_MOCK_STORE=1` で常にモック(UI テスト)、
-    /// DEBUG のシミュレータは StoreKit の商品が取れなければモック(`simctl launch` では Scheme の構成が効かない)。Release は常に StoreKit。
+    /// StoreKit かモックか(#414)。DEBUG・stg の `METAMON_MOCK_STORE=1`(開発用メニューでも・#2080)で常にモック(UI テスト)、
+    /// シミュレータは StoreKit の商品が取れなければモック(`simctl launch` では Scheme の構成が効かない)。Release は常に StoreKit。
     private static var storeMode: ProEntitlementStore.Mode {
-        #if DEBUG
-        switch ProcessInfo.processInfo.environment["METAMON_MOCK_STORE"] {
+        #if DEBUG || METAMON_STG
+        switch DebugPlanKnobs.string(DebugPlanKnobs.mockStore) {
         case "1": return .mock
         case "0": return .storeKit
         default:
@@ -156,7 +170,12 @@ final class ProGate {
     }
 
     private static var forceEnforce: Bool {
-        ProcessInfo.processInfo.environment["METAMON_IAP_ENFORCE"] == "1"
+        #if METAMON_STG
+        DebugPlanState.shared.observe()
+        return DebugPlanKnobs.forceEnforce // 環境変数 > 開発用メニュー(#2080)
+        #else
+        return ProcessInfo.processInfo.environment["METAMON_IAP_ENFORCE"] == "1"
+        #endif
     }
 
     /// `METAMON_IAP_FREE_LIMIT=<n>` で 1 日の無料回数を上書き(確認用)。
@@ -164,4 +183,14 @@ final class ProGate {
         ProcessInfo.processInfo.environment["METAMON_IAP_FREE_LIMIT"].flatMap(Int.init) ?? ProProducts.dailyFreeCreations
     }
 }
+
+#if METAMON_STG
+extension ProGate {
+    /// 開発用メニュー(#2080): 今日の作成回数を 0 に戻す
+    func debugResetUsageToday() {
+        usage.reset()
+        usedToday = usage.used()
+    }
+}
+#endif
 #endif

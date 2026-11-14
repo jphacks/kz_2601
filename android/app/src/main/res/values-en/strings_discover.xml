@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Discover (search, install, report) and "Publish to everyone" in the share sheet (#902). Copy from iOS DiscoverSheet / ShareAppSheet -->
+<resources>
+    <string name="discover_anonymous">Anonymous</string>
+    <string name="discover_block">Block publisher</string>
+    <plurals name="discover_byline">
+        <item quantity="one">%1$s · %2$d user</item>
+        <item quantity="other">%1$s · %2$d users</item>
+    </plurals>
+    <plurals name="discover_byline_mine">
+        <item quantity="one">%1$s · %2$d user · Published by you</item>
+        <item quantity="other">%1$s · %2$d users · Published by you</item>
+    </plurals>
+    <string name="discover_categories">Categories</string>
+    <string name="discover_category_all">All</string>
+    <string name="discover_close">Close</string>
+    <string name="discover_copy">Copy</string>
+    <string name="discover_empty">No published apps yet</string>
+    <string name="discover_entry">Discover apps made by others</string>
+    <string name="discover_entry_short">Discover</string>
+    <string name="discover_failure_load">Couldn\'t load</string>
+    <string name="discover_failure_offline">Couldn\'t load. Try again where you have a connection</string>
+    <string name="discover_failure_unavailable">Discover only works when connected to the server</string>
+    <string name="discover_get">Get</string>
+    <string name="discover_hidden">Unpublished by the operator</string>
+    <string name="discover_hidden_reason">Unpublished by the operator: %1$s</string>
+    <string name="discover_install_failed">Couldn\'t install</string>
+    <string name="discover_install_label">Install %1$s</string>
+    <string name="discover_install_offline">Couldn\'t install. Try again where you have a connection</string>
+    <string name="discover_install_unpublished">This app is no longer published</string>
+    <string name="discover_installed">Installed “%1$s”</string>
+    <string name="discover_loading">Loading</string>
+    <string name="discover_more">Actions for %1$s</string>
+    <string name="discover_no_match">No apps match “%1$s”</string>
+    <string name="discover_report">Report</string>
+    <string name="discover_retry">Try Again</string>
+    <string name="discover_search_placeholder">Budget, workouts, walks…</string>
+    <string name="discover_sort">Sort</string>
+    <string name="discover_sort_new">New</string>
+    <string name="discover_sort_popular">Popular</string>
+    <string name="discover_title">Discover Apps</string>
+    <string name="publish_action">Publish</string>
+    <string name="publish_cancel">Cancel</string>
+    <string name="publish_confirm_name_footer">Leave it blank to show “Anonymous”</string>
+    <string name="publish_confirm_name_label">Publisher name (optional)</string>
+    <string name="publish_confirm_name_placeholder">e.g. Taro</string>
+    <string name="publish_confirm_point_anyone">Anyone can find it in Discover and add it as their own app</string>
+    <string name="publish_confirm_point_privacy">Don\'t put personal info such as your address or phone number in the name, description or tags</string>
+    <string name="publish_confirm_point_records">Your private entries are not included</string>
+    <string name="publish_confirm_point_stop">You can unpublish it from the share sheet at any time</string>
+    <string name="publish_confirm_points_header">When you publish</string>
+    <string name="publish_confirm_title">Publish “%1$s”?</string>
+    <string name="publish_description_label">Short description (optional)</string>
+    <string name="publish_failed">Couldn\'t publish</string>
+    <string name="publish_failed_blank">This app is still empty. Make it with your voice first, then publish it</string>
+    <string name="publish_failed_not_owner">You can only publish apps you made</string>
+    <string name="publish_failed_offline">Couldn\'t publish. Try again where you have a connection</string>
+    <string name="publish_field_author">Display name</string>
+    <string name="publish_field_description">Short description</string>
+    <string name="publish_field_name">App name</string>
+    <string name="publish_field_tags">Tags</string>
+    <string name="publish_header">Publish to everyone</string>
+    <string name="publish_intro">Anyone can find and install it from Discover</string>
+    <plurals name="publish_live">
+        <item quantity="one">Published on Discover · %1$d install</item>
+        <item quantity="other">Published on Discover · %1$d installs</item>
+    </plurals>
+    <string name="publish_published">Published on Discover</string>
+    <string name="publish_tags_label">Tags (space-separated, optional)</string>
+    <string name="publish_tags_placeholder">e.g. health habits</string>
+    <string name="publish_text_not_allowed">“%1$s” contains words that can\'t be shown</string>
+    <string name="publish_text_not_allowed_generic">This contains words that can\'t be shown</string>
+    <string name="publish_unpublish">Unpublish</string>
+    <string name="publish_unpublish_failed">Couldn\'t unpublish</string>
+    <string name="publish_unpublish_message">It will no longer appear in Discover. Apps people already installed stay.</string>
+    <string name="publish_unpublish_title">Unpublish?</string>
+    <string name="publish_unpublished">Unpublished</string>
+</resources>

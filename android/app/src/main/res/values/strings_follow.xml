@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- フォローのトースト(FollowRuntime・#1028)。文言は iOS(Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="follow_failed">フォローを変えられませんでした。もう一度お試しください</string>
+    <string name="follow_followed">フォローしました</string>
+    <string name="follow_full">フォローできる人数(500 人)を超えています</string>
+    <string name="follow_not_in_app">この人はもうこのアプリに参加していません</string>
+    <string name="follow_offline">オフラインのあいだはフォローできません</string>
+    <string name="follow_open_post_first">ほかの人の投稿を開いてからフォローしてください</string>
+    <string name="follow_unavailable">このアプリでは今はフォローを使えません</string>
+    <string name="follow_unfollowed">フォローを外しました</string>
+</resources>

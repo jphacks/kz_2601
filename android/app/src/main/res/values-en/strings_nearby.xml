@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nearby_accept">Accept</string>
+    <string name="nearby_anonymous">Someone nearby</string>
+    <string name="nearby_build_failed">Couldn\'t prepare the data to send</string>
+    <string name="nearby_cannot_receive_now">Can\'t receive right now</string>
+    <string name="nearby_close">Close</string>
+    <string name="nearby_decline">Decline</string>
+    <string name="nearby_declined">%1$s didn\'t accept</string>
+    <string name="nearby_devices">Nearby devices</string>
+    <string name="nearby_devices_footer">People appear here when they have the same app open in Tailor It. It\'s delivered when they tap “Accept”.</string>
+    <string name="nearby_disconnected">Disconnected</string>
+    <string name="nearby_discovery_failed">Couldn\'t look for nearby devices (check Nearby devices access and Bluetooth)</string>
+    <string name="nearby_hide_name">Hide my name</string>
+    <string name="nearby_hide_name_footer">Same setting as pass-by sharing. When on, others see “Someone nearby” instead of your name.</string>
+    <string name="nearby_incoming_body">Accepting adds them to “%1$s”.</string>
+    <string name="nearby_ios_not_supported">Can\'t connect to iOS devices (works between Android devices)</string>
+    <string name="nearby_no_response">No response from %1$s</string>
+    <string name="nearby_not_received">%1$s couldn\'t receive it</string>
+    <string name="nearby_nothing_importable">Nothing could be added</string>
+    <string name="nearby_nothing_importable_from">The records from %1$s had no fields that could be added</string>
+    <string name="nearby_public_name">Name others see</string>
+    <string name="nearby_searching">Looking for Tailor It nearby…</string>
+    <string name="nearby_send_failed">Couldn\'t send</string>
+    <string name="nearby_sending">Sending to %1$s…</string>
+    <string name="nearby_sheet_title">Send to someone nearby</string>
+    <string name="nearby_unreadable">Couldn\'t read the data</string>
+    <string name="nearby_waiting">Waiting for %1$s to accept…</string>
+    <string name="nearby_what">Sending</string>
+    <plurals name="nearby_delivered">
+        <item quantity="one">Delivered %2$d to %1$s</item>
+        <item quantity="other">Delivered %2$d to %1$s</item>
+    </plurals>
+    <plurals name="nearby_imported">
+        <item quantity="one">Added %3$d “%2$s” record from %1$s</item>
+        <item quantity="other">Added %3$d “%2$s” records from %1$s</item>
+    </plurals>
+    <plurals name="nearby_incoming_title">
+        <item quantity="one">%1$s sent %3$d “%2$s” record</item>
+        <item quantity="other">%1$s sent %3$d “%2$s” records</item>
+    </plurals>
+    <plurals name="nearby_what_records">
+        <item quantity="one">%2$d “%1$s” record</item>
+        <item quantity="other">%2$d “%1$s” records</item>
+    </plurals>
+</resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="release_badge_a11y">Release request: %1$s</string>
+    <string name="release_close">Close</string>
+    <string name="release_contact_placeholder">Contact (optional), e.g. email or social</string>
+    <string name="release_failed">Couldn\'t send the request</string>
+    <string name="release_intro">Ask the Tailor It team to publish this as its own app that works outside Tailor It. If there is demand, the team will handle the release.</string>
+    <string name="release_menu">%1$s menu</string>
+    <string name="release_menu_request">Request a standalone release</string>
+    <string name="release_menu_share">Share / Publish</string>
+    <string name="release_note">The current version\'s screen layout is sent with the request (your records are not).</string>
+    <string name="release_purpose_placeholder">What you use it for (required), e.g. I log my health every morning</string>
+    <string name="release_purpose_quote">“%1$s”</string>
+    <string name="release_purpose_question">What do you use it for?</string>
+    <string name="release_received">Request received</string>
+    <string name="release_requested">Already requested</string>
+    <string name="release_send">Send Request</string>
+    <string name="release_status_declined">Declined</string>
+    <string name="release_status_now">Status</string>
+    <string name="release_status_planned">Release planned</string>
+    <string name="release_status_received">Received</string>
+    <string name="release_status_reviewing">Under review</string>
+    <string name="release_status_updates">Status updates appear on the card in your app list.</string>
+    <string name="release_title">Make “%1$s” a standalone app</string>
+</resources>

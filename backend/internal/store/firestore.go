@@ -42,6 +42,10 @@ func NewFirestore(ctx context.Context, projectID, database string) (*Firestore, 
 	return &Firestore{c: c}, nil
 }
 
+// NewFirestoreFromClient wraps a client the binary already holds (cmd/ai
+// reads shared-app membership with it).
+func NewFirestoreFromClient(c *firestore.Client) *Firestore { return &Firestore{c: c} }
+
 // Close releases the client.
 func (f *Firestore) Close() error { return f.c.Close() }
 
@@ -87,11 +91,12 @@ type appDoc struct {
 	DSL            map[string]any `firestore:"dsl"`
 	DSLJSON        string         `firestore:"dslJson"`
 	SortIndex      int64          `firestore:"sortIndex,omitempty"`
+	GlanceStat     string         `firestore:"glanceStat,omitempty"`
 }
 
 func (d *appDoc) toApp(id string) *App {
 	return &App{ID: id, Name: d.Name, CurrentVersion: int(d.CurrentVersion), Status: d.Status,
-		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, SortIndex: int(d.SortIndex), DSL: json.RawMessage(d.DSLJSON)}
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, SortIndex: int(d.SortIndex), GlanceStat: d.GlanceStat, DSL: json.RawMessage(d.DSLJSON)}
 }
 
 type versionDoc struct {
@@ -130,15 +135,20 @@ type recordDoc struct {
 	Author     string           `firestore:"author,omitempty"`
 	AuthorName string           `firestore:"authorName,omitempty"`
 	MarkCounts map[string]int64 `firestore:"markCounts,omitempty"` // #255
-	CreatedAt  time.Time        `firestore:"createdAt"`
-	UpdatedAt  time.Time        `firestore:"updatedAt"`
+	Origin     *originDoc       `firestore:"origin,omitempty"`     // #341
+	UniqueKey  string           `firestore:"uniqueKey,omitempty"`  // #273
+	Readers    []string         `firestore:"readers,omitempty"`    // #271
+	// #507: set on a matching profile once its author declared 18+
+	OwnerAgeConfirmed bool      `firestore:"ownerAgeConfirmed,omitempty"`
+	CreatedAt         time.Time `firestore:"createdAt"`
+	UpdatedAt         time.Time `firestore:"updatedAt"`
 }
 
 func (d *recordDoc) toRecord(id string) *Record {
 	if d.Data == nil {
 		d.Data = map[string]any{}
 	}
-	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, Origin: d.Origin.toOrigin(), UniqueKey: d.UniqueKey, Readers: d.Readers, OwnerAgeConfirmed: d.OwnerAgeConfirmed, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 	for k, v := range d.MarkCounts {
 		if rec.MarkCounts == nil {
 			rec.MarkCounts = map[string]int{}
@@ -259,7 +269,7 @@ func (f *Firestore) EnsureApp(ctx context.Context, uid, appID string, initial js
 		if err != nil {
 			return err
 		}
-		now := time.Now().UTC()
+		now := Now()
 		d := appDoc{Name: name, CurrentVersion: 1, Status: "active", CreatedAt: now, UpdatedAt: now, DSL: m, DSLJSON: string(initial)}
 		if err := tx.Create(ref, d); err != nil {
 			return err
@@ -282,7 +292,7 @@ func (f *Firestore) EnsureApp(ctx context.Context, uid, appID string, initial js
 // UpdateAppMeta implements Store.
 func (f *Firestore) UpdateAppMeta(ctx context.Context, uid, appID string, name, status *string) (*App, error) {
 	ref := f.appRef(uid, appID)
-	updates := []firestore.Update{{Path: "updatedAt", Value: time.Now().UTC()}}
+	updates := []firestore.Update{{Path: "updatedAt", Value: Now()}}
 	if name != nil {
 		updates = append(updates, firestore.Update{Path: "name", Value: *name})
 	}
@@ -325,6 +335,21 @@ func (f *Firestore) ReorderApps(ctx context.Context, uid string, ids []string) e
 	})
 }
 
+// SetAppGlance implements Store.
+func (f *Firestore) SetAppGlance(ctx context.Context, uid, appID, glance string) (*App, error) {
+	var v any = glance
+	if glance == "" {
+		v = firestore.Delete
+	}
+	if _, err := f.appRef(uid, appID).Update(ctx, []firestore.Update{{Path: "glanceStat", Value: v}}); err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return f.GetApp(ctx, uid, appID)
+}
+
 // CommitVersion implements Store.
 func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Commit) (*Version, error) {
 	ref := f.appRef(uid, appID)
@@ -350,7 +375,20 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		if err != nil {
 			return err
 		}
-		now := time.Now().UTC()
+		now := Now()
+		// reads first (a transaction cannot read after writing)
+		guard := c.HeldLimit > 0 && cur <= HeldVersion
+		if guard {
+			if err := f.checkHeld(ctx, tx, uid, c.HeldLimit); err != nil {
+				return err
+			}
+		}
+		var pubWrite func() error
+		if c.Publish != nil {
+			if pubWrite, err = f.publishOnCommit(tx, uid, appID, c, m, n, now); err != nil {
+				return err
+			}
+		}
 		upd := []firestore.Update{
 			{Path: "currentVersion", Value: n},
 			{Path: "dsl", Value: m},
@@ -362,6 +400,11 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		}
 		if err := tx.Update(ref, upd); err != nil {
 			return err
+		}
+		if guard { // the lock: concurrent guarded commits of uid conflict here and retry
+			if err := tx.Set(f.userRef(uid), map[string]any{"heldAppsAt": now}, firestore.MergeAll); err != nil {
+				return err
+			}
 		}
 		vd := versionDoc{Version: int64(n), ParentVersion: int64(cur), DSLJSON: string(c.DSL), CreatedAt: now}
 		if len(c.Patch) > 0 {
@@ -377,6 +420,20 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		if err := tx.Create(ref.Collection("versions").Doc(VersionDocID(n)), vd); err != nil {
 			return err
 		}
+		events, err := commitEvents(c, n, now)
+		if err != nil {
+			return err
+		}
+		for i := range events {
+			if err := tx.Create(f.outboxCol(events[i].Env).Doc(events[i].EventID), toOutboxDoc(&events[i])); err != nil {
+				return err
+			}
+		}
+		if pubWrite != nil {
+			if err := pubWrite(); err != nil {
+				return err
+			}
+		}
 		out = &Version{AppID: appID, Version: n, ParentVersion: cur, DSL: c.DSL, Patch: c.Patch, Source: c.Source, CreatedAt: now}
 		return nil
 	})
@@ -384,6 +441,24 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		return nil, err
 	}
 	return out, nil
+}
+
+// checkHeld reads users/{uid} (the lock CommitVersion then writes) and
+// counts uid's held apps in tx; *HeldLimitError at limit. The app being
+// committed is still at version 1, so it is not in the count.
+func (f *Firestore) checkHeld(ctx context.Context, tx *firestore.Transaction, uid string, limit int) error {
+	if _, err := tx.Get(f.userRef(uid)); err != nil && !isNotFound(err) {
+		return err
+	}
+	q := f.heldApps(uid)
+	held, err := countAgg(ctx, q.NewAggregationQuery().Transaction(tx))
+	if err != nil {
+		return err
+	}
+	if held >= limit {
+		return &HeldLimitError{Held: held, Limit: limit}
+	}
+	return nil
 }
 
 // ListVersions implements Store.
@@ -449,7 +524,7 @@ func (f *Firestore) PublishApp(ctx context.Context, uid, appID string, raw json.
 	published := false
 	err = f.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		published = false
-		now := time.Now().UTC()
+		now := Now()
 		snap, err := tx.Get(ref)
 		if err == nil {
 			var d publicAppDoc
@@ -475,6 +550,62 @@ func (f *Firestore) PublishApp(ctx context.Context, uid, appID string, raw json.
 		return false, err
 	}
 	return published, nil
+}
+
+// publishOnCommit reads app_owners and apps_public inside CommitVersion's
+// transaction and returns the writes to make (nil: none). See CommitPublish.
+func (f *Firestore) publishOnCommit(tx *firestore.Transaction, uid, appID string, c Commit, m map[string]any, version int, now time.Time) (func() error, error) {
+	ownerRef, pubRef := f.ownerRef(appID), f.publicRef(appID)
+	owner, claim := "", false
+	snap, err := tx.Get(ownerRef)
+	switch {
+	case err == nil:
+		var d ownerDoc
+		if err := snap.DataTo(&d); err != nil {
+			return nil, err
+		}
+		owner = d.UID
+	case !isNotFound(err):
+		return nil, err
+	case c.Publish.Claim:
+		owner, claim = uid, true
+	}
+	mirror, mirrorOwner := false, ""
+	snap, err = tx.Get(pubRef)
+	switch {
+	case err == nil:
+		var d publicAppDoc
+		if err := snap.DataTo(&d); err != nil {
+			return nil, err
+		}
+		mirror, mirrorOwner = true, d.OwnerUID
+	case !isNotFound(err):
+		return nil, err
+	}
+	action := decidePublish(c.Publish, uid, owner, mirrorOwner, mirror)
+	if !claim && action == publishNone {
+		return nil, nil
+	}
+	return func() error {
+		if claim {
+			if err := tx.Create(ownerRef, ownerDoc{UID: uid, CreatedAt: now}); err != nil {
+				return err
+			}
+		}
+		switch action {
+		case publishCreate:
+			return tx.Create(pubRef, publicAppDoc{OwnerUID: uid, Name: c.Name, Version: int64(version), DSL: m, DSLJSON: string(c.DSL), CreatedAt: now, UpdatedAt: now})
+		case publishUpdate:
+			upd := []firestore.Update{
+				{Path: "version", Value: version}, {Path: "dsl", Value: m}, {Path: "dslJson", Value: string(c.DSL)}, {Path: "updatedAt", Value: now},
+			}
+			if c.Name != "" {
+				upd = append(upd, firestore.Update{Path: "name", Value: c.Name})
+			}
+			return tx.Update(pubRef, upd)
+		}
+		return nil
+	}, nil
 }
 
 // GetPublicApp implements Store.
@@ -555,8 +686,9 @@ func (f *Firestore) CreateRecord(ctx context.Context, rs RecordSet, rec Record) 
 		if !isNotFound(err) {
 			return err
 		}
-		now := time.Now().UTC()
-		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, CreatedAt: now, UpdatedAt: now}
+		// Firestore keeps microseconds: return what a later read returns
+		now := Now()
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, OwnerAgeConfirmed: rec.OwnerAgeConfirmed, Origin: toOriginDoc(rec.Origin), CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}
@@ -575,7 +707,7 @@ func (f *Firestore) UpdateRecord(ctx context.Context, rs RecordSet, id string, d
 	ref := f.recRef(rs, id)
 	_, err := ref.Update(ctx, []firestore.Update{
 		{Path: "data", Value: data},
-		{Path: "updatedAt", Value: time.Now().UTC()},
+		{Path: "updatedAt", Value: Now()},
 	})
 	if isNotFound(err) {
 		return nil, ErrNotFound
@@ -592,11 +724,7 @@ func (f *Firestore) DeleteRecord(ctx context.Context, rs RecordSet, id string) e
 	if err := f.deleteMarks(ctx, ref); err != nil {
 		return err
 	}
-	_, err := ref.Delete(ctx, firestore.Exists)
-	if isNotFound(err) {
-		return ErrNotFound
-	}
-	return err
+	return f.deleteRecordAndClaim(ctx, rs, id) // #273: with its unique lock
 }
 
 // deleteAllChunk bounds the deletes sent in one BulkWriter run (Firestore
@@ -618,6 +746,19 @@ func (f *Firestore) DeleteAllRecords(ctx context.Context, rs RecordSet) error {
 			err = f.bulkDelete(ctx, refs)
 			refs = refs[:0]
 		}
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	// #273: the entity.unique locks of the records
+	err = eachRef(f.uniqueCol(rs).DocumentRefs(ctx), func(ref *firestore.DocumentRef) error {
+		refs = append(refs, ref)
+		if len(refs) < deleteAllChunk {
+			return nil
+		}
+		err := f.bulkDelete(ctx, refs)
+		refs = refs[:0]
 		return err
 	})
 	if err != nil {

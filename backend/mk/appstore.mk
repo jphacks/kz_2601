@@ -5,6 +5,6 @@
 # 本番は Cloud Run Job(docs/infra/app-store-notifications.md)。ローカルから stg/prod に向けない。
 APPSTORE_RECONCILE_FLAGS ?= -dry-run
 .PHONY: run-appstore-reconcile
-run-appstore-reconcile:
+run-appstore-reconcile: ## App Store の Pro 照合をエミュレータに対して試す(既定は -dry-run)
 	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 \
 	go run ./cmd/appstore-reconcile $(APPSTORE_RECONCILE_FLAGS)

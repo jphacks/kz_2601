@@ -1,0 +1,10 @@
+[
+ {"timestamp": "2026-10-20T01:00:00Z", "jsonPayload": {"event": "http.request", "requestId": "r-mac", "clientPlatform": "macos"}},
+ {"timestamp": "2026-10-20T01:00:01Z", "jsonPayload": {"event": "ai.generate", "requestId": "r-mac", "uid_hash": "aaaaaaaaaaaaaaaa", "mode": "create", "outcome": "validated"}},
+ {"timestamp": "2026-10-20T02:00:00Z", "jsonPayload": {"event": "ai.generate", "clientPlatform": "windows", "uid_hash": "bbbbbbbbbbbbbbbb", "mode": "create", "outcome": "failed"}},
+ {"timestamp": "2026-10-20T03:00:00Z", "jsonPayload": {"event": "ai.generate", "clientPlatform": "windows", "uid_hash": "bbbbbbbbbbbbbbbb", "mode": "edit", "outcome": "validated"}},
+ {"timestamp": "2026-10-20T04:00:00Z", "jsonPayload": {"event": "ai.generate", "clientPlatform": "Linux", "uid_hash": "cccccccccccccccc", "mode": "create", "outcome": "refused"}},
+ {"timestamp": "2026-10-20T05:00:00Z", "jsonPayload": {"event": "ai.generate", "clientPlatform": "beos", "uid_hash": "cccccccccccccccc", "mode": "create", "outcome": "validated"}},
+ {"timestamp": "2026-10-20T06:00:00Z", "jsonPayload": {"event": "ai.generate", "uid_hash": "cccccccccccccccc", "mode": "create", "outcome": "validated"}},
+ {"timestamp": "2026-10-20T07:00:00Z", "jsonPayload": {"event": "ai.generate", "clientPlatform": "ios", "uid_hash": "cccccccccccccccc", "mode": "create", "outcome": "bad_request"}}
+]

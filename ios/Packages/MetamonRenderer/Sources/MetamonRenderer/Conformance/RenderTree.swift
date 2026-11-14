@@ -113,7 +113,7 @@ public struct RenderTree {
     /// `if let form = ctx.form, let field = c.field` で描き、無ければ `NeedsForm` を出す Leaf。
     static let formBound: Set<ComponentType> = [
         .textField, .numberField, .picker, .toggle, .datePicker, .slider, .stepper, .textEditor, .secureField, .timePicker,
-        .rating, .colorPicker, .photoField, .videoField, .audioRecorder, .locationPicker, .locationButton, .qrScanner,
+        .rating, .colorPicker, .photoField, .drawingField, .videoField, .audioRecorder, .transcribeField, .locationPicker, .locationButton, .qrScanner,
     ]
 
     /// ラベルを `c.label ?? field.name` で補う入力(`InputRow`)。他の入力(`LabeledInput`)は `c.label` だけ。
@@ -226,7 +226,10 @@ public struct RenderTree {
             return ["buckets": .array(ChartLeaf.buckets(c, rt: rt).map { .object(["label": .string($0.label), "value": .number($0.value)]) })]
         case .progressBar:
             let raw = ProgressBarLeaf.ratio(c, rt: rt)
-            return ["ratio": .number(raw), "percent": .string(ProgressBarLeaf.percentText(raw: raw, tone: c.tone))]
+            let percent = ProgressBarLeaf.missingTarget(c, rt: rt) ? EmptyPlaceholder.unavailableValue : ProgressBarLeaf.percentText(raw: raw, tone: c.tone)
+            var p: [String: JSONValue] = ["ratio": .number(raw), "percent": .string(percent)]
+            if c.targetExpr != nil, let t = ProgressBarLeaf.target(c, rt: rt) { p["target"] = .number(t) }
+            return p
         case .gauge:
             let (value, unit) = GaugeLeaf.value(c, rt: rt)
             var p: [String: JSONValue] = ["value": .number(value)]
@@ -260,9 +263,43 @@ public struct RenderTree {
             let progress = FlashcardDeck().progress(in: cards)
             p["progress"] = .string("\(progress.position) / \(progress.total)")
             return p
+        case .bracket:
+            // 回戦ごとの試合(枠の上 a・下 b・勝者 winner・不戦勝 bye)と優勝
+            let draw = BracketLeaf.draw(c, rt: rt, pending: [:])
+            let entity = rt.dsl.entity(c.entity ?? "")
+            let entrant = { (r: Record?) -> JSONValue in
+                guard let r else { return .null }
+                let f = c.titleField ?? ""
+                return .object(["recordId": .string(r.id), "title": .string(rt.display(r[f], field: entity?.field(f)))])
+            }
+            let rounds: [JSONValue] = draw.rounds.enumerated().map { i, matches in
+                .object(["title": .string(BracketLeaf.roundTitle(i + 1, of: draw.rounds.count)), "matches": .array(matches.map { m in
+                    var o: [String: JSONValue] = ["a": entrant(m.a), "b": entrant(m.b), "winner": m.winner.map { .string($0.rawValue) } ?? .null]
+                    if m.bye { o["bye"] = .bool(true) }
+                    return .object(o)
+                })])
+            }
+            return ["rounds": .array(rounds), "champion": entrant(draw.champion)]
         case .image:
             let value = c.field.flatMap { ctx.form?.values[$0] } ?? .null
             return ["hasImage": .bool(!value.isNull)]
+        case .aiChat:
+            // DSL の値と会話の並び(AiChatLeaf と同じ: 自分の記録だけ・古い順・roleField が無ければ交互)。返事は AI 次第なので入れない
+            var p: [String: JSONValue] = [:]
+            if let v = c.textField { p["textField"] = .string(v) }
+            if let v = c.roleField { p["roleField"] = .string(v) }
+            if let v = c.chatSaveTo { p["saveTo"] = .object(["entity": .string(v.entity)]) }
+            if let v = c.inputEntity { p["inputEntity"] = .string(v) }
+            if let entityId = c.entity, let textField = c.textField {
+                let turns = rt.dsl.entity(entityId).map { entity in
+                    AIChat.turns(AIChat.own(rt.viewRecords(for: entity.id), uid: rt.currentUserId, shared: entity.isShared),
+                                 textField: textField, roleField: c.roleField)
+                } ?? []
+                p["turns"] = .array(turns.map {
+                    .object(["recordId": .string($0.id), "role": .string($0.role.rawValue), "text": .string($0.text)])
+                })
+            }
+            return p
         default:
             return [:]
         }

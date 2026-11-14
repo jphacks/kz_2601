@@ -4,7 +4,7 @@ import MetamonServices
 import MetamonRenderer
 @testable import Metamon
 
-/// #414: 有料機能(共有の記録)を使う全経路で、Pro でなければ課金画面を通る。AppRuntime + モック AI + モックのストアで確かめる。
+/// #414: 有料機能(共有の記録)を使う全経路で、Pro でなければ課金画面を通る(チャットの確認カードは「Pro にする」を押した時・H4)。AppRuntime + モック AI + モックのストアで確かめる。
 /// モック ai の「掲示板」は誰でも見られる(scope public)ひとこと投稿を返す。無料版・「自分だけ」の指示なら家計簿(private)。
 @MainActor
 final class PaidGateFlowTests: XCTestCase {
@@ -64,18 +64,32 @@ final class PaidGateFlowTests: XCTestCase {
 
     // MARK: - チャットの「これでいく」
 
-    /// 確認カードと一緒に課金画面(chat)→ 購入 → 有料機能込みの文で生成 → 共有の掲示板
-    func testChatPaywallPurchaseBuildsWithPaidFeature() async throws {
+    /// 確認カードだけを出し、課金画面は自動で開かない(H4・オーナーの決定 U3)
+    func testChatPaidCardDoesNotOpenPaywallAutomatically() async throws {
+        let (rt, spy) = try makeRuntime(clarify: true)
+        await rt.submitUtterance(sharedRequest)
+        await rt.buildFromChat()
+        XCTAssertNotNil(rt.paidConfirm, "確認カードを出す")
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertNil(rt.proGate.paywall, "課金画面は「Pro にする」を押すまで開かない")
+        XCTAssertFalse(rt.paidConfirmBusy)
+        XCTAssertTrue(spy.sent.isEmpty, "カードの間は生成しない")
+    }
+
+    /// カードの「Pro にする」→ 課金画面(chat)→ 購入 → 有料機能込みの文で生成 → 共有の掲示板
+    func testChatProButtonOpensPaywallThenBuildsWithPaidFeature() async throws {
         let (rt, spy) = try makeRuntime(clarify: true)
         await rt.submitUtterance(sharedRequest)
         await rt.buildFromChat()
         XCTAssertNotNil(rt.paidConfirm)
+        let purchase = Task { await rt.purchaseAndBuild() }
         let request = try await waitForPaywall(rt)
         XCTAssertEqual(request.placement, .chat)
         XCTAssertEqual(request.reason, .paidFeature([MockAIClient.sharedDataFeature]))
         XCTAssertTrue(spy.sent.isEmpty, "課金画面の間は生成しない")
 
         try await buy(rt)
+        await purchase.value
         try await waitUntil { !rt.dsl.isVoiceOnly }
         XCTAssertEqual(spy.sent, [sharedRequest], "有料機能込みの文で作る")
         XCTAssertTrue(PaidGate.usesSharedData(rt.dsl))
@@ -87,14 +101,15 @@ final class PaidGateFlowTests: XCTestCase {
         let (rt, spy) = try makeRuntime(clarify: true)
         await rt.submitUtterance(sharedRequest)
         await rt.buildFromChat()
+        let first = Task { await rt.purchaseAndBuild() }
         _ = try await waitForPaywall(rt)
         rt.proGate.finishPaywall()
-        try await Task.sleep(for: .milliseconds(200))
+        await first.value
         XCTAssertNotNil(rt.paidConfirm, "カードに戻る")
         XCTAssertFalse(rt.paidConfirmBusy)
         XCTAssertTrue(spy.sent.isEmpty, "閉じただけでは作らない")
 
-        // カードの「購入して作る」でもう一度課金画面
+        // カードの「Pro にする」でもう一度課金画面
         let again = Task { await rt.purchaseAndBuild() }
         _ = try await waitForPaywall(rt)
         rt.dismissPaidConfirm() // やめる = 課金画面ごと閉じる
@@ -186,16 +201,16 @@ final class PaidGateFlowTests: XCTestCase {
     func testRequestProReturnsImmediatelyForPro() async throws {
         let (rt, _) = try makeRuntime(clarify: false)
         _ = try await rt.proGate.store.purchaseOffer()
-        let pro = await rt.proGate.requestPro(.join(appName: "家族の買い物"))
+        let pro = await rt.proGate.requestPro(.settings)
         XCTAssertTrue(pro)
         XCTAssertNil(rt.proGate.paywall)
     }
 
     func testRequestProWaitsUntilClosed() async throws {
         let (rt, _) = try makeRuntime(clarify: false)
-        let wait = Task { await rt.proGate.requestPro(.join(appName: "家族の買い物")) }
+        let wait = Task { await rt.proGate.requestPro(.settings) }
         let request = try await waitForPaywall(rt)
-        XCTAssertEqual(request.reason, .join(appName: "家族の買い物"))
+        XCTAssertEqual(request.reason, .settings)
         rt.proGate.dismissPaywall(placement: .chat)
         XCTAssertNotNil(rt.proGate.paywall, "別の場所の課金画面は閉じない")
         rt.proGate.dismissPaywall(placement: .root)

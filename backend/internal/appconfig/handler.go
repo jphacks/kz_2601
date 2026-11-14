@@ -17,7 +17,14 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/books"
+	"github.com/jphacks/kz_2601/backend/internal/calls"
+	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/loop"
+	"github.com/jphacks/kz_2601/backend/internal/moderation/textfilter"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
+	"github.com/jphacks/kz_2601/backend/internal/plan"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -44,6 +51,33 @@ type Handler struct {
 	legacyBefore time.Time // LegacyMembersEnv: set by members.go
 
 	feedbackPerDay int // FEEDBACK_DAILY_LIMIT: set by feedback.go
+
+	planLimits *plan.Table   // apps / records / photos per plan (plan_limits.go, #317); nil = not checked
+	slots      AppSlotSource // coin-bought app slots (app_slots.go, #630); nil = none
+
+	usage *usageState // GET /v1/me/usage and /apps/{appId}/usage (usage.go); nil = no AI units
+
+	outbox   outboxConfig // RUNNER_OUTBOX / APP_ENV: set by outbox.go (#341)
+	activity activity     // lastOpenedAt written today (activity.go, #342)
+
+	runnerEnv string // runner/{env} the automations view reads (automations.go, #347)
+
+	pro       paid.ProChecker // Pro features (pro_gate.go, #316); nil = not enforced
+	proMode   paid.Mode       // PRO_GATE_MODE; "" = enforce
+	feeds     *feeds.Service  // external feeds (feeds.go, #348); nil = from env
+	feedUsers *feedLimiter
+	books     *books.Service // ISBN lookup (books.go); nil = from env
+	bookUsers *feedLimiter
+
+	textMode textfilter.Mode // TEXT_FILTER (textfilter.go, #321); "" = enforce
+
+	calls     *calls.Service // voice / video calls (calls.go, #447); nil = off
+	callUsers *feedLimiter
+
+	notices loop.NoticeReader // 「直りました」 (loop_notices.go, #374); nil = next to the store
+
+	ext      ExtRunner // the runner's external API door (ext.go, #1493); nil = 503 ext_unavailable
+	extUsers *feedLimiter
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own
@@ -55,8 +89,11 @@ func registerRoutes(f func(h *Handler, mux *http.ServeMux)) { routeGroups = appe
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
 // Core routes live here; feature routes come from routeGroups.
-func New(s store.Store) *http.ServeMux {
+func New(s store.Store, opts ...Option) *http.ServeMux {
 	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
+	for _, o := range opts {
+		o(h)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
@@ -76,6 +113,7 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}", h.getEntity)
 
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records", h.listRecords)
+	mux.HandleFunc("POST /v1/apps/{appId}/entities/{entityId}/records/query", h.queryRecords)
 	mux.HandleFunc("POST /v1/apps/{appId}/entities/{entityId}/records", h.createRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records", h.deleteAllRecords)
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
@@ -190,16 +228,21 @@ func requireIfMatch(r *http.Request) (int, error) {
 type paging struct{ size, offset int }
 
 func parsePaging(r *http.Request) (paging, error) {
+	return pagingFrom(r.URL.Query().Get("pageSize"), r.URL.Query().Get("pageToken"))
+}
+
+// pagingFrom reads pageSize / pageToken ("" = not sent) from a query or a body.
+func pagingFrom(size, token string) (paging, error) {
 	p := paging{size: defaultPage}
-	if s := r.URL.Query().Get("pageSize"); s != "" {
-		n, err := strconv.Atoi(s)
+	if size != "" {
+		n, err := strconv.Atoi(size)
 		if err != nil || n < 1 {
 			return p, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "pageSize must be a positive integer")
 		}
 		p.size = min(n, maxPage)
 	}
-	if t := r.URL.Query().Get("pageToken"); t != "" {
-		b, err := base64.RawURLEncoding.DecodeString(t)
+	if token != "" {
+		b, err := base64.RawURLEncoding.DecodeString(token)
 		n, err2 := strconv.Atoi(string(b))
 		if err != nil || err2 != nil || n < 0 {
 			return p, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid pageToken")
@@ -242,16 +285,34 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 	}
 	if pub != nil && !pub.Hidden { // #321: not from an app the operator unpublished
 		raw, name = pub.DSL, pub.Name
+	} else if err := h.checkAppLimit(r); err != nil { // #317: a new app of the caller's own
+		return nil, err
 	}
 	app, _, err := h.store.EnsureApp(ctx, uid, appID, raw, name)
 	return app, err
 }
 
-// publish mirrors a committed DSL to apps_public/{appId} when it has shared
-// entities, so other users opening the same appId get it from ensureApp.
-// Only the app's creator (app_owners) publishes; other copies stay private.
-// Failures are logged, not returned: the owner's private commit already
-// succeeded, and an appId first published by someone else is left alone.
+// commitPublish makes a commit to an existing app also update its mirror
+// (apps_public/{appId}) in the same transaction, so the creator's version and
+// the published one never drift apart: a commit that cannot publish fails as
+// a whole. Only the creator's commits publish (decided in the store from
+// app_owners); claim records the committer as the creator when none is known.
+// Legacy owners (catalog / mirror) are resolved into app_owners first.
+func (h *Handler) commitPublish(r *http.Request, appID string, app *dsl.App, claim bool) (*store.CommitPublish, error) {
+	if _, err := h.appOwner(r.Context(), appID); err != nil {
+		return nil, err
+	}
+	return &store.CommitPublish{Shared: app.HasSharedEntity(), Claim: claim}, nil
+}
+
+// publish mirrors the first DSL of a newly created appId (POST /apps,
+// duplicate) to apps_public/{appId} when it has shared entities, so other
+// users opening the same appId get it from ensureApp. Commits to an existing
+// app publish through commitPublish instead. Only the app's creator
+// (app_owners) publishes; other copies stay private. Failures are logged, not
+// returned: the app was already created, and without a mirror nothing of it
+// is shared yet (the next commit publishes). An appId first published by
+// someone else is left alone.
 func (h *Handler) publish(r *http.Request, appID string, app *dsl.App, raw json.RawMessage, version int) {
 	if !app.HasSharedEntity() {
 		return

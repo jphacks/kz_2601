@@ -1,0 +1,14 @@
+event: app
+data: {"name":"買い物","tabs":[],"attempt":0}
+
+event: component
+data: {"attempt":0,"screen":"home","component":{"index":0,"type":"text","label":"買うもの"}}
+
+event: restart
+data: {"attempt":1}
+
+event: component
+data: {"attempt":1,"screen":"home","component":{"index":0,"type":"button","label":"追加"}}
+
+event: result
+data: {"appId":"app1","version":2,"dsl":{"schemaVer

@@ -101,6 +101,15 @@ func (v Value) Text(loc *time.Location) string {
 	return ""
 }
 
+// RecordJSON is the value as stored in Record.data for a field (datetime =
+// the field is datetime). Server rules write it (#341).
+func (v Value) RecordJSON(datetime bool, loc *time.Location) any {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return v.recordJSON(datetime, loc)
+}
+
 // recordJSON is ExprValue.json(for:): the value as stored in Record.data.
 // Dates: datetime fields get RFC 3339 in UTC (ISO8601DateFormatter's default
 // zone), everything else "YYYY-MM-DD" in loc.

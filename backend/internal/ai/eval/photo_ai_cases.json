@@ -3,5 +3,10 @@
   {"id": "p_receipt_edit", "kind": "edit", "base": "example:kakeibo", "group": "photo-ai", "transcript": "レシートの写真から金額と日付を自動で入れられるようにして", "note": "#418 既存の家計簿の photoField に analyze を足す", "expect": {"patch": true, "photoAnalyze": ["amount", "date"]}},
   {"id": "p_form_check", "kind": "create", "group": "photo-ai", "transcript": "筋トレのフォームをチェック", "note": "#418 jointAngle(膝・腰など)", "expect": {"photo": true, "photoAnalyze": ["jointAngle"], "unreachable": 0}},
   {"id": "p_plant", "kind": "create", "group": "photo-ai", "transcript": "植物の写真を撮ったら、花・観葉植物・多肉植物のどれか自動で分けて記録したい", "note": "#418 classify into enum", "expect": {"photo": true, "photoAnalyze": ["classify"]}},
-  {"id": "p_business_card", "kind": "create", "group": "photo-ai", "transcript": "名刺を撮ったら書いてある文字をメモに入れて保存したい", "note": "#418 OCR text", "expect": {"photo": true, "photoAnalyze": ["text"]}}
+  {"id": "p_business_card", "kind": "create", "group": "photo-ai", "transcript": "名刺を撮ったら書いてある文字をメモに入れて保存したい", "note": "#418 OCR text", "expect": {"photo": true, "photoAnalyze": ["text"]}},
+  {"id": "p_flower_name", "kind": "create", "group": "photo-ai", "transcript": "散歩で見つけた花の写真を撮ったら、花の名前を自動で入れて図鑑みたいに残したい", "note": "#418 label(物・動植物の名前)", "expect": {"photo": true, "photoAnalyze": ["label"]}},
+  {"id": "p_fridge", "kind": "create", "group": "photo-ai", "transcript": "冷蔵庫の中を撮ったら写っている食材をメモに入れて記録したい", "note": "#418 labels(写っている物の名前を複数)", "expect": {"photo": true, "photoAnalyze": ["labels"]}},
+  {"id": "p_book_barcode", "kind": "create", "group": "photo-ai", "transcript": "本の裏のバーコードを撮ってISBNを読み取って蔵書を管理したい", "note": "#418 barcode(写真から読む・qrScanner と別)", "expect": {"photo": true, "photoAnalyze": ["barcode"]}},
+  {"id": "p_group_count", "kind": "create", "group": "photo-ai", "transcript": "イベントの集合写真を撮ったら写っている人数を数えて参加者数を記録したい", "note": "#418 peopleCount(顔の識別はしない)", "expect": {"photo": true, "photoAnalyze": ["peopleCount"]}},
+  {"id": "p_clothes_color", "kind": "create", "group": "photo-ai", "transcript": "持っている服を撮って、色を自動で入れてクローゼットを管理したい", "note": "#418 color(主な色)", "expect": {"photo": true, "photoAnalyze": ["color"]}}
 ]

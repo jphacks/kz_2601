@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -18,6 +19,7 @@ import (
 //	{"agg": "...", "entity": "...", "field"?, "by"?, "filter"?: Filter | [Filter]}
 //	{"op": "<name>", "args": [Expr, ...]}
 //	{"if": Expr, "then": Expr, "else": Expr}
+//	{"setting": "<fieldId>"}                     field of the single entity's one record (#267)
 //
 // iOS evaluates it; the backend only validates (names, arity, references,
 // row context, cycles, depth, coarse types).
@@ -31,6 +33,8 @@ type Expr struct {
 	If   *Expr
 	Then *Expr
 	Else *Expr
+	// Setting (Kind == ExprSetting, #267): a field id of a single entity.
+	Setting string
 }
 
 // ExprKind discriminates Expr.
@@ -42,6 +46,7 @@ const (
 	ExprAgg
 	ExprOp
 	ExprIf
+	ExprSetting
 )
 
 // AggExpr aggregates an entity's records. Filter is ANDed.
@@ -71,7 +76,7 @@ func (e *Expr) Number() (float64, bool) {
 	return f, ok
 }
 
-// UnmarshalJSON accepts the five shapes above and rejects anything else
+// UnmarshalJSON accepts the six shapes above and rejects anything else
 // (null, arrays, objects with unknown or mixed keys).
 func (e *Expr) UnmarshalJSON(b []byte) error {
 	b = bytes.TrimSpace(b)
@@ -174,6 +179,12 @@ func (e *Expr) UnmarshalJSON(b []byte) error {
 			e.Args = []Expr{}
 		}
 		return nil
+	case m["setting"] != nil:
+		if err := allow("setting"); err != nil {
+			return err
+		}
+		*e = Expr{Kind: ExprSetting}
+		return json.Unmarshal(m["setting"], &e.Setting)
 	case m["if"] != nil:
 		if err := allow("if", "then", "else"); err != nil {
 			return err
@@ -195,7 +206,7 @@ func (e *Expr) UnmarshalJSON(b []byte) error {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		return fmt.Errorf("expr: object with keys %v is not an expression (one of ref | agg | op | if)", keys)
+		return fmt.Errorf("expr: object with keys %v is not an expression (one of ref | agg | op | if | setting)", keys)
 	}
 }
 
@@ -212,6 +223,8 @@ func (e Expr) MarshalJSON() ([]byte, error) {
 		return json.Marshal(e.Lit)
 	case ExprRef:
 		return json.Marshal(map[string]string{"ref": e.Ref})
+	case ExprSetting:
+		return json.Marshal(map[string]string{"setting": e.Setting})
 	case ExprAgg:
 		if e.Agg == nil {
 			return nil, errors.New("expr: agg is nil")
@@ -281,10 +294,26 @@ const (
 	tBool
 	tDate
 	tList // type refs field: a list of record ids (only len reads it, #231)
+	// addMinutes results: tDatetime is a date with a time of day (usable as a
+	// date, shown with its time only by a datetime field); tTime is "HH:mm"
+	// (usable as a string, never as a date).
+	tDatetime
+	tTime
 )
 
 func (t exprType) String() string {
-	return [...]string{"any", "number", "string", "boolean", "date", "list of ids (type refs)"}[t]
+	return [...]string{"any", "number", "string", "boolean", "date", "list of ids (type refs)", "datetime", `"HH:mm" time`}[t]
+}
+
+// widen maps the addMinutes result types to the type they are used as.
+func widen(t exprType) exprType {
+	switch t {
+	case tDatetime:
+		return tDate
+	case tTime:
+		return tStr
+	}
+	return t
 }
 
 func fieldExprType(ft FieldType) exprType {
@@ -295,7 +324,7 @@ func fieldExprType(ft FieldType) exprType {
 		return tBool
 	case FieldDate, FieldDatetime:
 		return tDate
-	case FieldRefs:
+	case FieldRefs, FieldMembers:
 		return tList
 	default:
 		return tStr
@@ -303,7 +332,7 @@ func fieldExprType(ft FieldType) exprType {
 }
 
 // ComputedFieldTypes are the Field.type values a computed field may declare.
-var ComputedFieldTypes = []FieldType{FieldNumber, FieldInteger, FieldCurrency, FieldString, FieldBoolean, FieldDate}
+var ComputedFieldTypes = []FieldType{FieldNumber, FieldInteger, FieldCurrency, FieldString, FieldBoolean, FieldDate, FieldDatetime}
 
 // AggregateFuncs is the closed set of agg / aggregate names.
 var AggregateFuncs = []string{"count", "sum", "avg", "min", "max", "latest", "earliest"}
@@ -323,6 +352,21 @@ type opSpec struct {
 	result           exprType // tAny = depends on the args (coalesce)
 }
 
+// arityProblem says why n args do not fit op ("" = they do). Shared by the
+// app checker and ExprShapeProblems so the two cannot drift.
+func (s opSpec) arityProblem(op string, n int) string {
+	switch {
+	case s.maxArgs < 0 && n < s.minArgs:
+		return fmt.Sprintf("op %s needs at least %d args (got %d)", op, s.minArgs, n)
+	case s.maxArgs >= 0 && (n < s.minArgs || n > s.maxArgs):
+		if s.minArgs == s.maxArgs {
+			return fmt.Sprintf("op %s takes exactly %d args (got %d)", op, s.minArgs, n)
+		}
+		return fmt.Sprintf("op %s takes %d-%d args (got %d)", op, s.minArgs, s.maxArgs, n)
+	}
+	return ""
+}
+
 // Ops is the closed operator table (keep in sync with $defs/ExprOp.op enum
 // and docs/dsl/expressions.md). "date" args also accept strings.
 var Ops = map[string]opSpec{
@@ -335,7 +379,7 @@ var Ops = map[string]opSpec{
 	"and": {2, 2, tBool, tBool}, "or": {2, 2, tBool, tBool}, "not": {1, 1, tBool, tBool},
 	"concat": {2, 2, tAny, tStr}, "len": {1, 1, tStr, tNum},
 	"now": {0, 0, tAny, tDate}, "today": {0, 0, tAny, tDate},
-	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "hoursBetween": {2, 2, tAny, tNum},
+	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "addMinutes": {2, 2, tAny, tAny}, "hoursBetween": {2, 2, tAny, tNum},
 	"nextOccurrence": {2, 2, tAny, tDate}, "year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
 	"toNumber": {1, 1, tAny, tNum}, "toString": {1, 1, tAny, tStr}, "coalesce": {2, 2, tAny, tAny},
 	// daily check history (#172): arg 0 is {"ref": <resets daily toggle field>}
@@ -367,6 +411,15 @@ type exprChecker struct {
 	// daily (streak / doneInDays read their history). nil = not checked.
 	daily   map[string]map[string]bool
 	tooDeep bool
+	// server (#340): a server rule's expression (no agg / device history).
+	// prev is the entity whose "$prev.<field>" (value before an update) may
+	// be read; nil = not allowed.
+	server bool
+	prev   *Entity
+	// serverScope / serverReads (#340 reads): the side a server rule works
+	// on (agg may read only that side) and the entities its aggs list.
+	serverScope EntityScope
+	serverReads map[string]bool
 }
 
 func (c *exprChecker) dep(e *Entity, fid string) {
@@ -380,7 +433,8 @@ func (c *exprChecker) dep(e *Entity, fid string) {
 
 // accepts reports whether a value of type got can be used where want is expected.
 func accepts(want, got exprType) bool {
-	if want == tAny || got == tAny || want == got {
+	want = widen(want)
+	if want == tAny || got == tAny || want == widen(got) {
 		return true
 	}
 	return want == tDate && got == tStr // "YYYY-MM-DD" literals
@@ -417,6 +471,9 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		if e.Ref == "id" {
 			return tStr
 		}
+		if c.server && strings.HasPrefix(e.Ref, PrevPrefix) {
+			return c.checkPrev(where, e.Ref)
+		}
 		if strings.Contains(e.Ref, ".") {
 			return c.checkLookup(where, e.Ref, row)
 		}
@@ -428,30 +485,35 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		c.dep(row, f.ID)
 		return fieldExprType(f.Type)
 	case ExprAgg:
+		if c.server {
+			c.checkServerAgg(where, e.Agg)
+		}
 		return c.checkAgg(where, e.Agg, row, depth)
+	case ExprSetting:
+		if c.server {
+			c.add("%s: {\"setting\":%q} is not available in server rules (a setting is each user's own value, so the rule cannot tell whose to read)", where, e.Setting)
+			return tAny
+		}
+		return c.checkSetting(where, e.Setting)
 	case ExprOp:
 		spec, ok := Ops[e.Op]
 		if !ok {
 			c.add("%s: unknown op %q (allowed: %s)", where, e.Op, strings.Join(sortedOps(), " "))
 			return tAny
 		}
+		if c.server && (e.Op == "streak" || e.Op == "doneInDays") {
+			c.add("%s: op %s reads the device's check history and is not available in server rules", where, e.Op)
+		}
 		n := len(e.Args)
-		switch {
-		case spec.maxArgs < 0 && n < spec.minArgs:
-			c.add("%s: op %s needs at least %d args (got %d)", where, e.Op, spec.minArgs, n)
-		case spec.maxArgs >= 0 && (n < spec.minArgs || n > spec.maxArgs):
-			if spec.minArgs == spec.maxArgs {
-				c.add("%s: op %s takes exactly %d args (got %d)", where, e.Op, spec.minArgs, n)
-			} else {
-				c.add("%s: op %s takes %d-%d args (got %d)", where, e.Op, spec.minArgs, spec.maxArgs, n)
-			}
+		if msg := spec.arityProblem(e.Op, n); msg != "" {
+			c.add("%s: %s", where, msg)
 		}
 		types := make([]exprType, n)
 		for i := range e.Args {
 			aw := fmt.Sprintf("%s.%s.args[%d]", where, e.Op, i)
 			types[i] = c.check(aw, &e.Args[i], row, depth+1)
 			want := spec.arg
-			if e.Op == "addDays" || e.Op == "nextOccurrence" {
+			if e.Op == "addDays" || e.Op == "nextOccurrence" || e.Op == "addMinutes" {
 				want = tDate
 				if i == 1 {
 					want = tNum
@@ -465,6 +527,9 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 					c.add("%s: a type refs field is a list of ids; only op len (the number of chosen records) reads it. Filter another entity with op contains instead", aw)
 				}
 				continue
+			}
+			if e.Op == "addMinutes" && i == 0 && types[i] == tTime {
+				continue // a "HH:mm" from an inner addMinutes
 			}
 			if !accepts(want, types[i]) {
 				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], argHint(e.Op, want, types[i]))
@@ -489,6 +554,10 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 				if t != tAny {
 					return t
 				}
+			}
+		case "addMinutes":
+			if n > 0 {
+				return addMinutesType(e.Args[0], types[0])
 			}
 		}
 		return spec.result
@@ -526,6 +595,9 @@ func (c *exprChecker) checkAgg(where string, a *AggExpr, row *Entity, depth int)
 	if e == nil {
 		c.add("%s: entity %q does not exist (entities: %s)", where, a.Entity, entityIDs(c.entities))
 		return tNum
+	}
+	if e.Single {
+		c.add(`%s: entity %q is single (one record of settings); read its value with {"setting":"<fieldId>"} instead of agg`, where, e.ID)
 	}
 	result := tNum
 	if IsPickAgg(a.Agg) {
@@ -570,8 +642,8 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 		c.add(`%s: %q (marks, #255) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; marks are not records, so show the count with %q (table column / sort) instead of an agg`, where, f.Field, f.Field)
 		return
 	}
-	if f.Field == RecordAuthor || isMeValue(f.Value) {
-		c.add(`%s: %q / {"me":true} (only my posts) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; put it on the component (e.g. stat aggregate count with filter {"field":"$author","op":"eq","value":{"me":true}})`, where, RecordAuthor)
+	if f.Field == RecordAuthor || isMeValue(f.Value) || isMyFollowsValue(f.Value) {
+		c.add(`%s: %q / {"me":true} / {"myFollows":true} (only my posts / people I follow) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; put it on the component (e.g. stat aggregate count with filter {"field":"$author","op":"eq","value":{"me":true}})`, where, RecordAuthor)
 		return
 	}
 	if fld := e.FieldByID(f.Field); fld == nil {
@@ -608,12 +680,32 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 	}
 }
 
+// addMinutesType: a date / datetime (or a "YYYY-MM-DD…" literal) gives a
+// datetime, any other string a "HH:mm" time (what the evaluator returns).
+func addMinutesType(arg Expr, t exprType) exprType {
+	switch widen(t) {
+	case tDate:
+		return tDatetime
+	case tStr:
+		if s, ok := arg.Lit.(string); ok && arg.Kind == ExprLiteral && dateLitRe.MatchString(s) {
+			return tDatetime
+		}
+		return tTime
+	}
+	return tAny
+}
+
+var dateLitRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
+
 // argHint: subtracting times / dates is hoursBetween / daysBetween, never
 // toNumber ("09:30" is not 9.5 and a date is not a number). #229: the generic
 // toNumber hint led retries to {"op":"sub","args":[toNumber(end),toNumber(start)]}.
 func argHint(op string, want, got exprType) string {
-	if want == tNum && (got == tStr || got == tDate) && (op == "sub" || op == "add") {
+	if g := widen(got); want == tNum && (g == tStr || g == tDate) && (op == "sub" || op == "add") {
 		return ` (to get the hours between two "HH:mm" times or datetimes use {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}; days between dates use daysBetween; do not toNumber a time)`
+	}
+	if op == "addMinutes" && want == tDate {
+		return ` (pass a "HH:mm" time string or a date / datetime, e.g. departure = {"op":"addMinutes","args":[{"ref":"arrive_at"},{"op":"neg","args":[{"ref":"travel_min"}]}]})`
 	}
 	return convertHint(want)
 }
@@ -684,7 +776,7 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 				}
 			}
 			if !okType {
-				add("%s: computed field type must be one of number|integer|currency|string|boolean|date (got %s)", where, f.Type)
+				add("%s: computed field type must be one of number|integer|currency|string|boolean|date|datetime (got %s)", where, f.Type)
 			}
 			if f.Required {
 				add("%s: computed fields are read-only; remove required", where)
@@ -694,7 +786,9 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 			}
 			c := &exprChecker{entities: byID, add: add, deps: map[fieldKey]bool{}, daily: daily}
 			got := c.check(where+".computed", f.Computed, e, 1)
-			if okType && !accepts(fieldExprType(f.Type), got) {
+			if okType && got == tDatetime && (f.Type == FieldString || f.Type == FieldDate) {
+				add(`%s: computed expression yields a datetime (addMinutes of a date / datetime) but the field type is %s, which shows only the date; make it type datetime (for a time of day only, add minutes to a "HH:mm" string field instead)`, where, f.Type)
+			} else if okType && !accepts(fieldExprType(f.Type), got) {
 				add("%s: computed expression yields a %s but the field type is %s; change the type or convert%s", where, got, f.Type, convertHint(fieldExprType(f.Type)))
 			}
 			checkPayFromHours(where, f, add)

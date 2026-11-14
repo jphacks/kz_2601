@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scanning components (qrScanner, #866). -->
+<resources>
+    <string name="renderer_scan_qr">Scan QR code</string>
+    <string name="renderer_scan_unavailable">Not available on this device</string>
+    <string name="renderer_scan_manual">Enter the code manually</string>
+</resources>

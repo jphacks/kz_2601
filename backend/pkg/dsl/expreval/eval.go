@@ -52,10 +52,21 @@ type Row struct {
 	Record Record
 	// Draft marks a form draft (not saved): its computed values are not memoized.
 	Draft bool
+	// Prev is the record before an update (server rules, #340/#341):
+	// "$prev.<field>" reads its stored value. nil = no previous record.
+	Prev *Record
 }
 
 // MaxDepth bounds nesting plus computed chains (iOS ExprEvaluator.maxDepth).
 const MaxDepth = 48
+
+// MaxAddDays bounds addDays' day count (about 273 years; iOS
+// ExprEvaluator.maxAddDays). Beyond it addDays is nil.
+const MaxAddDays = 100_000
+
+// MaxAddMinutes bounds addMinutes' minute count (MaxAddDays days; iOS
+// ExprEvaluator.maxAddMinutes). Beyond it addMinutes is nil.
+const MaxAddMinutes = MaxAddDays * 1440
 
 // maxHistory is DailyCheck.maxHistory.
 const maxHistory = 400
@@ -77,6 +88,7 @@ type Evaluator struct {
 	views      map[string][]Record
 	inProgress map[string]bool
 	depth      int
+	singles    []*dsl.Entity // single entities in entity order (#267)
 }
 
 // New builds an Evaluator over env.
@@ -97,6 +109,9 @@ func New(env Env) *Evaluator {
 	for i := range env.Entities {
 		if _, dup := ev.entities[env.Entities[i].ID]; !dup {
 			ev.entities[env.Entities[i].ID] = &env.Entities[i]
+			if env.Entities[i].Single {
+				ev.singles = append(ev.singles, &env.Entities[i])
+			}
 		}
 	}
 	return ev
@@ -129,6 +144,8 @@ func (ev *Evaluator) Eval(e dsl.Expr, row *Row) Value {
 			return Value{}
 		}
 		return ev.aggregate(e.Agg, row)
+	case dsl.ExprSetting:
+		return ev.setting(e.Setting)
 	case dsl.ExprOp:
 		return ev.apply(e.Op, e.Args, row)
 	case dsl.ExprIf:
@@ -225,6 +242,9 @@ func (ev *Evaluator) FieldValue(id string, row *Row) Value {
 	if id == "id" {
 		return StringValue(row.Record.ID)
 	}
+	if fid, ok := strings.CutPrefix(id, dsl.PrevPrefix); ok && row.Prev != nil {
+		return ev.prevValue(fid, row)
+	}
 	if i := strings.IndexByte(id, '.'); i >= 0 {
 		return ev.lookup(id[:i], id[i+1:], row)
 	}
@@ -252,6 +272,16 @@ func (ev *Evaluator) FieldValue(id string, row *Row) Value {
 		ev.computed[key] = v
 	}
 	return v
+}
+
+// prevValue is "$prev.<field>": the stored value before the update. Only
+// stored fields of the row's entity (computed values are not stored).
+func (ev *Evaluator) prevValue(fid string, row *Row) Value {
+	f := field(row.Entity, fid)
+	if f == nil || f.Computed != nil || strings.HasPrefix(fid, "$") {
+		return Value{}
+	}
+	return ev.stored(get(*row.Prev, fid), f)
 }
 
 func (ev *Evaluator) lookup(refField, target string, row *Row) Value {
@@ -354,6 +384,39 @@ func (ev *Evaluator) resolve(fs []dsl.Filter, row *Row) ([]filter, bool) {
 	return out, true
 }
 
+// Matching returns the stored records of entity that pass every filter
+// (values evaluated in row), in listed order; nil when a filter value is
+// empty (it matches nothing). Server-rule pick reads it.
+func (ev *Evaluator) Matching(entity string, fs []dsl.Filter, row *Row) []Record {
+	resolved, ok := ev.resolve(fs, row)
+	if !ok {
+		return nil
+	}
+	base := ev.records(entity)
+	if len(resolved) == 0 {
+		return base
+	}
+	return ev.filtered(ev.entities[entity], base, resolved)
+}
+
+// filtered keeps the records of e that pass every resolved filter.
+func (ev *Evaluator) filtered(e *dsl.Entity, base []Record, resolved []filter) []Record {
+	var rows []Record
+	for _, r := range base {
+		ok := true
+		for _, f := range resolved {
+			if !ev.matches(f, r, field(e, f.Field)) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			rows = append(rows, r)
+		}
+	}
+	return rows
+}
+
 func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
 	resolved, ok := ev.resolve(a.Filter, row)
 	keyBytes, _ := json.Marshal(struct {
@@ -387,19 +450,7 @@ func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
 	if !ok {
 		rows = nil
 	} else if len(resolved) > 0 {
-		rows = nil
-		for _, r := range base {
-			ok := true
-			for _, f := range resolved {
-				if !ev.matches(f, r, field(e, f.Field)) {
-					ok = false
-					break
-				}
-			}
-			if ok {
-				rows = append(rows, r)
-			}
-		}
+		rows = ev.filtered(e, base, resolved)
 	}
 	var nums []float64
 	if a.Field != "" {

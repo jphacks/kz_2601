@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dashcam (dashcam, #872). Japanese is in values. -->
+<resources>
+    <string name="renderer_dashcam_auto_start_in">Recording starts in %1$d s</string>
+    <string name="renderer_dashcam_clips">Saved clips (%1$d)</string>
+    <string name="renderer_dashcam_clips_empty">No saved clips yet</string>
+    <string name="renderer_dashcam_clips_empty_detail">Footage around an impact, or around when you tap \"Save this moment\", is kept here</string>
+    <string name="renderer_dashcam_clips_title">Saved clips</string>
+    <string name="renderer_dashcam_close">Close</string>
+    <string name="renderer_dashcam_condition_charging">charging</string>
+    <string name="renderer_dashcam_condition_landscape">landscape</string>
+    <string name="renderer_dashcam_condition_separator">, </string>
+    <string name="renderer_dashcam_condition_still">almost still</string>
+    <string name="renderer_dashcam_delete">Delete</string>
+    <string name="renderer_dashcam_delete_clip">Delete the clip from %1$s</string>
+    <string name="renderer_dashcam_denied">Can\'t record without camera access</string>
+    <string name="renderer_dashcam_footnote">Records only while this screen is showing (it stops when you leave the app or the screen turns off). Keeps the last %1$d min and saves the footage around impacts.</string>
+    <string name="renderer_dashcam_footnote_auto">Recording starts automatically after 5 s of: %1$s.</string>
+    <string name="renderer_dashcam_full_device">Stopped recording because the device is low on space</string>
+    <string name="renderer_dashcam_full_saved">Stopped recording because saved clips reached the storage limit. Delete clips you don\'t need</string>
+    <string name="renderer_dashcam_gallery_failed">Couldn\'t save to the gallery</string>
+    <string name="renderer_dashcam_gallery_saved">Saved to the gallery</string>
+    <string name="renderer_dashcam_impact_saved">Saved the footage around %1$s</string>
+    <string name="renderer_dashcam_open_settings">Open settings</string>
+    <string name="renderer_dashcam_preview">Rear camera view</string>
+    <string name="renderer_dashcam_recording">Recording</string>
+    <string name="renderer_dashcam_save_now">Save this moment</string>
+    <string name="renderer_dashcam_save_to_gallery">Save to gallery</string>
+    <string name="renderer_dashcam_share">Share</string>
+    <string name="renderer_dashcam_start">Start recording</string>
+    <string name="renderer_dashcam_stop">Stop</string>
+    <string name="renderer_dashcam_stopped_in_background">Recording stopped because you left the screen. It records only while the screen is showing</string>
+    <string name="renderer_dashcam_title">Dashcam</string>
+    <string name="renderer_dashcam_unavailable">Can\'t record because no camera is available</string>
+</resources>

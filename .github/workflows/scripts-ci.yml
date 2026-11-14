@@ -1,4 +1,4 @@
-# シェルスクリプトと workflows の CI(#574)。shellcheck・scripts/ai-cost-test.sh・actionlint。
+# シェルスクリプトと workflows の CI(#574)。shellcheck・scripts/ai-cost-test.sh・actionlint・ライセンスの一覧の鮮度(#306)。
 # required check にはしていないので、workflow レベルの paths フィルタで対象を触った時だけ動かす。
 # shellcheck / actionlint は公式 Release からバージョン固定で取得する(runner 同梱版の更新で結果が変わらないように)。
 name: scripts-ci
@@ -6,10 +6,10 @@ name: scripts-ci
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ["**/*.sh", "scripts/**", ".github/workflows/**"]
+    paths: ["**/*.sh", "scripts/**", ".github/workflows/**", "ios/scripts/**", "**/Package.resolved", "ios/Metamon/Resources/ThirdPartyLicenses.json", "LICENSE", "docs/infra/runtime-config.md"]
   push:
     branches: [develop, main]
-    paths: ["**/*.sh", "scripts/**", ".github/workflows/**"]
+    paths: ["**/*.sh", "scripts/**", ".github/workflows/**", "ios/scripts/**", "**/Package.resolved", "ios/Metamon/Resources/ThirdPartyLicenses.json", "LICENSE", "docs/infra/runtime-config.md"]
 
 concurrency:
   group: scripts-ci-${{ github.event.pull_request.number || github.ref }}
@@ -32,15 +32,26 @@ jobs:
       - name: shellcheck を取得(バージョン固定)
         run: |
           set -euo pipefail
-          curl -fsSL \
-            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar xJ -C "$RUNNER_TEMP"
+          # GitHub の一時的な 5xx で落ちないよう再試行する。途中で切れた時に壊れた tar を作らないようファイルに落としてから展開
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          tar xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/shellcheck-v${SHELLCHECK_VERSION}" >>"$GITHUB_PATH"
       - name: shellcheck(追跡中の *.sh 全部)
         run: |
           set -euo pipefail
           shellcheck --version
           git ls-files -z '*.sh' | xargs -0 shellcheck
+
+  # deploy-cloudrun.yml の --update-env-vars と docs/infra/runtime-config.md の表が合っているか(#509)。
+  # デプロイの時にしか見ていなかったため、合わない PR がマージされて stg のデプロイが止まった(2026-11-07)。
+  deploy-env-check:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/check-deploy-env.sh
 
   ai-cost-test:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
@@ -49,6 +60,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: scripts/ai-cost-test.sh # jq は runner に同梱
+      - run: scripts/runner-usage-test.sh # runner.usage の集計(#345)
+      - run: scripts/demo-check-test.sh # demo-check の版・env 照合(偽の curl)
+      - run: scripts/setup-branch-protection-test.sh # ブランチの保護の --dry-run の JSON(偽の gh・送らない)
+      # 段階的なリリースの判定・巻き戻し・通知(#372・偽の gcloud)。模擬の巻き戻しを この run の summary / 注釈に出さないよう外す
+      - run: env -u GITHUB_STEP_SUMMARY -u GITHUB_ACTIONS scripts/rollout-test.sh
+
+  # アプリに同梱するライセンスの一覧(#306)。Package.resolved・LICENSE が変わったのに一覧が古いと落ちる。
+  # ubuntu にはパッケージのチェックアウトが無いので、依存(identity・版・revision)と LICENSE の照合だけ
+  licenses-check:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 ios/scripts/third-party-licenses.py --check
 
   actionlint:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
@@ -60,9 +86,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/actionlint"
-          curl -fsSL \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
-            | tar xz -C "$RUNNER_TEMP/actionlint"
+          # 上の取得と同じく 5xx を再試行し、ファイルに落としてから展開
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint"
           echo "$RUNNER_TEMP/actionlint" >>"$GITHUB_PATH"
       - name: actionlint(.github/workflows/*.yml)
         run: |

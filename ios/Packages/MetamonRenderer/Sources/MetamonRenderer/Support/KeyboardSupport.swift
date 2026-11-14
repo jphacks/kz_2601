@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// ソフトキーボードの表示状態(#143)。ホストはマイク FAB を隠すのに使う。
@@ -10,6 +14,7 @@ public final class KeyboardState {
     public private(set) var isVisible = false
 
     private init() {
+        #if os(iOS)
         let center = NotificationCenter.default
         center.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { [weak self] note in
             let height = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect)?.height ?? 0
@@ -18,12 +23,16 @@ public final class KeyboardState {
         center.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.isVisible = false }
         }
+        #endif
+        // Mac: ソフトキーボードが無いので常に false
     }
 
     /// iOS 26 のキーボードツールバー(「完了」)はキーボードの上に浮く Liquid Glass で、セーフエリアに入らない。
     /// 画面下の固定バーはその分だけ持ち上げる(数値キーパッドで「完了」が保存ボタンに重なっていた)。
     static var toolbarClearance: CGFloat {
-        if #available(iOS 26, *) { return 36 }
+        #if os(iOS)
+        if #available(iOS 26, macOS 26, *) { return 36 }
+        #endif
         return 0
     }
 
@@ -32,7 +41,7 @@ public final class KeyboardState {
 
     /// 今のファーストレスポンダを外してキーボードを閉じる(ツールバーの「完了」・入力欄外タップ)。
     public static func dismiss() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        PlatformSystem.resignFirstResponder()
     }
 }
 

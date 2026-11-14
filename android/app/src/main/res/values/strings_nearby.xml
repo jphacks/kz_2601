@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 近くの人に送る(nearbyShare・#1382)。iOS の Localizable.xcstrings と同じ文 -->
+<resources>
+    <string name="nearby_accept">受け取る</string>
+    <string name="nearby_anonymous">近くの人</string>
+    <string name="nearby_build_failed">送るデータを作れませんでした</string>
+    <string name="nearby_cannot_receive_now">今は受け取れません</string>
+    <string name="nearby_close">閉じる</string>
+    <string name="nearby_decline">受け取らない</string>
+    <string name="nearby_declined">%1$sさんが受け取りませんでした</string>
+    <string name="nearby_devices">近くの端末</string>
+    <string name="nearby_devices_footer">相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。</string>
+    <string name="nearby_disconnected">接続が切れました</string>
+    <string name="nearby_discovery_failed">近くの端末を探せませんでした(近くのデバイスの許可と Bluetooth を確認してください)</string>
+    <string name="nearby_hide_name">名前を出さない</string>
+    <string name="nearby_hide_name_footer">すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。</string>
+    <string name="nearby_incoming_body">受け取ると「%1$s」に追加します。</string>
+    <string name="nearby_ios_not_supported">iOS の端末とはつながりません(Android どうしで送り合えます)</string>
+    <string name="nearby_no_response">%1$sさんから応答がありませんでした</string>
+    <string name="nearby_not_received">%1$sさんが受け取れませんでした</string>
+    <string name="nearby_nothing_importable">追加できる項目がありませんでした</string>
+    <string name="nearby_nothing_importable_from">%1$sさんから届いた記録に、追加できる項目がありませんでした</string>
+    <string name="nearby_public_name">相手に見える名前</string>
+    <string name="nearby_searching">近くの Tailor It を探しています…</string>
+    <string name="nearby_send_failed">送信に失敗しました</string>
+    <string name="nearby_sending">%1$sさんに送っています…</string>
+    <string name="nearby_sheet_title">近くの人に送る</string>
+    <string name="nearby_unreadable">データを読み取れませんでした</string>
+    <string name="nearby_waiting">%1$sさんの承認を待っています…</string>
+    <string name="nearby_what">送るもの</string>
+    <plurals name="nearby_delivered">
+        <item quantity="other">%1$sさんに %2$d 件届きました</item>
+    </plurals>
+    <plurals name="nearby_imported">
+        <item quantity="other">%1$sさんから「%2$s」を %3$d 件追加しました</item>
+    </plurals>
+    <plurals name="nearby_incoming_title">
+        <item quantity="other">%1$sさんから「%2$s」が %3$d 件届きました</item>
+    </plurals>
+    <plurals name="nearby_what_records">
+        <item quantity="other">「%1$s」%2$d 件</item>
+    </plurals>
+</resources>

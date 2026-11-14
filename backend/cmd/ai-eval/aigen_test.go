@@ -39,4 +39,17 @@ func TestCheckAIGenerate(t *testing.T) {
 	if bad := validateExpect(map[string]any{"aiGenerate": "table"}); len(bad) != 1 {
 		t.Errorf("bad shape: %v", bad)
 	}
+	// aiTask: any aiButton (also inside a stack) with that task
+	if miss := checkAIGenerate(map[string]any{"aiTask": "summarize"}, plain); miss != nil {
+		t.Errorf("aiTask summarize: %v", miss)
+	}
+	if miss := checkAIGenerate(map[string]any{"aiTask": "generate"}, app); miss != nil {
+		t.Errorf("aiTask generate in a stack: %v", miss)
+	}
+	if miss := checkAIGenerate(map[string]any{"aiTask": "rewrite"}, plain); miss == nil {
+		t.Error("aiTask rewrite should miss")
+	}
+	if bad := validateExpect(map[string]any{"aiTask": "translate"}); len(bad) != 1 {
+		t.Errorf("bad task: %v", bad)
+	}
 }

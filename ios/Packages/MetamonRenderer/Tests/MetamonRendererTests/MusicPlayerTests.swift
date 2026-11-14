@@ -36,6 +36,9 @@ final class MusicPlayerTests: XCTestCase {
     }
 
     func testReceivePendingThenAcceptOrReject() async throws {
+        let savedLanguage = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
+        defer { LanguagePreference.shared.setting = savedLanguage }
         let (s, _) = session()
         let ack = await s.receive(FakeMusicPlayback.catalog[2], from: "花子", autoAccept: false)
         XCTAssertEqual(ack, .init(ok: true, added: 1))
@@ -68,6 +71,9 @@ final class MusicPlayerTests: XCTestCase {
     }
 
     func testFailedAcceptGoesBackToPending() async throws {
+        let savedLanguage = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
+        defer { LanguagePreference.shared.setting = savedLanguage }
         let (s, _) = session(strict: true)
         _ = await s.receive(MusicSong(title: "存在しない曲", artist: "誰か"), from: "花子", autoAccept: false)
         await s.accept(try XCTUnwrap(s.inbox.pending.first).id)
@@ -113,11 +119,11 @@ final class MusicPlayerTests: XCTestCase {
         let build = try XCTUnwrap(ComponentRegistry.standard.builder(for: "musicPlayer"))
         let view = build(c, RenderContext(route: Route(screen: "home")))
             .frame(width: 390, height: 600)
-        let host = UIHostingController(rootView: view)
+        let host = TestHostingController(rootView: view)
         host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 600)
-        host.view.layoutIfNeeded()
+        host.layoutNow()
         let size = host.sizeThatFits(in: CGSize(width: 390, height: 600))
         XCTAssertGreaterThan(size.height, 0)
-        XCTAssertNotNil(ImageRenderer(content: view).uiImage)
+        XCTAssertNotNil(ImageRenderer(content: view).platformImage)
     }
 }

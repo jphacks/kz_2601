@@ -66,6 +66,7 @@ final class DashcamLeafTests: XCTestCase {
         XCTAssertEqual(a.root.deletingLastPathComponent(), base)
     }
 
+    #if os(iOS) // Mac のドラレコは「使えません」の枠だけ(mac-037)
     func testFootnoteAlwaysSaysScreenMustStayOn() {
         LanguagePreference.shared.setting = .en
         XCTAssertTrue(DashcamLeaf.footnote(DashcamConfig()).contains("only while this screen is showing"), "英訳がある")
@@ -81,6 +82,7 @@ final class DashcamLeafTests: XCTestCase {
         XCTAssertNil(DashcamLeaf.conditionText([]))
         XCTAssertEqual(DashcamLeaf.clock(3725), "1:02:05")
     }
+    #endif
 
     /// 例の DSL から部品を描ける(レジストリに登録されている・落ちない)。
     @MainActor func testRendersFromExample() throws {
@@ -92,7 +94,7 @@ final class DashcamLeafTests: XCTestCase {
         let view = DashcamLeaf(c: comp, ctx: RenderContext(route: Route(screen: "home")))
             .frame(width: 390, height: 600)
         let renderer = ImageRenderer(content: view)
-        XCTAssertNotNil(renderer.uiImage)
+        XCTAssertNotNil(renderer.platformImage)
     }
 }
 

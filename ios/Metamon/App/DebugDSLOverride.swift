@@ -117,7 +117,7 @@ enum DummyRecords {
             return .string("video:dummy-\(i)")
         case .audio:
             return .string("audio:dummy-\(i)|\(30 + i * 7)")
-        case .photo, .location:
+        case .photo, .location, .member, .members:
             return nil
         }
     }

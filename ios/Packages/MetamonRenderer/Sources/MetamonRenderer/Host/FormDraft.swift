@@ -12,10 +12,24 @@ public final class FormDraft {
     /// 編集中レコードの投稿者 uid(public/shared entity のみ)。新規・private は nil。
     public private(set) var author: String?
     public var values: [String: JSONValue] = [:]
+    /// 保存で空のまま弾かれた必須の field id(M10)。
+    public internal(set) var flaggedFields: Set<String> = []
+    /// 保存で弾かれた回数。同じ欄でも押すたびにスクロールし直す。
+    public internal(set) var flagCount = 0
+    /// ホストが書き込んだ回数と、最後の結果(`markSaved`)。保存バーが「保存しました」を出すかの判定に使う(M10)。
+    public internal(set) var saveCount = 0
+    public internal(set) var lastSaveResult: FormSaveResult?
+    /// VoiceOver のフォーカスを移す field(M10)。
+    var attentionField: String?
     /// 他人の共有レコードを開いた(#249)。保存バーを理由の表示に替え、保存ボタンを隠す。
     public var isReadOnly = false
     /// 削除ボタンを出してよいか(共有レコードは作った人だけ)。
     public var canDelete = true
+
+    /// 開いた時(読み込み・保存の後)の値。`hasUnsavedChanges` の比較元(M10)
+    @ObservationIgnored var baseline: [String: JSONValue] = [:]
+    /// 最後の保存の前の `baseline`。サーバーが断った時に未保存へ戻す(`markSaveRefused`)
+    @ObservationIgnored var baselineBeforeSave: [String: JSONValue]?
 
     public init(entity: Entity, record: Record? = nil) {
         self.entity = entity
@@ -23,23 +37,40 @@ public final class FormDraft {
         if let record { load(record) }
     }
 
+    /// 今の値を「保存済み」とみなす(開いた時の初期値を入れた後・保存の後)。
+    public func markClean() {
+        baseline = normalized(values)
+    }
+
+    /// 開いてから入力を変えたか(M10: 閉じる前に破棄の確認を出す)。他人の記録(見るだけ)は false。
+    public var hasUnsavedChanges: Bool {
+        !isReadOnly && normalized(values) != baseline
+    }
+
+    /// 書き込みが要るか。既存レコードを何も変えずに保存したら送らない(「保存しました」も出さない・M10)。
+    public var needsWrite: Bool { !isEditing || hasUnsavedChanges }
+
     public var isEditing: Bool { recordId != nil }
 
     public func reset() {
         recordId = nil
         author = nil
+        flaggedFields = []
         values = [:]
         for f in entity.storedFields {
             values[f.id] = FieldCoding.defaultValue(for: f)
         }
+        markClean()
     }
 
     public func load(_ record: Record) {
         recordId = record.id
         author = record.author
+        flaggedFields = []
         for f in entity.storedFields {
             values[f.id] = record.data[f.id] ?? FieldCoding.defaultValue(for: f)
         }
+        markClean()
     }
 
     /// `Field.hidden`(#262)の入力を出してよいか(新規 / 自分が投稿したレコード)。
@@ -55,7 +86,9 @@ public final class FormDraft {
     }
 
     /// appconfig に送る `data`(Field.type に合わせて正規化・空は落とす)。
-    public var payload: [String: JSONValue] {
+    public var payload: [String: JSONValue] { normalized(values) }
+
+    private func normalized(_ values: [String: JSONValue]) -> [String: JSONValue] {
         var out: [String: JSONValue] = [:]
         // computed は保存しない(#101)
         for f in entity.storedFields {
@@ -66,7 +99,7 @@ public final class FormDraft {
 
     /// required 未入力のフィールド名。
     public var missingRequired: [String] {
-        entity.storedFields.filter { ($0.required ?? false) && FieldCoding.normalize(values[$0.id] ?? .null, for: $0) == nil }.map(\.name)
+        missingRequiredFields.map(\.name)
     }
 }
 

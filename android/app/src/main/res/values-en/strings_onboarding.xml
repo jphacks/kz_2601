@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First-run tutorial (#900). Copy follows iOS (FirstRunTutorial / TutorialView / Localizable.xcstrings). -->
+<resources>
+    <string name="onboarding_create_body">Tap the mic and say something like “I want a budget app.” You can also type it.</string>
+    <string name="onboarding_create_note">Even before voice setup finishes, you can start right away by typing.</string>
+    <string name="onboarding_create_title">Talk, and an app appears</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_page">%1$d / %2$d</string>
+    <string name="onboarding_replay">How to use</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_start">Get started</string>
+</resources>

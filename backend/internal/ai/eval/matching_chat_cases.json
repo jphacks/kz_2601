@@ -2,5 +2,7 @@
   {"id": "mc_dating", "group": "matching", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#507 恋愛・出会い目的はできない(理由と仲間探しの案)",
    "steps": [{"say": "恋人が探せるマッチングアプリって作れる?", "textAny": ["できません", "できない"], "textNot": ["entity", "match"]}]},
   {"id": "mc_hobby", "group": "matching", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#507 趣味の仲間探し(相互承認)はできる",
-   "steps": [{"say": "同じ趣味の人とお互いにOKしたらつながれるアプリは作れる?", "textNot": ["できません", "entity", "match"]}]}
+   "steps": [{"say": "同じ趣味の人とお互いにOKしたらつながれるアプリは作れる?", "textNot": ["できません", "entity", "match"]}]},
+  {"id": "mc_dating_en", "group": "matching", "mode": "create", "locale": "en", "capabilities": ["answer", "proposal"], "note": "#507 en でも恋愛・出会い目的はできない",
+   "steps": [{"say": "Can you make a dating app to find a girlfriend?", "textAny": ["can't", "can’t", "cannot", "not able"], "textNot": ["entity"]}]}
 ]

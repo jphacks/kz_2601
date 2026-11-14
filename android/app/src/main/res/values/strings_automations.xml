@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自動の動き(#905・iOS の AutomationsView) -->
+<resources>
+    <string name="automations_conflict">ほかの変更と重なったため切り替えませんでした。最新の状態を読み込み直しました。</string>
+    <string name="automations_empty">このアプリには自動の動きがありません。</string>
+    <string name="automations_fix">直しますか?</string>
+    <string name="automations_fix_request">自動の動き「%1$s」が続けてうまくいっていません。うまく動くように直して</string>
+    <string name="automations_last_run">最後に動いた: %1$s</string>
+    <string name="automations_load_failed">自動の動きを読み込めませんでした</string>
+    <string name="automations_loading">読み込み中</string>
+    <string name="automations_not_creator">自動の動きはアプリを作った人だけが見られます。</string>
+    <string name="automations_notify_paused">通知を一時的に止めています。自動の動きは動いています。</string>
+    <string name="automations_off">オフ</string>
+    <string name="automations_on">オン</string>
+    <string name="automations_quota">今日の実行</string>
+    <string name="automations_quota_footer">日本時間の 0 時に 0 に戻ります。</string>
+    <string name="automations_retry">再試行</string>
+    <string name="automations_stopped">運営がこのアプリの自動の動きを止めています。</string>
+    <string name="automations_toggle_failed">切り替えられませんでした。時間をおいてもう一度お試しください。</string>
+    <string name="automations_toggle_label">「%1$s」を動かす</string>
+    <string name="automations_until">%1$s に自動で解除されます。</string>
+</resources>

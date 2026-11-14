@@ -18,7 +18,7 @@ final class NearbyService: NSObject {
 
     struct Peer: Identifiable, Hashable {
         let id: MCPeerID
-        var name: String { id.displayName }
+        var name: String { NearbyLimits.displayName(id.displayName) } // 匿名の印は今の言語の「近くの人」に
     }
 
     enum SendState: Equatable {
@@ -51,7 +51,7 @@ final class NearbyService: NSObject {
     /// 招待時の取り込み判定(AppRuntime が設定・今開いているアプリで判定)。
     @ObservationIgnored var decide: (@MainActor (NearbyShare.Header) -> NearbyShare.Decision)?
 
-    @ObservationIgnored private let me: MCPeerID
+    @ObservationIgnored private var me: MCPeerID
     @ObservationIgnored private var session: MCSession
     @ObservationIgnored private var advertiser: MCNearbyServiceAdvertiser?
     @ObservationIgnored private var browser: MCNearbyServiceBrowser?
@@ -61,18 +61,39 @@ final class NearbyService: NSObject {
     @ObservationIgnored private var accepted: [MCPeerID: NearbyShare.Decision] = [:]
     @ObservationIgnored private var timeoutTask: Task<Void, Never>?
 
+    /// 相手に見える名前(MCPeerID と Header の送り主)。「名前を出さない」なら `NearbyLimits.anonymousName`。
+    private(set) var myName: String
+
+    /// `displayName` は相手に送る名前そのもの(匿名の判定は呼ぶ側・`AppRuntime.nearbyPublicName`)。
     init(displayName: String) {
-        // MCPeerID の displayName は UTF-8 で 63 バイトまで
-        var name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty { name = "Tailor It" }
-        while name.utf8.count > 63 { name.removeLast() }
+        let name = NearbyLimits.peerName(displayName, anonymous: false)
         me = MCPeerID(displayName: name)
+        myName = name
         session = MCSession(peer: me, securityIdentity: nil, encryptionPreference: .required)
         super.init()
         session.delegate = self
     }
 
-    var myName: String { me.displayName }
+    /// 相手に見える名前を変える(「名前を出さない」の切り替え)。MCPeerID は作り直すしかないので、
+    /// 待ち受け・相手探しを止め、送受信の途中なら打ち切ってから、新しい名前でやり直す。
+    func rename(_ displayName: String) {
+        let name = NearbyLimits.peerName(displayName, anonymous: false)
+        guard name != myName else { return }
+        let advertising = advertiser != nil
+        let browsing = browser != nil
+        setAdvertising(false)
+        if browsing { stopBrowsing() }
+        if sendState.isBusy { finishOutgoing(.idle) }
+        session.delegate = nil
+        session.disconnect()
+        accepted = [:]
+        me = MCPeerID(displayName: name)
+        myName = name
+        session = MCSession(peer: me, securityIdentity: nil, encryptionPreference: .required)
+        session.delegate = self
+        if advertising { setAdvertising(true) }
+        if browsing { startBrowsing() }
+    }
 
     // MARK: - 受信(advertise)
 
@@ -120,6 +141,7 @@ final class NearbyService: NSObject {
     func send(_ payload: NearbyShare.Payload, to peer: Peer) {
         guard !sendState.isBusy, let browser else { return }
         do {
+            let payload = payload.sent(as: myName) // 送り主は今の MCPeerID の名前に揃える
             let data = try NearbyShare.encode(payload)
             let context = try NearbyShare.encode(payload.header)
             outgoing = (peer.id, data)
@@ -129,10 +151,10 @@ final class NearbyService: NSObject {
             timeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(35))
                 guard let self, self.sendState.isBusy else { return }
-                self.finishOutgoing(.failed("\(peer.name)さんから応答がありませんでした"))
+                self.finishOutgoing(.failed(L10n.tr("\(peer.name)さんから応答がありませんでした")))
             }
         } catch {
-            sendState = .failed("送るデータを作れませんでした")
+            sendState = .failed(L10n.tr("送るデータを作れませんでした"))
         }
     }
 
@@ -147,37 +169,38 @@ final class NearbyService: NSObject {
 
     private func peerConnected(_ peer: MCPeerID) {
         guard let out = outgoing, out.peer == peer else { return }
-        sendState = .sending(peer.displayName)
+        sendState = .sending(NearbyLimits.displayName(peer.displayName))
         do {
             try session.send(out.data, toPeers: [peer], with: .reliable)
         } catch {
-            finishOutgoing(.failed("送信に失敗しました"))
+            finishOutgoing(.failed(L10n.tr("送信に失敗しました")))
         }
     }
 
     private func peerDisconnected(_ peer: MCPeerID) {
         accepted[peer] = nil
         if let out = outgoing, out.peer == peer, sendState.isBusy {
-            finishOutgoing(.failed(sendState == .inviting(peer.displayName)
-                ? "\(peer.displayName)さんが受け取りませんでした" : "接続が切れました"))
+            finishOutgoing(.failed(sendState == .inviting(NearbyLimits.displayName(peer.displayName))
+                ? L10n.tr("\(NearbyLimits.displayName(peer.displayName))さんが受け取りませんでした") : L10n.tr("接続が切れました")))
         }
     }
 
     private func received(_ data: Data, from peer: MCPeerID) async {
         // 送信側: Ack を受け取ったら完了
-        if let out = outgoing, out.peer == peer, let ack = try? NearbyShare.decode(NearbyShare.Ack.self, from: data) {
+        if let out = outgoing, out.peer == peer, let ack = NearbyShare.decodeAck(data) {
             finishOutgoing(ack.ok
-                ? .done("\(peer.displayName)さんに \(ack.added) 件届きました")
-                : .failed(ack.message ?? "\(peer.displayName)さんが受け取れませんでした"))
+                ? .done(L10n.tr("\(NearbyLimits.displayName(peer.displayName))さんに \(ack.added) 件届きました"))
+                : .failed(ack.message ?? L10n.tr("\(NearbyLimits.displayName(peer.displayName))さんが受け取れませんでした")))
             return
         }
         // 受信側: 承認した相手からの Payload だけ取り込む
         guard let decision = accepted.removeValue(forKey: peer) else { return }
         let ack: NearbyShare.Ack
-        if let payload = try? NearbyShare.decode(NearbyShare.Payload.self, from: data), let onReceive {
+        // 大きさ・名前・id の長さを読む前に確かめる(上限を超えたら取り込まない)
+        if let payload = NearbyShare.decodePayload(data), let onReceive {
             ack = await onReceive(payload, decision)
         } else {
-            ack = .init(ok: false, added: 0, message: "データを読み取れませんでした")
+            ack = .init(ok: false, added: 0, message: L10n.tr("データを読み取れませんでした"))
         }
         if let reply = try? NearbyShare.encode(ack) {
             try? session.send(reply, toPeers: [peer], with: .reliable)
@@ -190,11 +213,11 @@ final class NearbyService: NSObject {
 extension NearbyService: MCNearbyServiceAdvertiserDelegate {
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID,
                                 withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        let header = context.flatMap { try? NearbyShare.decode(NearbyShare.Header.self, from: $0) }
+        let header = context.flatMap(NearbyShare.decodeHeader)
         Task { @MainActor in
-            // Header が無い・読めない招待(Tailor It 以外 / 壊れたデータ)と、確認中の二重招待は黙って断る
+            // Header が無い・読めない・上限を超える招待(Tailor It 以外 / 壊れたデータ)と、確認中の二重招待は黙って断る
             guard let header, self.incoming == nil else { invitationHandler(false, nil); return }
-            let decision = self.decide?(header) ?? .reject(reason: "今は受け取れません")
+            let decision = self.decide?(header) ?? .reject(reason: L10n.tr("今は受け取れません"))
             // 曲のリクエスト(#412)は確認を出さずに受ける(承認は musicPlayer の一覧・autoAccept)。受けられないアプリなら黙って断る
             if header.song != nil {
                 guard case .accept = decision else { invitationHandler(false, nil); return }
@@ -224,7 +247,7 @@ extension NearbyService: MCNearbyServiceBrowserDelegate {
     }
 
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
-        Task { @MainActor in self.sendState = .failed("近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)") }
+        Task { @MainActor in self.sendState = .failed(L10n.tr("近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)")) }
     }
 }
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notice_a11y_info">Notice: %1$s</string>
+    <string name="notice_a11y_warning">Important notice: %1$s</string>
+    <string name="notice_dismiss">Dismiss notice</string>
+    <string name="notice_learn_more">Learn more</string>
+    <string name="update_later">Not now</string>
+    <string name="update_open_store">Open Google Play</string>
+    <string name="update_recommended_body">You can update to the latest version from Google Play.</string>
+    <string name="update_recommended_title">A new version is available</string>
+    <string name="update_required_body">This version of Tailor It is no longer supported. Please update to the latest version from Google Play.</string>
+    <string name="update_required_title">Please update</string>
+    <string name="update_update">Update</string>
+</resources>

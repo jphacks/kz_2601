@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定の「次の通知」(#1124・iOS の SettingsSheet の通知の節と同じ文言) -->
+<resources>
+    <string name="settings_upcoming_empty">予約中の通知はありません</string>
+    <string name="settings_upcoming_footer">アプリを閉じていても、この時刻に届きます。</string>
+    <string name="settings_upcoming_header">次の通知</string>
+    <string name="settings_upcoming_places">保存した場所 %1$d か所の近くに着いたら知らせます</string>
+    <string name="settings_upcoming_places_off">位置情報が許可されていないため、場所に着いた時の通知は届きません(タップで設定を開く)</string>
+</resources>

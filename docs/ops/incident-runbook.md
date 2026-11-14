@@ -11,6 +11,7 @@
 1. [重さの区分(SEV)](#1-重さの区分sev)
 2. [誰がいつ対応するか](#2-誰がいつ対応するか)
 3. [最初の 15 分](#3-最初の-15-分)
+   - [OS ごとに絞って見る](#os-ごとに絞って見る)
 4. [道具: アプリ内のお知らせ](#4-道具-アプリ内のお知らせ)
 5. [手順 A: Claude API の障害・上限](#5-手順-a-claude-api-の障害上限)
 6. [手順 B: 悪いデプロイを戻す](#6-手順-b-悪いデプロイを戻す)
@@ -20,6 +21,7 @@
 10. [振り返り(障害の記録)](#10-振り返り障害の記録)
 11. [stg での障害訓練(#333 の完了条件)](#11-stg-での障害訓練333-の完了条件)
 12. [知っておくべき落とし穴](#12-知っておくべき落とし穴)
+13. [手順 F: 悪用(自動の動き)](#13-手順-f-悪用自動の動き)
 
 ## 1. 重さの区分(SEV)
 
@@ -84,6 +86,37 @@
 - [ ] **8. 15 分ごとに状況をメモ**し、補助と共有する。
 
 **終わりの宣言**: 症状が消え、ログ・ダッシュボードが平常に戻ってから 30 分見る → お知らせを外す(または「復旧しました」に差し替えて翌日外す)→ SEV1・SEV2 は 2 日以内に振り返りを書く。
+
+### OS ごとに絞って見る
+
+特定の OS(ios・android・macos・windows・linux)だけで起きていそうな時の絞り込みです。ログの鍵は `backend/internal/httpx/client.go` の `ClientAttrs` が付ける `clientPlatform`(`clientVersion`・`clientBuild`・`clientDslVersion` も同じ所)。付く行・値の丸め方は [observability.md](../infra/observability.md#クライアントの属性)。
+
+- `clientPlatform` が付くのは `http.request`(アクセスログ)と `appcheck` の行。**`ai.usage` には付かない**ので、AI の失敗を OS で見る時は先に `http.request` で絞り、同じ `requestId` を `ai.usage` で引く。
+- ヘッダが無い・知らない値のリクエストは `other`。
+
+例(`ai-prod` で windows の 5xx。サービス名・OS を替えて使う):
+
+```sh
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="ai-prod" AND jsonPayload.event="http.request" AND jsonPayload.clientPlatform="windows" AND jsonPayload.status>=500' \
+  --project=jphacks-kz2601 --freshness=1h --limit=50 --format='value(timestamp,jsonPayload.path,jsonPayload.status,jsonPayload.clientVersion,jsonPayload.clientBuild,jsonPayload.requestId)'
+```
+
+```
+jsonPayload.event="http.request" AND jsonPayload.clientPlatform="linux" AND jsonPayload.status>=400
+jsonPayload.event="http.request" AND jsonPayload.clientPlatform="ios" AND jsonPayload.clientBuild="12"
+jsonPayload.event="http.request" AND jsonPayload.clientPlatform="other"
+jsonPayload.requestId="<上で見つけた requestId>"
+```
+
+どの OS・どの版に偏っているかは、`clientPlatform`・`clientBuild` ごとに件数を数えて比べる(上のコマンドの `--format` を `json` にして集計するか、Logs Explorer の「ログ分析」で `GROUP BY`)。
+
+**デスクトップ版と Mac 版を分ける**: Mac アプリとデスクトップ版を macOS で動かした時は、どちらも `clientPlatform="macos"` になる([client-platforms.md](../backend/client-platforms.md))。分けるのは `User-Agent`。デスクトップ版は `TailorIt-Desktop/<版> (<OS> <OS の版>; <arch>)` を付ける(`desktop/app/.../net/ClientPlatform.kt` の `desktopUserAgent`)。アプリの `jsonPayload` には User-Agent を出さないので、Cloud Run のリクエストログの `httpRequest.userAgent` で見る:
+
+```
+resource.type="cloud_run_revision" AND resource.labels.service_name="ai-prod" AND httpRequest.userAgent:"TailorIt-Desktop/"
+```
+
+見つけた行の `trace`(Cloud Run のリクエストログとアプリのログは同じ trace でまとまる)から、同じリクエストの `http.request` を引いて `clientPlatform` を確かめる。
 
 ## 4. 道具: アプリ内のお知らせ
 
@@ -301,3 +334,55 @@ SEV1。**原因の調査より先にキーを無効化する。**
 2. **デプロイと手で入れた env**: `deploy-cloudrun.yml` は(#513 から) `--update-env-vars` でデプロイが決める値だけを上書きし、手で足した `NOTICE_JSON`・`RATE_LIMIT_*`・`MIN_IOS_BUILD`・`LATEST_IOS_BUILD` は**残る**(消し忘れに注意)。どの値を運用で変えてよいか・変え方は [runtime-config.md](../infra/runtime-config.md)。障害中・強制アップデート中はデプロイ後に必ず確かめる。
 3. **stg と prod は同じ Firestore**(#288 で分けるまで): stg の訓練・調査でもデータを書き換えない。
 4. **キャッシュ**: `client-config` は 5 分キャッシュされる。お知らせ・強制アップデートは即時ではない。
+
+## 13. 手順 F: 悪用(自動の動き)
+
+自動の動き(サーバーのルール・#341)を使ったスパム・フィッシング・いやがらせの通知、または越境(他のアプリのデータが動いた・宛先でない人に届いた)の疑い。越境の疑いは SEV1、スパム・フィッシングは広がり方で SEV1〜2([決定 339](../decisions/339-abuse-threat-model.md#止めるスイッチ346))。
+
+runner はまだデプロイしていない。デプロイの後に使う手順。止めるスイッチ(#346)は 6 つあり、どれもデプロイ無しに次のきっかけから効く(止めている間のきっかけは実行せずに終わり、解いても後からまとめて実行しない):
+
+| スイッチ | 止める範囲 | 操作 |
+|---|---|---|
+| `RUNNER_PAUSED=1` | 環境の自動の動きを全部(`skipped_paused`) | runner のサービスの env |
+| `RUNNER_NOTIFY_PAUSED=1` | 環境の**通知だけ**(書き込みは動く) | runner のサービスの env |
+| 全体の停止 | `RUNNER_PAUSED` と同じ範囲(`skipped_stopped`・`stop_level=global`)。新しいリビジョンを待たずに効く | `moderate stop-all`(`-force` で下の書き込みの拒否も) |
+| アプリの停止 | 1 つのアプリ(`skipped_stopped`・`reason=operator_stop`・`stop_level=app`)。定期のルールも止まる。作成者は解けない。`-for 24h` で期限つきの一時停止、`-force` でルールのきっかけになる書き込みも 403 `app_stopped` で断る(強制停止) | `moderate stop-app` |
+| ルールの停止 | 1 つのルール(`stop_level=rule`) | `moderate stop-rule` |
+| アプリの通知の一時停止 | 1 つのアプリの通知だけ(期限つき) | `moderate pause-notify`(と、下の自動) |
+
+**自動の一時停止**: 1 つのアプリ(アプリそのもの・その中の投稿)を 24 時間で **3 人**(別々の人。同じ人の何回もの通報は 1 人)が通報すると、runner がそのアプリの通知を 72 時間止める(ログ `runner.stop`・`by=auto`)。止めるのは通知だけ。非公開化・削除・アカウントの無効化は人が決める。人数と長さは `RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS` / `_FOR`([runtime-config.md](../infra/runtime-config.md))。
+
+### 止める順(最初の 15 分)
+
+1. **通知だけを止める**。1 つのアプリなら `pause-notify`、どのアプリか分からない・広がっているなら `RUNNER_NOTIFY_PAUSED=1`。越境の疑い(SEV1)なら最初から `RUNNER_PAUSED=1`。
+
+   ```sh
+   cd backend
+   go run ./cmd/moderate pause-notify <appId> -env prod -reason "通知の内容を確認しています" -allow-prod-db        # 何をするか見る
+   go run ./cmd/moderate pause-notify <appId> -env prod -reason "通知の内容を確認しています" -allow-prod-db -yes   # 実行
+   ```
+
+   ```sh
+   gcloud run services update <runner のサービス> --region=asia-northeast1 --project=jphacks-kz2601 \
+     --update-env-vars=RUNNER_NOTIFY_PAUSED=1
+   ```
+
+2. **範囲を確かめる**。Cloud Logging で `jsonPayload.event="runner.run"` を `app_id` で絞り、ルール・結果・宛先の数を見る(中身と uid はログに無い)。`moderate reports` でそのアプリへの通報を見る。
+3. **アプリ(またはルール)を止める**。書き込みも止めたい・規約に当たる疑いが強い時。
+
+   ```sh
+   go run ./cmd/moderate stop-app <appId> -env prod -reason "規約に反する通知を送っていたため止めました" -allow-prod-db -yes
+   go run ./cmd/moderate stop-app <appId> -env prod -reason "..." -force -allow-prod-db -yes     # 書き込みも断る
+   go run ./cmd/moderate stop-rule <appId> <ruleId> -env prod -reason "..." -allow-prod-db -yes
+   ```
+
+4. 規約に当たれば非公開化(`hide-app`・[moderation.md](../infra/moderation.md))、悪質ならアカウントの無効化(人)。作成者への理由の表示は #347。
+
+`-env` は runner の環境(`prod` / `stg` / `local`)。本番の Firestore には `-allow-prod-db` が無いと動かない。`-yes` が無いと書かずに何をするかだけ出す。止めた記録は `runner/{env}/stops/*` に残る(誰が・いつ・理由・解いた時刻)。`go run ./cmd/moderate stops -env prod -allow-prod-db` で一覧。止める・解くたびに `runner/{env}/stop_log` にも 1 件ずつ足す(操作した人 `-operator`(既定 `$USER`)・理由・期限・強制か。自動の一時停止も)。`go run ./cmd/moderate stop-log [appId] -env prod -allow-prod-db` で新しい順に見る。
+
+### 戻し方
+
+- 全体・アプリ・ルール・アプリの通知: `resume-all` / `resume-app <appId>` / `resume-rule <appId> <ruleId>` / `resume-notify <appId>`(それぞれ `-env prod -allow-prod-db -yes`)。自動の一時停止も `resume-notify` で解く。解いた後は、それまでの通報では自動で止め直さない(新しく 3 人の通報があれば止まる)。
+- 環境の `RUNNER_NOTIFY_PAUSED` / `RUNNER_PAUSED`: `--remove-env-vars=RUNNER_NOTIFY_PAUSED`(または `=0`)。
+- 止めていた間のきっかけは実行されない(後からまとめて送らない)。必要なら作成者に知らせる。
+- 振り返り(§10)を書く。

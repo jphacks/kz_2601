@@ -1,34 +1,83 @@
 {
   "identifier" : "7C1F2A9E",
-  "nonRenewingSubscriptions" : [
-
-  ],
+  "nonRenewingSubscriptions" : [],
   "products" : [
-
+    {
+      "displayPrice" : "99999",
+      "familyShareable" : false,
+      "internalID" : "6739000101",
+      "localizations" : [
+        {
+          "description" : "ローカル確認用の仮のパック。値段は本物ではない仮の値(本番の値段は App Store Connect だけで決める)・枚数はサーバーの設定",
+          "displayName" : "コイン S(仮)",
+          "locale" : "ja"
+        },
+        {
+          "description" : "Placeholder pack for local testing. The price is a fake placeholder (real prices live only in App Store Connect); the coin amount comes from the server",
+          "displayName" : "Coins S (placeholder)",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "jp.kz2601.metamon.coins.small",
+      "referenceName" : "Coins S (placeholder)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "99998",
+      "familyShareable" : false,
+      "internalID" : "6739000102",
+      "localizations" : [
+        {
+          "description" : "ローカル確認用の仮のパック。値段は本物ではない仮の値(本番の値段は App Store Connect だけで決める)・枚数はサーバーの設定",
+          "displayName" : "コイン M(仮)",
+          "locale" : "ja"
+        },
+        {
+          "description" : "Placeholder pack for local testing. The price is a fake placeholder (real prices live only in App Store Connect); the coin amount comes from the server",
+          "displayName" : "Coins M (placeholder)",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "jp.kz2601.metamon.coins.medium",
+      "referenceName" : "Coins M (placeholder)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "99997",
+      "familyShareable" : false,
+      "internalID" : "6739000103",
+      "localizations" : [
+        {
+          "description" : "ローカル確認用の仮のパック。値段は本物ではない仮の値(本番の値段は App Store Connect だけで決める)・枚数はサーバーの設定",
+          "displayName" : "コイン L(仮)",
+          "locale" : "ja"
+        },
+        {
+          "description" : "Placeholder pack for local testing. The price is a fake placeholder (real prices live only in App Store Connect); the coin amount comes from the server",
+          "displayName" : "Coins L (placeholder)",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "jp.kz2601.metamon.coins.large",
+      "referenceName" : "Coins L (placeholder)",
+      "type" : "Consumable"
+    }
   ],
   "settings" : {
     "_failTransactionsEnabled" : false,
     "_locale" : "ja_JP",
     "_storefront" : "JPN",
-    "_storeKitErrors" : [
-
-    ]
+    "_storeKitErrors" : []
   },
   "subscriptionGroups" : [
     {
       "id" : "21500001",
-      "localizations" : [
-
-      ],
+      "localizations" : [],
       "name" : "Tailor It Pro",
       "subscriptions" : [
         {
-          "adHocOffers" : [
-
-          ],
-          "codeOffers" : [
-
-          ],
+          "adHocOffers" : [],
+          "codeOffers" : [],
           "displayPrice" : "500",
           "familyShareable" : false,
           "groupNumber" : 1,

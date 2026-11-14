@@ -95,7 +95,7 @@ func (f *Firestore) CreateReleaseRequest(ctx context.Context, rr ReleaseRequest)
 				return nil
 			}
 		}
-		now := time.Now().UTC()
+		now := Now()
 		id := NewID("rr_")
 		d := releaseDoc{AppID: rr.AppID, OwnerUID: rr.OwnerUID, Name: rr.Name, Version: int64(rr.Version),
 			DSLJSON: string(rr.DSL), Purpose: rr.Purpose, Contact: rr.Contact, Status: ReleaseReceived,

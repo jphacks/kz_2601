@@ -14,10 +14,41 @@ extension AppRuntime {
         let refs = entity.fields.compactMap(\.refEntity)
         await load(entities: Set([entityId] + refs))
         do {
-            exportFile = try makeExportFile(action, screen: ctx.route.screen)
+            let file = try makeExportFile(action, screen: ctx.route.screen)
+            // 覚えたフォルダがあれば共有シートを出さずにそこへ(#2221)。無い / 書けない時は共有シート
+            if writeToRememberedFolder(file) { return }
+            exportFile = file
         } catch {
             toast = L10n.tr("書き出せませんでした")
         }
+    }
+
+    /// 覚えたフォルダ(iCloud Drive など)に書き出せたか(#2221)。
+    /// 覚えていなければ false(1 回目は共有シートで選ぶ)。書き出せたら一時フォルダの写しは残さない。
+    func writeToRememberedFolder(_ file: ExportFile, bookmark: FolderBookmark = .shared) -> Bool {
+        guard bookmark.isRemembered(appId: document.appId) else { return false }
+        do {
+            _ = try bookmark.copy(file.url, appId: document.appId)
+        } catch {
+            return false // 消えた・許可が切れたフォルダ: 共有シートに戻す(覚えた物は残す)
+        }
+        ExportFiles.remove(file.url) // 記録の写しを一時フォルダに残さない
+        toast = L10n.tr("保存しました")
+        return true
+    }
+
+    /// 選んだフォルダを覚える(`FolderPicker` の直後)。次の書き出しからは選ばせない。
+    func rememberExportFolder(_ folder: URL, bookmark: FolderBookmark = .shared) {
+        do {
+            try bookmark.remember(folder, appId: document.appId)
+        } catch {
+            toast = L10n.tr("書き出せませんでした")
+        }
+    }
+
+    /// 覚えたフォルダを忘れる(選び直す時)。
+    func forgetExportFolder(bookmark: FolderBookmark = .shared) {
+        bookmark.forget(appId: document.appId)
     }
 }
 

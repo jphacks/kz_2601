@@ -12,6 +12,10 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case videoField, videoPlayer
     // leaf(録音・#420)
     case audioRecorder
+    // leaf(文字起こし・読み上げ。端末の中だけ)。transcribeField: field / label / placeholder、speakButton: text / field / value / label は共用
+    case transcribeField, speakButton
+    // leaf(手書き・お絵かき。PencilKit → photo field)
+    case drawingField
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
@@ -43,14 +47,22 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case locationTracker
     // leaf(チャット・#260)
     case chatThread
+    // leaf(クラウドの AI と何往復も話す)。entity / textField / length / placeholder / emptyText は共用
+    case aiChat
     // leaf(ヘルスデータ・#167)
     case healthStat
     // leaf(時間割のマス目・#234)
     case gridTable
     // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
     case randomPicker
+    // leaf(トーナメント表・BracketDraw)。entity / title / titleField は共用
+    case bracket
+    // leaf(ファイルの取り込み: CSV の行 / テキスト・PDF の本文を記録に。端末内だけ)。entity / field / label は共用
+    case fileImport
     // leaf(目的地までの道案内・#411)。title / label / entity / locationField / titleField / mode は共用
     case routeGuide
+    // leaf(近くの場所を Apple のマップで探してフォームに入れる)。label / nameField / locationField は共用
+    case placeSearch
     // leaf(ドラレコ・#410)。title は共用
     case dashcam
     // leaf(端末のセンサー・#419)。label / style / min / max / entity / field / dateField / seconds / limit は共用
@@ -61,6 +73,10 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case matchList
     // leaf(単語カード・#264)。entity / filter は共用
     case flashcards
+    // leaf(外部の公開データ・#348)。title / limit / emptyText は共用。appconfig が許可リストの出どころだけから取る
+    case feed
+    // leaf(共有のアプリの参加者どうしの音声・ビデオ通話・#447)。label は共用
+    case callButton
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -88,6 +104,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var title: String?          // section / chart
     public var spacing: String?        // none|small|medium|large
     public var children: [Component]
+    /// 読む・描く入れ子の段数の上限(スキーマは 2 段)。これより深い `children` は読まない(空の枠)。
+    /// 1 段のデコードが大きなスタックを使い、非同期処理のスレッド(512KB)では約 20 段(Debug は約 10 段)で落ちるため。
+    public static let maxNestingDepth = 8
 
     // text / button / inputs
     public var text: String?
@@ -104,6 +123,10 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var source: String?         // photoField / videoField: camera|library|both
     public var maxDuration: Int?       // videoField: 録画の上限秒(既定 60)
     public var height: String?         // image: small|medium|large
+    /// button: "admins" = 管理者にだけ出す(#272)。表示だけで、守るのはサーバー(editableBy / deleteBy)。
+    public var visibleTo: String?
+    /// text: 文中の語に印をつける(TextHighlight.swift)。
+    public var highlight: TextHighlight?
 
     // data-bound(list / stat / chart)
     public var entity: String?
@@ -142,7 +165,14 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var shape: String?          // generate(#417): line|list|fields
     public var count: Int?             // generate list の個数
     public var items: [String]?        // generate fields の項目名
+    public var length: String?         // short(既定)| long = 長い文・オンライン AI だけ
+    public var inputPhoto: String?     // 一緒に AI に見せる photo field(オンライン AI だけ)
+    public var saveTo: AISaveTo?       // generate list: 1 項目 = 1 件の記録(AISaveTo.swift)
+    public var chatSaveTo: AIChatSaveTo? // aiChat の saveTo {entity, fields}: 話しかけて記録する(AIChatSaveTo.swift)
+    public var inputFeeds: [String]?   // generate: 同じ画面の feed の id(行を材料に足す・AIFeedInput.swift)
+    public var outputs: [String: String]? // generate fields: 項目名 → フォームの field(AIOutputs.swift)
     public var target: Double?         // progressBar entity モードの分母
+    public var targetExpr: Expr?       // progressBar: target が式 {"setting": …} の時(変えられる目標)。数値なら `target`
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
@@ -167,7 +197,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var address: String?        // routeGuide: 固定の目的地(住所・施設名)
     public var seconds: Int?           // timerDisplay countdown 初期秒
     public var liveActivity: Bool?     // timerDisplay: ロック画面 / Dynamic Island にも出す(#423)
-    public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
+    public var shareTo: String?        // shareButton: any|line|slack|discord|x|mail(`target` は progressBar の数値)
+    public var app: String?            // openUrlButton: url の代わりに開くアプリ(OpenApp)
+    public var to: String?             // openUrlButton: app の中の開き先(リンク・ユーザー名・住所・番号。{{fieldId}} 可)
     // 入力系バッチ(slider / stepper / rating / textEditor)
     public var min: Double?            // slider / stepper / gauge
     public var max: Double?            // rating: 星の数(既定 5) / gauge
@@ -185,6 +217,11 @@ public struct Component: Decodable, Identifiable, Sendable {
     // chatThread(#260)。entity / placeholder / emptyText は共用
     public var textField: String?      // 本文の string / text field
     public var photoField: String?     // 任意の photo field
+    // aiChat。entity / textField / length / placeholder / emptyText は共用
+    public var roleField: String?      // user / assistant を書く field(nil = 自分と AI が交互)
+    public var persona: String?        // AI の役と話し方(500 字まで・サーバーへは instruction)
+    public var speak: Bool?            // aiChat: 新しい AI の返事を端末の声で自動で読み上げる
+    public var inputEntity: String?    // aiChat: 自分の記録を参考として AI に添える entity(limit 件・AIChatMaterial.swift)
     // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
     public var keepMinutes: Int?       // ループで残す分数
     public var maxStorageMB: Int?      // 録画の容量上限
@@ -196,6 +233,11 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var threshold: SensorThreshold?
     // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
     public var analyze: [PhotoAnalyze] = []
+    // photoField: 端末内の Image Playground でイラストを作るボタンも出す(使えない端末では出さない)
+    public var illustrate: Bool = false
+    // fileImport
+    public var accept: [String] = []       // csv|text|pdf
+    public var map: [ImportColumn] = []    // csv: 見出し → field id
     // nearbyShare passby(#425)。entity / mode / limit は共用
     public var fields: [String]?       // 交換する field id(明示したものだけ送る)
     public var distance: Bool?         // UWB で距離・方向を出す
@@ -208,6 +250,23 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var front: String?          // 表の field
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
+    // bracket。entity / title / titleField は共用
+    public var winsField: String?      // 勝った回戦の数を保存する integer field
+    public var seedField: String?      // シード順の integer / number field(nil = 登録順)
+    public var startedField: String?   // 大会を始めた時刻を保存する datetime field(nil = 時刻の規則で固定)
+    // feed(#348)。URL は持たない
+    public var provider: String?       // weather|warnings|pressure|holidays|rss|arxiv|diet
+    public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
+    public var feedId: String?         // rss: 許可したフィードの id / arxiv: 分野
+    // placeSearch。label / nameField / locationField は共用
+    public var query: String?          // 決まった検索語(placeSearch・feed の diet)
+    public var category: String?       // cafe|restaurant|…(PlaceSearch.categories)
+    public var near: String?           // current(既定)
+    public var addressField: String?   // placeSearch / locationButton: 住所の string / text field
+    public var pins: Bool?             // placeSearch: 結果を小さな地図のピンでも出す
+    // callButton(#447)。label は共用
+    public var video: Bool?            // カメラも使う(nil / false = 音声だけ)
+    public var room: String?           // アプリの中の部屋の名前(nil = アプリの部屋)
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -217,20 +276,26 @@ public struct Component: Decodable, Identifiable, Sendable {
         case includeTime, source, maxDuration, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
-        case searchField, onDateTap, locationField, zoom, mode, address, seconds, shareTo
+        case searchField, onDateTap, locationField, zoom, mode, address, seconds, shareTo, app, to
         case liveActivity
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options, shape, count, items
+        case task, input, output, options, shape, count, items, length, inputPhoto, saveTo, inputFeeds, outputs
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
-        case textField, photoField
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
+        case textField, photoField, roleField, persona, speak, inputEntity
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, illustrate, fields, distance, allowRequests, autoAccept
+        case accept, map
         case show
         case front, back, toggle
+        case winsField, seedField, startedField
+        case visibleTo, highlight
+        case provider, region, feedId
+        case query, category, near, addressField, pins
+        case video, room
     }
 
     public init(from decoder: Decoder) throws {
@@ -241,7 +306,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         area = try? c.decodeIfPresent(String.self, forKey: .area)
         title = try? c.decodeIfPresent(String.self, forKey: .title)
         spacing = try? c.decodeIfPresent(String.self, forKey: .spacing)
-        children = (try? c.decode(Lossy<Component>.self, forKey: .children).wrappedValue) ?? []
+        let depth = decoder.codingPath.lazy.filter { $0.stringValue == Keys.children.stringValue }.count
+        children = depth + 1 < Self.maxNestingDepth ? (try? c.decode(Lossy<Component>.self, forKey: .children).wrappedValue) ?? [] : []
         text = try? c.decodeIfPresent(String.self, forKey: .text)
         style = try? c.decodeIfPresent(String.self, forKey: .style)
         align = try? c.decodeIfPresent(String.self, forKey: .align)
@@ -256,6 +322,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         source = try? c.decodeIfPresent(String.self, forKey: .source)
         maxDuration = try? c.decodeIfPresent(Int.self, forKey: .maxDuration)
         height = try? c.decodeIfPresent(String.self, forKey: .height)
+        visibleTo = try? c.decodeIfPresent(String.self, forKey: .visibleTo)
+        highlight = try? c.decodeIfPresent(TextHighlight.self, forKey: .highlight)
         entity = try? c.decodeIfPresent(String.self, forKey: .entity)
         item = try? c.decodeIfPresent(ListItem.self, forKey: .item)
         sort = try? c.decodeIfPresent(Sort.self, forKey: .sort)
@@ -284,6 +352,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
         liveActivity = try? c.decodeIfPresent(Bool.self, forKey: .liveActivity)
         shareTo = try? c.decodeIfPresent(String.self, forKey: .shareTo)
+        app = try? c.decodeIfPresent(String.self, forKey: .app)
+        to = try? c.decodeIfPresent(String.self, forKey: .to)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
         step = try? c.decodeIfPresent(Double.self, forKey: .step)
@@ -301,7 +371,14 @@ public struct Component: Decodable, Identifiable, Sendable {
         shape = try? c.decodeIfPresent(String.self, forKey: .shape)
         count = try? c.decodeIfPresent(Int.self, forKey: .count)
         items = try? c.decodeIfPresent([String].self, forKey: .items)
+        length = try? c.decodeIfPresent(String.self, forKey: .length)
+        inputPhoto = try? c.decodeIfPresent(String.self, forKey: .inputPhoto)
+        saveTo = try? c.decodeIfPresent(AISaveTo.self, forKey: .saveTo)
+        chatSaveTo = try? c.decodeIfPresent(AIChatSaveTo.self, forKey: .saveTo)
+        inputFeeds = try? c.decodeIfPresent([String].self, forKey: .inputFeeds)
+        outputs = try? c.decodeIfPresent([String: String].self, forKey: .outputs)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
+        if target == nil { targetExpr = try? c.decodeIfPresent(Expr.self, forKey: .target) }
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)
@@ -320,6 +397,10 @@ public struct Component: Decodable, Identifiable, Sendable {
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
         textField = try? c.decodeIfPresent(String.self, forKey: .textField)
         photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        roleField = try? c.decodeIfPresent(String.self, forKey: .roleField)
+        persona = try? c.decodeIfPresent(String.self, forKey: .persona)
+        speak = try? c.decodeIfPresent(Bool.self, forKey: .speak)
+        inputEntity = try? c.decodeIfPresent(String.self, forKey: .inputEntity)
         keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
         maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
         impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)
@@ -328,6 +409,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
         threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
         analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
+        illustrate = (try? c.decodeIfPresent(Bool.self, forKey: .illustrate)) ?? false
+        accept = (try? c.decodeIfPresent(Lossy<String>.self, forKey: .accept))?.wrappedValue ?? []
+        map = (try? c.decodeIfPresent(Lossy<ImportColumn>.self, forKey: .map))?.wrappedValue ?? []
         fields = try? c.decodeIfPresent([String].self, forKey: .fields)
         distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
         allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
@@ -336,6 +420,19 @@ public struct Component: Decodable, Identifiable, Sendable {
         front = try? c.decodeIfPresent(String.self, forKey: .front)
         back = try? c.decodeIfPresent(String.self, forKey: .back)
         toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
+        winsField = try? c.decodeIfPresent(String.self, forKey: .winsField)
+        seedField = try? c.decodeIfPresent(String.self, forKey: .seedField)
+        startedField = try? c.decodeIfPresent(String.self, forKey: .startedField)
+        provider = try? c.decodeIfPresent(String.self, forKey: .provider)
+        region = try? c.decodeIfPresent(String.self, forKey: .region)
+        feedId = try? c.decodeIfPresent(String.self, forKey: .feedId)
+        query = try? c.decodeIfPresent(String.self, forKey: .query)
+        category = try? c.decodeIfPresent(String.self, forKey: .category)
+        near = try? c.decodeIfPresent(String.self, forKey: .near)
+        addressField = try? c.decodeIfPresent(String.self, forKey: .addressField)
+        pins = try? c.decodeIfPresent(Bool.self, forKey: .pins)
+        video = try? c.decodeIfPresent(Bool.self, forKey: .video)
+        room = try? c.decodeIfPresent(String.self, forKey: .room)
     }
 }
 
@@ -449,6 +546,8 @@ public struct Filter: Codable, Hashable, Sendable {
         op = try c.decode(String.self, forKey: .op)
         if (try? c.decodeIfPresent([String: Bool].self, forKey: .value)) == ["me": true] {
             value = Self.meValue // 自分(#251)。Expr ではない
+        } else if (try? c.decodeIfPresent([String: Bool].self, forKey: .value)) == ["myFollows": true] {
+            value = Self.myFollowsValue // フォローしている人(#270)。Expr ではない
         } else if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
             if let lit = e.literalValue { value = lit } else { valueExpr = e }
         }

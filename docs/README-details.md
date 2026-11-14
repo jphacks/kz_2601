@@ -42,7 +42,7 @@
 | 2. 相談 | 足りない点だけ 1〜3 問聞き返す。「見やすくして」のようなあいまいな依頼には案のカードを出し、「これでいく」で決める(設定でオフ可) | チャット eval 24/24([`2026-10-25-chat-first.md`](backend/ai-eval/2026-10-25-chat-first.md))・#105 #191 |
 | 3. 生成 | `POST /v1/generate` が Claude(`claude-sonnet-5-5`)に部品カタログ + few-shot を渡し、DSL v1 JSON を生成。画面の枠は約 2.4 秒で出始める | create p50 **6.6 秒** / p95 8.7 秒・#94 |
 | 4. 検証 | Go がスキーマ・id 参照・enum・**グリッド座標の重なり/範囲外**を全件列挙。NG ならエラー一覧を添えて再生成(最大 2 回) | 16 発話 × 2 条件で一発通過 **100%** |
-| 5. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 **57 種**(Container 7 + Leaf 50)+ アクション 9 種 |
+| 5. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 **75 種**(Container 7 + Leaf 68)+ アクション 16 種 |
 | 6. 育てる | 2 回目以降は **JSON Patch** の差分生成。「カテゴリにカフェを追加」「集計の画面からも追加できるように」も通る。直後の「元に戻す」「やり直す」で行き来できる | edit p50 **1.7 秒**・#218 |
 
 アプリ本体にはコードが増えません。増えるのは DSL JSON の version だけです(保存先は Firestore・#32)。
@@ -70,7 +70,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 
 ### 2. ネイティブ機能も、計算も"生成"される
 
-生成されるのは Web ページではなく、**ネイティブ部品の組み合わせ**です。部品は **57 種 + アクション 9 種**。AI が用途に合わせて選んで配置します。
+生成されるのは Web ページではなく、**ネイティブ部品の組み合わせ**です。部品は **75 種 + アクション 16 種**。AI が用途に合わせて選んで配置します。
 
 | 種別 | 例 |
 |---|---|
@@ -121,9 +121,10 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 | 展望 | 状態 |
 |---|---|
 | 作ったアプリを**単体のアプリとしてリリース**する | 申請の受付(申請 API・変身一覧の申請シート)は実装済み(#145)。審査・配布の仕組みはこれから |
-| アプリ内課金「Tailor It Pro」 | 有料機能(共有データ)を含む時の確認カードと購入の流れは実装済み(#166 #204)。サーバー側のレシート検証はこれから |
+| アプリ内課金「Tailor It Pro」 | 購入の流れ(#166 #204)・更新や解約の反映(#585)・有料の機能をサーバーで Pro だけにする判定(#641)は実装済み。使った分だけ払う料金の形は検討中(#630・中身は未定) |
+| サーバーの自動の動き(M4) | 宣言(serverRules)・AI での生成・実行基盤 runner は実装済み(#611 #624)。記録を読む語彙は開発中(#672)。本番環境への導入は準備中 |
+| 作れるアプリの幅 | 過去の JPHACKS の作品の机上の見込みは、今の部品で 43%・上位の部品を足して 60%([調査](research/jphacks-coverage.md))。足す部品は一部が本体に入り(#659)、残りは開発中(#672 #674)。実際に作らせた評価は #672 で測る |
 | DSL の表現力 | 連続日数(#172)・計算(#117)は実装済み。タイマーの自動切り替え・一括削除など、DSL で表せない依頼が品質監査で残っている([`audit3`](backend/ai-eval/2026-10-24-audit3.md) §6) |
-| 実機での検証 | QR の読取・実 GPS・共有先・Siri の音声実行・近距離共有の 2 台など、**実機検証が一部未了**のものを詰める |
 
 ## 注力したこと(詳細)
 
@@ -135,7 +136,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 
 ## 話してみてほしい内容
 
-**話してみてほしい内容**([`docs/03_demo_script.md`](03_demo_script.md) §3.4。すべて eval で 1 回で通過したもの):
+**話してみてほしい内容**([`docs/demo/2026-10-25-judging-demo-script.md`](demo/2026-10-25-judging-demo-script.md) §3.4。すべて eval で 1 回で通過したもの):
 
 | 見たい機能 | 話す内容(このまま) |
 |---|---|
@@ -155,7 +156,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 * Claude API(`claude-sonnet-5-5`・生 HTTP・prompt caching・ストリーミング)
 * Firebase Auth(Sign in with Apple / 匿名認証。Go 側は ID トークン検証のみ)
 * Firestore(Native mode・DSL version 履歴・records・共有データ。リスナー + SSE で他端末に約 0.5 秒で反映・#104)
-* Cloud Run(`appconfig` / `ai` × stg/prod・asia-northeast1)、Secret Manager、Artifact Registry、Workload Identity Federation
+* Cloud Run(`appconfig` / `ai` / `runner` × stg/prod・asia-northeast1)、Secret Manager、Artifact Registry、Workload Identity Federation
 * JSON Schema draft 2020-12(DSL v1)、JSON Patch RFC 6902
 
 ### フレームワーク・ライブラリ・モジュール
@@ -164,6 +165,14 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 * WhisperKit(argmax-oss-swift・`small` モデル・CoreML/ANE)
 * Go(Claude 呼び出しは `net/http` 直叩き。外部依存は `santhosh-tekuri/jsonschema/v6` と `evanphx/json-patch/v5` のみ)
 * xcodegen(`.xcodeproj` をコミットしない)、ローカル Swift Package × 3(マルチモジュール)
+* Android(`android/`): Kotlin 2.4.21 + Jetpack Compose(BOM 2026.06.01)+ Material 3 + Coil(`android/app`・`android/renderer`)
+* Android の端末内音声認識: whisper.cpp 1.9.5 を NDK でビルドして JNI で呼ぶ(arm64-v8a・x86_64。モデルは初回に取得・`android/whisper/src/main/cpp/`)
+* Android のネイティブ機能: Health Connect(`healthStat`・`android/renderer/.../components/health/`)、CameraX・Media3(撮影と動画・`android/renderer`)、MapLibre(地図・`android/renderer`)、ML Kit(文字・QR・画像ラベル・顔・`android/app`・`android/renderer`)、Google Play Billing(Tailor It Pro・`android/app`)
+* Android の Firebase: Auth・App Check・Cloud Messaging・Crashlytics(`android/services`・`android/app`)
+* デスクトップ(`desktop/`): Compose Multiplatform Desktop 1.12.2(JVM 17・msi / deb / rpm / dmg を jpackage で作る形・`desktop/app`)。DSL・API・保存は Android の `android/dsl`・`android/services` の純 Kotlin を取り込んで共用
+* デスクトップの端末内音声認識: Android と同じ版の whisper.cpp を JNI で(Windows x64・arm64 / Linux x64 / 手元の macOS・既定は off・`desktop/whisper/native/`)
+* デスクトップのその他: OkHttp(`desktop/services`)、zxing(QR)・PDFBox(PDF の読み書き)・JNA(Windows の電池の読み取り)(`desktop/app`)
+* Mac(`ios/MetamonMac/`): SwiftUI。iOS の 3 パッケージと `ios/Shared/` を共有
 * GitHub Actions(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)、golangci-lint、gitleaks、Firebase Emulator Suite、XCUITest
 
 ### デバイス
@@ -201,23 +210,43 @@ flowchart LR
     Ren --> DSL["MetamonDSL<br/>Codable / GridArea / 式"]
     Svc --> DSL
   end
+  subgraph AND["Android (Compose・5 モジュール)"]
+    ASvc["services<br/>HTTP / Firebase Auth"] --> ADSL["dsl (純 Kotlin)"]
+    AApp["app<br/>whisper.cpp (JNI) / Health Connect"] --> ASvc
+  end
+  subgraph MAC["Mac (SwiftUI・MetamonMac)"]
+    MApp["MacAppRuntime<br/>3 パッケージを iOS と共有"]
+  end
+  subgraph DT["デスクトップ (Compose Desktop・Windows / Linux)"]
+    DApp["desktop app<br/>Android の dsl / services を取り込み"]
+  end
   subgraph GCP["GCP (Cloud Run / asia-northeast1)"]
     AI["ai (Go)<br/>chat / generate / validate / patch"]
     AC["appconfig (Go)<br/>DSL version / records / share"]
+    RN["runner (Go)<br/>自動の動き (serverRules)"]
     FS[("Firestore")]
     SM["Secret Manager"]
   end
-  Svc -- "Bearer: Firebase ID token<br/>POST /v1/chat・/v1/generate" --> AI
-  Svc -- "records / versions / SSE" --> AC
+  Svc -- "Bearer: Firebase ID token<br/>X-Client-Platform: ios<br/>POST /v1/chat・/v1/generate" --> AI
+  Svc -- "X-Client-Platform: ios<br/>records / versions / SSE" --> AC
+  ASvc -- "X-Client-Platform: android<br/>/v1/chat・/v1/generate" --> AI
+  ASvc -- "X-Client-Platform: android<br/>records / versions" --> AC
+  MApp -- "X-Client-Platform: macos" --> AI
+  MApp -- "X-Client-Platform: macos" --> AC
+  DApp -- "X-Client-Platform: windows / linux / macos<br/>(stg の appconfig のみ)" --> AC
   AI -- "PUT / PATCH /apps/{id}/dsl" --> AC
   AC --> FS
+  FS -- "outbox / 時刻" --> RN
+  RN -- "通知 (APNs)" --> Svc
   AI -- "messages.create" --> CL[(Claude API)]
   SM -. ANTHROPIC_API_KEY .-> AI
   Svc -- "Sign in with Apple / 匿名" --> FA[(Firebase Auth)]
   GH["GitHub Actions<br/>develop→stg / main→prod (WIF)"] -. deploy .-> GCP
 ```
 
-iOS の依存の向きは `App → Renderer → DSL`、`App → Services → DSL`。Renderer は Services を知らず、`DSLRuntime` protocol 経由で能力を注入されます(詳細: [`docs/ios/architecture.md`](ios/architecture.md))。backend は単一 Go モジュールに `cmd/appconfig` と `cmd/ai` を置き、共有型 `pkg/dsl` に検証・JSON Patch を集約(詳細: [`docs/backend/architecture.md`](backend/architecture.md))。API は [`openapi-ai.yaml`](backend/openapi-ai.yaml) / [`openapi-appconfig.yaml`](backend/openapi-appconfig.yaml)。
+`X-Client-Platform` は全クライアントが付けるヘッダで、値は `ios` / `android` / `macos` / `windows` / `linux`(それ以外は `other`)。backend はログに出すだけで、部品の絞り込みは body の `allowedComponents` で行います([`backend/internal/httpx/client.go`](../backend/internal/httpx/client.go))。Android とデスクトップの作りは [`android/README.md`](../android/README.md)・[`docs/desktop/architecture.md`](desktop/architecture.md)、Mac は [`docs/mac/architecture.md`](mac/architecture.md)。デスクトップは今 stg の appconfig にだけ話します(既定はモック。サインインと AI の呼び出しは未接続)。Mac は iOS のパッケージを共有し、Android は `AIClient` / `AppConfigClient` を持ちます(図の矢印は iOS と同じ 2 サービスへ)。
+
+iOS の依存の向きは `App → Renderer → DSL`、`App → Services → DSL`。Renderer は Services を知らず、`DSLRuntime` protocol 経由で能力を注入されます(詳細: [`docs/ios/architecture.md`](ios/architecture.md))。backend は単一 Go モジュールに `cmd/appconfig`・`cmd/ai`・`cmd/runner` を置き、共有型 `pkg/dsl` に検証・JSON Patch を集約(詳細: [`docs/backend/architecture.md`](backend/architecture.md))。API は [`openapi-ai.yaml`](backend/openapi-ai.yaml) / [`openapi-appconfig.yaml`](backend/openapi-appconfig.yaml)。
 
 ## セットアップ
 
@@ -227,7 +256,7 @@ iOS の依存の向きは `App → Renderer → DSL`、`App → Services → DSL
 cd backend
 make build vet test            # CI と同じ(schema-check + go test)
 # ai をローカル起動(ANTHROPIC_API_KEY が必要。appconfig 未指定ならインメモリ store)
-set -a; source ~/Desktop/JPHACKS2026/.env; set +a   # リポ外の .env(ANTHROPIC_API_KEY=...)
+export ANTHROPIC_API_KEY=...   # リポジトリの外で管理する
 PORT=8081 go run ./cmd/ai
 curl -s localhost:8081/health
 # 生成品質 eval(実 API)
@@ -251,6 +280,44 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 - 実機では初回起動時に WhisperKit `small` モデルを DL します(進捗表示・一度 DL すればオフラインでロード)。
 - 対応言語: 日本語 / English。設定 >「言語」で即時に切り替え、生成・対話・音声認識も連動します(#129)。
 
+### Android(JDK 17+ / Android SDK 36)
+
+```sh
+cd android
+./gradlew test                 # JVM の単体テスト(全モジュール)
+./gradlew assembleStgDebug     # stg の debug APK
+./gradlew installStgDebug      # つないだ端末・エミュレータに入れる
+```
+
+- Android SDK の場所は `android/local.properties` の `sdk.dir` か `ANDROID_HOME`。
+- 詳しくは [`android/README.md`](../android/README.md)、CI は [`docs/android/ci.md`](android/ci.md)。
+
+### Mac(Xcode 16+ / xcodegen)
+
+Mac 版(`ios/MetamonMac/`)は iOS と同じ Xcode プロジェクトの別 scheme です。
+
+```sh
+cd ios
+METAMON_TEAM_ID=<TEAM_ID> xcodegen generate     # iOS と同じ .xcodeproj を作る
+xcodebuild -scheme MetamonMac -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme MetamonMac -destination 'platform=macOS' test CODE_SIGNING_ALLOWED=NO
+scripts/mac-package-test.sh MetamonDSL          # 共有パッケージ 1 つを macOS で(Renderer / Services も可)
+```
+
+- repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、macOS のテストが読み込みで落ちることがあります(macOS の保護)。その時は保護の外に置きます。
+- 詳しくは [`ios/README.md` のテスト](../ios/README.md#テスト)、OS との連携は [`docs/mac/system-integration.md`](mac/system-integration.md)、CI は `.github/workflows/mac-ci.yml`。
+
+### デスクトップ(Windows・Linux / JDK 17+)
+
+```sh
+cd desktop
+./gradlew :desktop:run                    # 同梱の例 shopping を開く(既定は接続先モック)
+./gradlew :desktop:test :dsl:test         # 適合テストと :dsl のテスト
+```
+
+- DSL は Android の `android/dsl` をそのまま使います(Android SDK は不要)。
+- 詳しくは [`desktop/README.md`](../desktop/README.md)、CI は `.github/workflows/desktop-ci.yml`。
+
 ### secrets の置き方(public リポ)
 
 | 秘密 | 置き場 | 流し込み |
@@ -259,19 +326,24 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 | `GoogleService-Info.plist` | リポ外 | `ios/scripts/sync-firebase-plist.sh` がコピーし `git check-ignore` で無視を確認 |
 | GCP 認証 | 鍵ファイル無し | GitHub Actions は Workload Identity Federation(`jphacks/kz_2601` に限定) |
 
-`.gitignore` + `secrets-scan.yml`(gitleaks)で二重防御。GCP の構築手順は [`docs/infra/gcp-setup.md`](infra/gcp-setup.md)。認証情報の置き場所と差し替え手順は [`docs/infra/credentials-inventory.md`](infra/credentials-inventory.md)。
+`.gitignore` + `secrets-scan.yml`(gitleaks)で二重防御。GCP の構築手順は [`docs/infra/gcp-setup.md`](infra/gcp-setup.md)。
 
 ## リポジトリ構成とドキュメント
 
-iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノレポ。
+iOS・Android・Mac・デスクトップ(Windows・Linux)のクライアントと、バックエンド・インフラ・文書を同居させたモノレポ。表はフォルダ名順。内容は `origin/epic/god` のフォルダと各 README から書いた。
 
-| パス | 内容 |
-|---|---|
-| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト |
-| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/ai-eval`, `cmd/ai-audit`)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` |
-| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) |
-| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS |
-| `scripts/` | 運用スクリプト(`github/` ブランチ保護) |
+| パス | 内容 | 入口 |
+|---|---|---|
+| `.claude/` | エージェント向けのスキル(`skills/`) | [`CLAUDE.md`](../CLAUDE.md) |
+| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS | [`02_github_workflow.md`](02_github_workflow.md) |
+| `android/` | Android アプリ(Kotlin・Jetpack Compose)。`app` `dsl` `renderer` `services` `whisper` の 5 モジュール。`dsl` は純 Kotlin でデスクトップも取り込む | [`android/README.md`](../android/README.md)、[`docs/android/README.md`](android/README.md) |
+| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/runner`, `cmd/ai-eval`, `cmd/ai-audit` ほか)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` | [`backend/README.md`](../backend/README.md)、[`docs/backend/architecture.md`](backend/architecture.md) |
+| `desktop/` | Windows・Linux 版(Compose Multiplatform Desktop・JVM)。`android/dsl` を取り込み、`app` `services` `whisper` を持つ | [`desktop/README.md`](../desktop/README.md)、[`docs/desktop/architecture.md`](desktop/architecture.md) |
+| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) | [`00_decisions.md`](00_decisions.md) |
+| `infra/` | GCP の構成の Terraform(prod と stg を同じコードと環境ごとの変数で作る) | [`infra/README.md`](../infra/README.md)、[`docs/infra/gcp-setup.md`](infra/gcp-setup.md) |
+| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト。Mac 版(`MetamonMac*`)と共有コード(`Shared/`)も同じフォルダにある | [`ios/README.md`](../ios/README.md)、[`docs/ios/architecture.md`](ios/architecture.md)、[`docs/mac/architecture.md`](mac/architecture.md) |
+| `scripts/` | 運用スクリプト(`github/` ブランチ保護ほか) | なし |
+| `web/` | 発表用の静的ページ。`pv/`(PV の映像)と `splash/`(起動スプラッシュ)。ビルド不要の HTML | [`web/pv/README.md`](../web/pv/README.md) |
 
 | ドキュメント | 内容 |
 |---|---|
@@ -279,5 +351,5 @@ iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノ�
 | [`docs/01_goals_and_requirements.md`](01_goals_and_requirements.md) | ゴール・要件 |
 | [`docs/dsl/README.md`](dsl/README.md) | DSL v1 の決定表・グリッド仕様・部品一覧 |
 | [`docs/backend/ai-eval/`](backend/ai-eval) | 生成品質・速度の実測 |
-| [`docs/03_demo_script.md`](03_demo_script.md) | 審査デモ台本 |
+| [`docs/03_demo_script.md`](03_demo_script.md) | 発表のデモ台本 |
 | [`docs/release/2026-10-25-release-notes.md`](release/2026-10-25-release-notes.md) | 10/25 のリリースノート |

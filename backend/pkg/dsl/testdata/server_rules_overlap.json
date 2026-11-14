@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "予定と作業", "voiceEntry": "none"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "bookings", "name": "予約", "titleField": "title", "fields": [
+      {"id": "title", "name": "件名", "type": "string", "required": true},
+      {"id": "start", "name": "開始", "type": "datetime", "required": true},
+      {"id": "end", "name": "終了", "type": "datetime"},
+      {"id": "clash", "name": "重なり", "type": "boolean"}
+    ]},
+    {"id": "tasks", "name": "作業", "titleField": "name", "fields": [
+      {"id": "name", "name": "作業名", "type": "string", "required": true},
+      {"id": "from", "name": "開始日", "type": "date"},
+      {"id": "due", "name": "締切", "type": "date"}
+    ]},
+    {"id": "days_off", "name": "作業できない日", "titleField": "day", "fields": [
+      {"id": "day", "name": "日付", "type": "date", "required": true}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "予約", "components": [
+      {"type": "list", "entity": "bookings", "item": {"title": "title", "subtitle": "start"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "double_booking", "on": {"record": "created", "entity": "bookings"},
+     "lookup": {"op": "overlaps", "entity": "bookings", "field": "start", "fieldEnd": "end", "equals": "start", "equalsEnd": "end"},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "予定が重なっています", "body": "{title} がほかの予約と重なっています"}}]},
+    {"id": "clash_mark", "on": {"every": "daily", "time": "06:00", "each": "bookings"},
+     "if": {"op": "neq", "args": [{"ref": "clash"}, true]},
+     "lookup": {"op": "overlaps", "entity": "bookings", "field": "start", "fieldEnd": "end", "equals": "start", "equalsEnd": "end"},
+     "do": [{"updateRecord": {"values": {"clash": true}}}]},
+    {"id": "day_off_check", "on": {"every": "daily", "time": "07:00", "each": "tasks"},
+     "lookup": {"op": "overlaps", "entity": "days_off", "field": "day", "equals": "from", "equalsEnd": "due"},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "作業できない日があります", "body": "{name} の期間に作業できない日が入っています"}}]}
+  ]
+}

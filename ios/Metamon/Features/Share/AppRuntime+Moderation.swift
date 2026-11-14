@@ -106,7 +106,7 @@ extension AppRuntime: ModerationHost {
         } catch {
             let message = (error as? APIError)?.status == 429
                 ? L10n.tr("今日はこれ以上通報できません。明日またお試しください")
-                : L10n.tr("通報できませんでした: \(error.localizedDescription)")
+                : ErrorCopy.failure(L10n.tr("通報できませんでした"), error, context: "Moderation")
             ui.notice = ModerationNotice(title: L10n.tr("通報できませんでした"), message: message, fromDiscover: req.fromDiscover)
         }
     }
@@ -131,7 +131,8 @@ extension AppRuntime: ModerationHost {
                                          fromDiscover: req.fromDiscover)
         } catch {
             if let uid = req.authorUID { ui.blocked[uid] = nil }
-            ui.notice = ModerationNotice(title: L10n.tr("ブロックできませんでした"), message: error.localizedDescription, fromDiscover: req.fromDiscover)
+            ErrorLog.record(error, context: "block")
+            ui.notice = ModerationNotice(title: L10n.tr("ブロックできませんでした"), message: ErrorCopy.nextStep(for: error), fromDiscover: req.fromDiscover)
         }
     }
 
@@ -144,7 +145,7 @@ extension AppRuntime: ModerationHost {
             for e in dsl.entities where e.isShared { await load(entities: [e.id], force: true) } // サーバーが除いていた投稿を取り直す
         } catch {
             ui.blocked[user.uid] = user.name
-            toast = L10n.tr("解除できませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("解除できませんでした"), error, context: "Moderation")
         }
     }
 

@@ -17,7 +17,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testComponentTypesMatchSchema() throws {
         let schemaTypes = Set(try SchemaFixture.load().componentProps.keys)
         let swiftTypes = Set(ComponentType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 68, "部品の数が 68 でない(7 Container + 61 Leaf・#351・matchList #507・flashcards #264)")
+        XCTAssertEqual(schemaTypes.count, 77, "部品の数が 77 でない(7 Container + 70 Leaf・placeSearch・#351・matchList #507・flashcards #264・transcribeField / speakButton・drawingField・feed #348・fileImport・aiChat・bracket・callButton #447)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "部品の type",
                       swiftPlace: "ComponentType の case")
     }
@@ -52,7 +52,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testActionTypesMatchSchema() throws {
         let schemaTypes = try SchemaFixture.load().actionTypes
         let swiftTypes = Set(ActionType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 12, "アクションの数が 12 でない(#351)")
+        XCTAssertEqual(schemaTypes.count, 16, "アクションの数が 16 でない(#351・#270 で follow / unfollow・addToCalendar・lookupBook)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "アクションの type",
                       swiftPlace: "ActionType の case")
     }
@@ -61,6 +61,13 @@ final class SchemaSwiftKeysTests: XCTestCase {
         let schemaKeys = try SchemaFixture.load().objectKeys("Action")
         assertSameSet(schema: schemaKeys, swift: Action.codingKeyNames, what: "Action のキー",
                       swiftPlace: "Action の Keys(Model/Action.swift)", allowSwiftOnly: swiftOnlyActionKeys)
+    }
+
+    /// Action の中に直接書いたオブジェクト(`$defs` に無いもの)。
+    func testInlineActionObjectKeysMatchSchema() throws {
+        assertSameSet(schema: try SchemaFixture.load().inlineKeys("Action", "bookLookup"),
+                      swift: Self.storedPropertyNames(BookLookupSpec(isbnField: "i")),
+                      what: "Action.bookLookup のキー", swiftPlace: "BookLookupSpec(Records/BookLookupPlan.swift)の stored property")
     }
 
     // MARK: - entity / field など
@@ -82,9 +89,12 @@ final class SchemaSwiftKeysTests: XCTestCase {
             ("TableColumn", "TableColumnSpec(Model/Component.swift)", TableColumnSpec(field: "f")),
             ("SensorThreshold", "SensorThreshold(Model/Component.swift)", SensorThreshold()),
             ("Activity", "ActivitySpec(Model/Action.swift)", ActivitySpec(title: "t")),
+            ("CalendarEvent", "CalendarEventSpec(Model/Action.swift)", CalendarEventSpec(startField: "s")),
             ("Mark", "Mark(Records/RecordMark.swift)", Mark(id: "m", icon: "heart", label: "l")),
             ("PhotoAnalyze", "PhotoAnalyze(Records/PhotoReading.swift)", PhotoAnalyze(kind: .text, into: "f")),
+            ("ImportColumn", "ImportColumn(Records/RecordImport.swift)", ImportColumn(column: "c", field: "f")),
             ("Notification", "NotificationSpec(Model/AppDocument.swift)", NotificationSpec(id: "n", title: "t")),
+            ("TextHighlight", "TextHighlight(Model/TextHighlight.swift)", TextHighlight()),
         ]
         for c in cases {
             assertSameSet(schema: try schema.objectKeys(c.def), swift: Self.storedPropertyNames(c.value),
@@ -131,6 +141,13 @@ private struct SchemaFixture {
 
     func objectKeys(_ name: String) throws -> Set<String> {
         Set(try XCTUnwrap(try def(name)["properties"] as? [String: Any], "$defs/\(name) に properties が無い").keys)
+    }
+
+    /// `$defs/<name>.properties.<prop>.properties` のキー。
+    func inlineKeys(_ name: String, _ prop: String) throws -> Set<String> {
+        let props = try XCTUnwrap(try def(name)["properties"] as? [String: Any], "$defs/\(name) に properties が無い")
+        let obj = try XCTUnwrap(props[prop] as? [String: Any], "$defs/\(name).\(prop) が無い")
+        return Set(try XCTUnwrap(obj["properties"] as? [String: Any], "$defs/\(name).\(prop) に properties が無い").keys)
     }
 
     /// 部品 type → その部品のスキーマ上の props キー(type / id / area を含む)。

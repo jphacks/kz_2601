@@ -98,3 +98,15 @@ Reduce Motion ではスタガーとハイライトを省略(即時表示)。
 - 新しい色・サイズは `RenderTheme` に足してから使う(leaf に生の数値や `Color.blue` を書かない)。
 - a11y(#68)の `accessibilityLabel` 等の行は見た目の変更で壊さない。
 - 本体 `Theme` を変えたら `RenderTheme` の対応表(ファイル冒頭)も更新する。
+
+## 5. Mac(#935・#938)
+Mac 版(`ios/MetamonMac`)も同じトークンを使う。Mac だけの色は作らない。
+
+| 項目 | Mac での扱い |
+|---|---|
+| 色 | `RenderTheme` / 本体 `Theme` をそのまま使う(`Theme.swift` を Mac のターゲットにも入れている)。ライト / ダークはシステムの設定に従う |
+| アクセント | `ios/Shared/Brand.xcassets` の AccentColor(藍)を iOS と共有。Mac ではシステム設定のアクセントが「マルチカラー」の時だけ藍になり、ほかの色を選んでいる人にはその色が出る(`.tint` で上書きしない) |
+| 文字 | text style のまま(Mac では body 13pt など Mac の大きさ)。本体の画面の文字・余白は `MacTheme`(`ios/MetamonMac/App/Theme/MacTheme.swift`)。ウィンドウの端の余白は 20pt |
+| サイドバー・ツールバー | Mac 標準の材質と形のまま。ブランド色は選択行などアクセントだけに出る |
+| ツル | `Brand.xcassets` の絵を共有。中央の列・サイドバー・設定が空の時に出す。「視差効果を減らす」では揺らさない。背景は iOS の音声画面と同じ滲み(`Theme.backdrop`) |
+| 生成したアプリの配置 | 列は 6 のまま(DSL の area をそのまま読む)。外枠の幅 = 高さ × 3/4(iPad の縦向きと同じ縦長)を 480〜720pt に収めて中央寄せ。行の高さ = 高さ ÷ 12、52pt を下回る低いウィンドウでは 52pt で止めて縦スクロール(`GridMetrics.resolveDesktop`)。iOS の配置は変えない |

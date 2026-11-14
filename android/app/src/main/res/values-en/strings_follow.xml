@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="follow_failed">Couldn\'t change the follow. Please try again</string>
+    <string name="follow_followed">Followed</string>
+    <string name="follow_full">You can follow up to 500 people in this app</string>
+    <string name="follow_not_in_app">This person no longer takes part in this app</string>
+    <string name="follow_offline">You can\'t follow while offline</string>
+    <string name="follow_open_post_first">Open someone else\'s post to follow them</string>
+    <string name="follow_unavailable">Following isn\'t available in this app right now</string>
+    <string name="follow_unfollowed">Unfollowed</string>
+</resources>

@@ -16,6 +16,8 @@ struct RandomPickerLeaf: View {
     @State private var spinning: Record?
     @State private var spinTask: Task<Void, Never>?
     @State private var pickCount = 0
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 34
+    @ScaledMetric(relativeTo: .largeTitle) private var iconFrame: CGFloat = 60
 
     private var entityId: String { c.entity ?? "" }
     private var entity: Entity? { rt.dsl.entity(entityId) }
@@ -91,9 +93,9 @@ struct RandomPickerLeaf: View {
         } else {
             VStack(spacing: RenderTheme.Spacing.sm) {
                 Image(systemName: "questionmark")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .font(.system(size: iconSize, weight: .bold, design: .rounded))
                     .foregroundStyle(RenderTheme.Colors.brandA.opacity(0.6))
-                    .frame(width: 60, height: 60)
+                    .frame(width: iconFrame, height: iconFrame)
                     .background(RenderTheme.Colors.brandSoft, in: Circle())
                     .accessibilityHidden(true)
                 Text(L("ボタンを押すと 1 つ選びます"))

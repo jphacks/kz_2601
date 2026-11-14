@@ -35,7 +35,7 @@
       "components": [
         { "type": "stat", "id": "avg_stars", "area": "A1:F2", "label": "平均満足度", "entity": "checkin", "aggregate": "avg", "field": "stars" },
         { "type": "list", "id": "recent", "area": "A3:F10", "entity": "checkin",
-          "item": { "title": "note", "subtitle": "mood", "trailing": "stars" },
+          "item": { "title": "mood", "subtitle": "note", "trailing": "stars" },
           "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ記録がありません", "swipeToDelete": true,
           "onItemTap": { "type": "navigate", "screen": "checkin_form", "presentation": "push" } },
         { "type": "button", "id": "add", "area": "D11:F12", "label": "今日の記録をつける", "icon": "square.and.pencil",

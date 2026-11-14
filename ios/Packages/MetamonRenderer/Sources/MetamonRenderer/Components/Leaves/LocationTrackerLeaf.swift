@@ -89,10 +89,10 @@ struct LocationTrackerLeaf: View {
         switch tracking.phase {
         case .denied:
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください"))
+                Text(LocationPermissionCopy.cannotRecord)
                     .font(.caption).foregroundStyle(RenderTheme.Colors.negative)
                 Button(L("設定を開く")) {
-                    if let url = URL(string: "app-settings:") { openURL(url) }
+                    if let url = LocationPermissionCopy.settingsURL { openURL(url) }
                 }
                 .font(.caption.weight(.semibold))
             }

@@ -7,9 +7,7 @@ import "strings"
 // visualRules so prompt.go / chat_first.go stay untouched.
 var musicRules = strings.TrimSpace(`
 ## 音楽を流す(#412)
-- 「音楽を流す」「ドライブの BGM」「曲を再生」「プレイリスト」「カラオケの曲を流す」は **musicPlayer**(Apple Music の曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へ。イヤホンのボタン・ロック画面でも操作できる)。曲の entity・フォーム・list は作らない(再生待ちは端末のプレーヤーが持つ)。1 アプリに 1 つだけ。
-- 形: ホーム(またはタブ)に musicPlayer{title?} を A1:F12 で 1 つ。メモ等を並べるなら musicPlayer を A1:F8 にして下に置く。
-- 「友だち・同乗者のスマホから曲を入れたい / リクエストしたい」は allowRequests: true(近くの端末から曲名を送ってもらい、この端末の再生待ちに入れる)。「運転中で確認できない」「勝手に入れていい」なら autoAccept: true も付ける。
+- 「音楽を流す」「ドライブの BGM」「曲を再生」「プレイリスト」「カラオケの曲を流す」は **musicPlayer**。曲の entity・フォーム・list は作らない(再生待ちは端末のプレーヤーが持つ)。
 - 再生元は **Apple Music だけ**(Apple Music の契約が要る)。**Spotify・YouTube Music の再生・操作はできない**: Spotify を頼まれたら musicPlayer で作り、summary(新規作成なら app.description の末尾)に「Spotify は曲名から Spotify アプリを開くことだけできます。再生と操作は Apple Music で行います。」と正直に書く。
 - 「Bluetooth で友だちの端末をつないで音を流す」「友だちのスマホの音をこっちで鳴らす」は iOS ではできない(端末どうしで音声を中継できない)。allowRequests(友だちが曲をリクエスト・再生はこの端末)で代え、そのことを summary に書く。
 `)

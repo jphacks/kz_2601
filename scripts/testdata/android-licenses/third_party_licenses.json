@@ -1,0 +1,34 @@
+{
+ "source": "android :app prodReleaseRuntimeClasspath",
+ "entries": [
+  {
+   "id": "test-app",
+   "name": "Test App",
+   "url": "https://example.com/app",
+   "kind": "app",
+   "version": null,
+   "license": "MIT",
+   "copyright": [
+    "Copyright (c) 2026 Test App"
+   ],
+   "artifacts": [],
+   "text": "MIT License\n\nCopyright (c) 2026 Test App\n\nテスト用のアプリの LICENSE。\n",
+   "notices": []
+  },
+  {
+   "kind": "dependency",
+   "id": "com-example",
+   "name": "com.example",
+   "version": null,
+   "url": "https://example.com/alpha",
+   "license": "Apache-2.0",
+   "copyright": [],
+   "artifacts": [
+    "alpha:1.0.0",
+    "beta:2.0.0"
+   ],
+   "text": "Apache License 2.0(テスト用の短い本文)\n",
+   "notices": []
+  }
+ ]
+}

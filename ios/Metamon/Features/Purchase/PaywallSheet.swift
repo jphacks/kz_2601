@@ -2,9 +2,10 @@
 #if !APP_STORE_REVIEW
 import SwiftUI
 import StoreKit
+import MetamonRenderer
 import MetamonServices
 
-/// 「Tailor It Pro」の課金画面(#77 / #414)。何ができるようになるか・価格・購入・復元・規約とプライバシー(3.1.2)。
+/// 「Tailor It Pro」の課金画面(#77 / #414)。何ができるようになるか・価格・購入・復元・サブスクの管理(#326)・規約とプライバシー(3.1.2)。
 /// 開く入口: 設定の「Pro にする」/ 無料作成の上限 / 有料機能(共有など)を使うアプリの生成・修正 / 共有アプリへの参加。
 struct PaywallSheet: View {
     var reason: PaywallReason = .settings
@@ -51,14 +52,12 @@ struct PaywallSheet: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("閉じる") { dismiss() }
-                        .accessibilityIdentifier("paywall.close")
-                }
+                SheetCloseToolbarItem(identifier: "paywall.close") { dismiss() }
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .coinSheets() // #630 この画面の上にお店・プランの比較を重ねる
         .task {
             if store.offer == nil { await store.loadProducts() }
         }
@@ -85,6 +84,15 @@ struct PaywallSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("paywall.headline")
+            if CoinGate.shared.isEnabled { // #630 コインの残高とプランの比較
+                HStack(spacing: Theme.Spacing.md) {
+                    CoinBalanceChip(accessibilityID: "paywall.coins")
+                    Button { CoinGate.shared.openPlans() } label: { Text("プランを比べる") }
+                        .font(.subheadline.weight(.medium))
+                        .tint(Theme.Colors.brandText)
+                        .accessibilityIdentifier("paywall.comparePlans")
+                }
+            }
         }
     }
 
@@ -96,8 +104,6 @@ struct PaywallSheet: View {
             return L10n.tr("今日の無料作成(\(gate.quota.dailyFreeLimit) 回)を使い切りました")
         case .paidFeature(let features):
             return L10n.tr("「\(Self.featureNames(features))」には Tailor It Pro が必要です")
-        case .join(let name):
-            return L10n.tr("「\(name)」に参加するには Tailor It Pro が必要です")
         }
     }
 
@@ -178,6 +184,12 @@ struct PaywallSheet: View {
                 .disabled(busy)
                 .accessibilityIdentifier("paywall.restore")
 
+            if ManageSubscriptionPlacement.placement(isPro: false) == .nearRestore {
+                ManageSubscriptionButton(accessibilityID: "paywall.manage")
+                    .font(.footnote)
+                    .tint(.secondary)
+            }
+
             if store.offer == nil, !store.isLoadingProducts {
                 Text("価格を取得できませんでした。通信状態を確認してください。")
                     .font(.footnote)
@@ -210,13 +222,20 @@ struct PaywallSheet: View {
     }
 
     private var proBadge: some View {
-        Label(justPurchased ? "Pro になりました" : "Pro をご利用中です", systemImage: "checkmark.seal.fill")
-            .font(.headline)
-            .foregroundStyle(Theme.Colors.brandText)
-            .padding(.vertical, Theme.Spacing.md)
-            .frame(maxWidth: .infinity)
-            .metamonCard()
-            .accessibilityIdentifier("paywall.pro")
+        VStack(spacing: Theme.Spacing.md) {
+            Label(justPurchased ? "Pro になりました" : "Pro をご利用中です", systemImage: "checkmark.seal.fill")
+                .font(.headline)
+                .foregroundStyle(Theme.Colors.brandText)
+                .accessibilityIdentifier("paywall.pro")
+            if ManageSubscriptionPlacement.placement(isPro: true) == .prominent {
+                ManageSubscriptionButton(accessibilityID: "paywall.manage")
+                    .font(.subheadline.weight(.medium))
+                    .tint(Theme.Colors.brandText)
+            }
+        }
+        .padding(.vertical, Theme.Spacing.md)
+        .frame(maxWidth: .infinity)
+        .metamonCard()
     }
 
     /// 3.1.2: 自動更新の説明 + 利用規約・プライバシーポリシーへのリンク
@@ -274,14 +293,20 @@ struct PaywallSheet: View {
 /// (root = RootView の外側・chat = 確認カードのある対話画面。音声シートの中でも重ねて出せる)。
 struct PaywallPresenter: ViewModifier {
     let placement: PaywallRequest.Placement
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let gate = ProGate.shared
+        let shows = assistiveAccess.shows(.paywall) // アシスティブアクセス(#1997)では課金の画面を出さない
         return content.sheet(item: Binding(
-            get: { gate.paywall?.placement == placement ? gate.paywall : nil },
+            get: { shows && gate.paywall?.placement == placement ? gate.paywall : nil },
             set: { if $0 == nil { gate.dismissPaywall(placement: placement) } }
         ), onDismiss: { gate.dismissPaywall(placement: placement) }) { request in
             PaywallSheet(reason: request.reason, closeNote: request.closeNote)
+        }
+        // 出さない時は閉じた(買わなかった)扱いですぐ返す(待っている呼び出し元を止めない)
+        .onChange(of: gate.paywall?.id, initial: true) {
+            if !shows, gate.paywall?.placement == placement { gate.dismissPaywall(placement: placement) }
         }
     }
 }
@@ -291,6 +316,7 @@ struct PaywallHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .modifier(PaywallPresenter(placement: .root))
+            .modifier(CoinHost()) // #630 コイン(サーバーが有効にした時だけ出る)
             .task { ProGate.shared.start() }
     }
 }

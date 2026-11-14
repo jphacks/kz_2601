@@ -147,6 +147,39 @@ final class ChatHistoryTests: XCTestCase {
         XCTAssertEqual(store.load(appId: rt.document.appId), [])
     }
 
+    /// M9: これまでの会話があれば「最初から」は確認を出し、確認の前には何も消さない
+    func testRestartAsksBeforeErasingHistory() async throws {
+        let rt = try makeEditRuntime()
+        await rt.submitUtterance("金額を大きくして")
+        await rt.buildFromChat()
+        await rt.submitUtterance("色を変えて")
+        let saved = rt.chatHistory
+        XCTAssertTrue(rt.isChatting)
+
+        rt.requestRestartChat()
+        XCTAssertTrue(rt.showRestartConfirm, "これまでの会話があるので確認する")
+        XCTAssertEqual(rt.chatHistory, saved, "確認の前に消さない")
+        XCTAssertTrue(rt.isChatting)
+
+        // 「今の会話だけ消す」: 区切りは残る(今の会話は閉じた会話にも移さない)
+        rt.restartLiveChat()
+        XCTAssertFalse(rt.showRestartConfirm)
+        XCTAssertFalse(rt.isChatting)
+        XCTAssertEqual(rt.chatHistory, saved)
+        XCTAssertEqual(store.load(appId: rt.document.appId), saved)
+    }
+
+    /// M9: これまでの会話が無ければ、確認なしで今の会話だけ消す
+    func testRestartWithoutHistoryNeedsNoConfirm() async throws {
+        let rt = try makeEditRuntime()
+        await rt.submitUtterance("見やすくして")
+        XCTAssertFalse(rt.hasChatHistory)
+        rt.requestRestartChat()
+        XCTAssertFalse(rt.showRestartConfirm)
+        XCTAssertFalse(rt.isChatting)
+        XCTAssertEqual(rt.chatHistory, [], "今の会話は閉じた会話に残さない")
+    }
+
     // MARK: - AI に送る文脈
 
     func testContextIsSummariesPlusSinceLastApply() {

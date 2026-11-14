@@ -1,0 +1,579 @@
+package jp.kz2601.metamon.desktop
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.ApplicationScope
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
+import java.awt.Dimension
+import java.awt.GraphicsEnvironment
+import java.awt.Rectangle
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.consent.DesktopAiButtonMetrics
+import jp.kz2601.metamon.desktop.consent.LocalAiButtonMetrics
+import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
+import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
+import jp.kz2601.metamon.desktop.debug.DevOnboardingItems
+import jp.kz2601.metamon.desktop.debug.SeenFlagsOnboardingReplay
+import jp.kz2601.metamon.desktop.hotkey.HotkeyRunner
+import jp.kz2601.metamon.desktop.hotkey.HotkeySettings
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatEntry
+import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.desktop.create.AppCreator
+import jp.kz2601.metamon.desktop.create.CreateWindow
+import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.services.consent.AiConsentStore
+import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.OpenWithFiles
+import jp.kz2601.metamon.desktop.io.OpenWithInbox
+import jp.kz2601.metamon.desktop.net.DesktopApi
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
+import jp.kz2601.metamon.desktop.notify.NoticeArgs
+import jp.kz2601.metamon.desktop.platform.JumpArgs
+import jp.kz2601.metamon.desktop.platform.JumpCommand
+import jp.kz2601.metamon.desktop.platform.JumpListPlan
+import jp.kz2601.metamon.desktop.platform.JumpListPublisher
+import jp.kz2601.metamon.desktop.platform.RecentApps
+import jp.kz2601.metamon.desktop.platform.SendToArgs
+import jp.kz2601.metamon.desktop.platform.SendToInbox
+import jp.kz2601.metamon.desktop.platform.SendToShortcut
+import jp.kz2601.metamon.desktop.power.ScreenAwake
+import jp.kz2601.metamon.desktop.net.ServerApps
+import jp.kz2601.metamon.desktop.store.DesktopStore
+import jp.kz2601.metamon.desktop.store.DeviceWipe
+import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.desktop.theme.ProvideTextZoom
+import jp.kz2601.metamon.desktop.onboarding.OnboardingStore
+import jp.kz2601.metamon.desktop.store.ThumbnailStore
+import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.desktop.update.UpdateGate
+import jp.kz2601.metamon.desktop.update.UpdateState
+import jp.kz2601.metamon.desktop.voice.VoiceFlag
+import jp.kz2601.metamon.dsl.records.entityModels
+import jp.kz2601.metamon.dsl.screen
+import java.io.File
+import java.util.prefs.Preferences
+import javax.swing.SwingUtilities
+
+/**
+ * 起動。引数 1 つ目(または -Dtailorit.example)で同梱の例を選ぶ。既定は shopping。
+ * 引数 2 つ目に記録の JSON(`{"<entity>": [{"id", "data"}]}`・case.json の形も可)を渡すとモックに入れて開く(端末には残さない)。3 つ目は最初の画面の id。
+ * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。端末の記録は裏で読み、読み終えるまでスケルトンを出す。
+ * ウィンドウはアプリごとに 1 枚、記録の詳細も別の 1 枚で開ける(#1763・Windows.kt)。同じアプリのウィンドウは記録を共有する。
+ * ウィンドウの大きさ・位置は種類(アプリ / 詳細)ごとに覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
+ * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
+ * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
+ */
+fun main(rawArgs: Array<String>) {
+    // 通知のボタン(#3210)で起動した時は `tailorit-notice:…` の引数が付く。ほかの引数の並びは崩さない
+    val press = NoticeArgs.parse(rawArgs.toList())
+    val withoutNotice = NoticeArgs.strip(rawArgs.toList())
+    // 「送る」(#3209)は `--send-to` の後ろに選んだファイルが付く。先に切り出して、ほかの引数の並びは崩さない
+    val sent = SendToArgs.files(withoutNotice)
+    val argv = SendToArgs.strip(withoutNotice)
+    // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する
+    val jump = JumpArgs.parse(argv)
+    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける(`--jump=…` もここで落ちる)
+    val parsed = LaunchArgs.parse(argv)
+    // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
+    val openFiles = OpenWithFiles.fromArgs(parsed.positional)
+    val args = OpenWithFiles.withoutFiles(parsed.positional).toTypedArray()
+    // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
+    if (args.getOrNull(1) == null && !SingleInstance.claim()) {
+        if (!SingleInstance.handOff(args = rawArgs.toList())) SingleInstance.reportRunning()
+        return
+    }
+    OpenWithInbox.offer(openFiles)
+    press?.let(NoticeActions::deliver)
+    runApp(args, parsed.action, jump, sent)
+}
+
+private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null, sent: List<File>? = null) = application {
+    // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
+    val desktopStore = remember { DesktopStore.open().also { DevOnboardingItems.hook = SeenFlagsOnboardingReplay(it.settings) } }
+    // 並びを直した分(#3207)。同梱の DSL に当て直して開く
+    val layouts = remember { LayoutEditStore(desktopStore.root?.resolve("layouts")) }
+    val first = remember {
+        args.firstOrNull() ?: System.getProperty("tailorit.example")
+            ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
+    }
+    // 端末の記録は裏で読む。読み終えるまでウィンドウはスケルトン(SharedRecords.loading)
+    val loadScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    // 前に落ちた時などに残った引き出し・写真・カレンダーに渡した一時フォルダ(1 日より古い物)を裏で消す
+    remember {
+        loadScope.launch {
+            runCatching { DragOut.sweep() }
+            runCatching { DragOut.sweep(root = PhotoOpen.tempRoot()) }
+            runCatching { DesktopActionHost.sweepCalendar() }
+            // 消したアプリ・数を超えた古い写し(#3204)
+            runCatching { desktopStore.thumbnails.prune(BundledApps.ids().toSet()) }
+        }
+    }
+    // aiButton の集計(#2817): 前の日までの分を起動時に 1 回まとめて送る(AI の同意が無い・モックなら送らない)
+    val aiButtonMetrics = remember {
+        DesktopAiButtonMetrics(desktopStore.aiButtonMetrics, desktopStore.aiConsent, DesktopApi.aiButtonMetricsSender(DesktopApiConfig.fromEnvironment()))
+            .also { m -> loadScope.launch { m.flush() } }
+    }
+    // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
+    // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
+    val onboarding = remember { OnboardingStore(desktopStore.settings) }
+    val onboardingAtLaunch = remember {
+        val reset = onboarding.applyLaunchOverride()
+        onboarding.shouldAutoPresent() && (args.getOrNull(1) == null || reset)
+    }
+    // 最後に見た画面の写し(#3204)。記録の JSON を渡した開発・スクリーンショットの起動では撮らない
+    val thumbnails = remember { desktopStore.thumbnails.takeIf { args.getOrNull(1) == null } }
+    // サーバーのアプリ(#2379)。MOCK・サインインしていない時は何も出さない(サインイン #2151 までは TAILORIT_DEV_TOKEN をサインインと見る)
+    val apiConfig = remember { DesktopApiConfig.fromEnvironment() }
+    val appConfig = remember { DesktopApi.appConfig(apiConfig, desktopStore.documents) }
+    val serverApps = remember {
+        ServerAppsModel(appConfig?.let { ServerApps(it, desktopStore.documents) { apiConfig.devToken != null } }) { id ->
+            desktopStore.documents.load(id)?.document?.dsl?.app?.icon
+        }
+    }
+    LaunchedEffect(serverApps) { serverApps.refresh() }
+    val opener = remember { appConfig?.let { ServerAppOpener(it, desktopStore.documents) } }
+    // 最後に開いた同梱のアプリが無く、サーバーの一覧があればホームから(引数で選んだ時は選んだアプリ)
+    val home = remember {
+        args.isEmpty() && System.getProperty("tailorit.example") == null && serverApps.available &&
+            desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } == null
+    }
+    val registry = remember { WindowRegistry().also { it.open(if (home) WindowKey.home() else WindowKey.app(first)) } }
+    // 会話・作る(#2160・#2163): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
+    val uiScope = rememberCoroutineScope()
+    val chat = remember {
+        val config = DesktopApiConfig.fromEnvironment()
+        val granted = { desktopStore.aiConsent.isGranted }
+        val creator = DesktopApi.generate(config, granted)?.let { source ->
+            AppCreator(
+                source,
+                uiScope,
+                locale = { Strings.locale.language },
+                cache = { desktopStore.documents.store(it.document.appId, it.envelopeJson) },
+                onOpen = { id -> registry.open(WindowKey.app(id)) },
+            )
+        }
+        ChatWiring(ChatEntry.factory(DesktopApi.ai(config, granted, desktopStore.documents)), desktopStore.aiConsent, creator)
+    }
+    val hub = remember {
+        // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
+        val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
+        AppHub(
+            // 作ったアプリ(#2163)はこの起動の間だけ一覧に出す。同梱のアプリは並びを直した分(#3207)を当てる
+            load = { id -> chat.creator?.created?.dsl(id) ?: layouts.applyTo(id, Examples.load(id)) },
+            openRecords = { id, dsl ->
+                if (fixture != null && id == first) {
+                    SharedRecords(fixture)
+                } else {
+                    val p = SessionPersistence.create(desktopStore, id)
+                    val models = dsl.entityModels()
+                    // 記録は Swing の画面のスレッドでだけ書き換える(断られた分を混ぜる時も)
+                    SharedRecords.opening(p, loadScope, post = { SwingUtilities.invokeLater(it) }) { p.load(models) }
+                }
+            },
+            wipeStore = {
+                desktopStore.wipe()
+                layouts.removeAll()
+                DeviceWipe.run(desktopStore.root)
+            },
+            // DSL の差し替え(#2809)は画面のスレッドで
+            post = { SwingUtilities.invokeLater(it) },
+        )
+    }
+    DisposableEffect(hub) {
+        onDispose {
+            // 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ってから(3 秒まで)閉じる
+            hub.close()
+            loadScope.cancel()
+        }
+    }
+    // 一覧で選んだ: DSL を読み、アプリのウィンドウで開く(開いていれば前に出す)
+    val openServerApp: suspend (ServerAppRow) -> Boolean = { row ->
+        val dsl = opener?.load(row.id)
+        if (dsl != null) {
+            hub.put(row.id, dsl)
+            registry.open(WindowKey.app(row.id))
+        }
+        dsl != null
+    }
+    // 作っている間のウィンドウ(#2163)
+    chat.creator?.let { c -> c.current?.let { CreateWindow(c, it) } }
+    val firstWindowId = remember { registry.windows.first().id }
+    // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
+    val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
+    // 入れた物(MSI)で動いている Windows なら「送る」にショートカットを置く(置いてあれば何もしない)
+    remember { loadScope.launch { SendToShortcut.create().ensure() } }
+    // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
+    val tray = remember { TrayController.create(hub.dsl(first)) }
+    tray.onOpenApp = { registry.open(WindowKey.app(it)) }
+    // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
+    remember {
+        // 通知のボタン(#3210): 開くはアプリを前に出す。どのボタンかは通知の onAction にも渡る
+        NoticeActions.onPress { p ->
+            SwingUtilities.invokeLater { if (p.action == NoticeAction.OPEN) tray.open() }
+        }
+        SingleInstance.onHandoff { handed ->
+            val press = NoticeArgs.parse(handed)
+            if (press != null) {
+                NoticeActions.deliver(press)
+                return@onHandoff
+            }
+            val files = SendToArgs.files(handed)
+            val raw = SendToArgs.strip(handed)
+            val cmd = JumpArgs.parse(raw)
+            SwingUtilities.invokeLater {
+                val p = LaunchArgs.parse(raw)
+                val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.takeUnless { it.isHome }?.appId ?: first
+                tray.openApp(id)
+                if (p.action == LaunchAction.QUICK_RECORD || cmd == JumpCommand.QUICK_RECORD) tray.quickRecord()
+                OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
+                // 送られたファイルは前にあるアプリの、アプリのウィンドウへ(すぐ記録と同じ行き先)
+                if (files != null) sendTo.offer(SendToArgs.readable(files), registry.quickRecordWindow()?.id)
+            }
+        }
+    }
+    // 最初の起動が右クリックの操作から: ウィンドウを開いた後に 1 回だけ動かす
+    LaunchedEffect(Unit) { if (launchAction == LaunchAction.QUICK_RECORD) tray.quickRecord() }
+    // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
+    tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
+    // ジャンプリストの「すぐ記録」で起動した(#3208)
+    LaunchedEffect(Unit) { if (jump == JumpCommand.QUICK_RECORD) tray.quickRecord() }
+    // ジャンプリスト(#3208・既定は出さない)。前に出たアプリを「最近」の頭に足して出し直す
+    val jumpList = remember { JumpListPublisher.create() }
+    // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
+    val active = registry.active
+    LaunchedEffect(active?.id) {
+        val appId = active?.key?.takeUnless { it.isHome }?.appId ?: return@LaunchedEffect
+        tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
+        if (jumpList !== JumpListPublisher.Noop) {
+            val before = RecentApps.decode(desktopStore.settings.getString(RecentApps.KEY))
+            val recent = RecentApps.touch(before, appId)
+            if (recent != before) desktopStore.settings.putString(RecentApps.KEY, RecentApps.encode(recent))
+            val content = JumpListPlan.build(
+                recent, BundledApps.all().toMap(), QuickRecordTarget.find(hub.dsl(appId)) != null, VoiceFlag.enabled(),
+                JumpListPlan.Labels(Strings["desktop_jumplist_recent"], Strings["desktop_tray_quick_record"], Strings["desktop_jumplist_voice"]),
+            )
+            loadScope.launch { jumpList.publish(content) }
+        }
+    }
+    DesktopTray(tray)
+    // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
+    // 設定の画面でキーを変えたら HotkeyRunner.restartShared で登録し直す(#2204)
+    DisposableEffect(tray) {
+        val runner = HotkeyRunner { raw ->
+            GlobalHotkeys.startFromSettings(
+                raw = raw,
+                voiceEnabled = { VoiceFlag.enabled() },
+                bringToFront = { tray.open() },
+                notify = Notifier.Tray::notify,
+                post = { SwingUtilities.invokeLater(it) },
+            )
+        }
+        HotkeyRunner.shared = runner
+        val job = loadScope.launch { runner.restart(HotkeySettings.raw()) }
+        onDispose {
+            job.cancel()
+            HotkeyRunner.shared = null
+            runner.close()
+        }
+    }
+    // 版の確認(#2377): 起動時と 6 時間ごと。MOCK(通信しない)では読まない
+    val updates = remember { UpdateState.create(DesktopApiConfig.fromEnvironment()) }
+    LaunchedEffect(updates) { updates.run() }
+    // 画面を順に移る(開発用・環境変数)。最初のウィンドウだけ
+    val autoNav = remember { AutoNavPlan.fromEnvironment() }
+    CompositionLocalProvider(LocalAiButtonMetrics provides aiButtonMetrics) {
+        registry.windows.toList().forEach { w ->
+            key(w.id) {
+                if (w.key.isHome) {
+                    HomeWindow(w, registry, tray, serverApps, openServerApp)
+                } else {
+                    DesktopWindow(
+                        w, registry, hub, tray, updates, layouts, sendTo, chat,
+                        startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
+                        autoNav = autoNav?.takeIf { w.id == firstWindowId },
+                        onboarding = onboarding,
+                        showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
+                        thumbnails = thumbnails,
+                        serverApps = serverApps,
+                        openServerApp = openServerApp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
+@OptIn(FlowPreview::class)
+@Composable
+private fun ApplicationScope.DesktopWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    hub: AppHub,
+    tray: TrayController,
+    updates: UpdateState,
+    layouts: LayoutEditStore,
+    sendTo: SendToInbox,
+    chat: ChatWiring,
+    startScreen: String?,
+    autoNav: AutoNavPlan?,
+    onboarding: OnboardingStore,
+    showOnboarding: Boolean,
+    thumbnails: ThumbnailStore?,
+    serverApps: ServerAppsModel,
+    openServerApp: suspend (ServerAppRow) -> Boolean,
+) {
+    // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
+    val app = remember(w) { hub.acquire(w.key.appId) }
+    DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
+    val kind = w.key.kind
+    val saved = remember(w) {
+        WindowBounds.load(kind)?.let { WindowBounds.fit(WindowBounds.cascade(it, registry.indexInKind(w)), WindowBounds.screens()) }
+    }
+    val state = rememberWindowState(
+        size = saved?.size ?: WindowBounds.defaultSize(kind),
+        position = saved?.position ?: WindowPosition.PlatformDefault,
+    )
+    val close = {
+        if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication()
+    }
+    // 並びを直して保存した後に開き直す画面
+    var reopenScreen by remember(w) { mutableStateOf<String?>(null) }
+    val screenTitle = w.key.screen?.let { app.dsl.screen(it)?.title?.ifEmpty { null } }
+    Window(
+        onCloseRequest = close,
+        visible = tray.windowVisible,
+        title = if (screenTitle != null) Strings.format("desktop_window_title_record", app.dsl.app.name, screenTitle) else Strings.format("desktop_window_title", app.dsl.app.name),
+        state = state,
+    ) {
+        // トレイの「開く」は前にあるウィンドウ、同じ物をもう一度開いた時はそのウィンドウを前に出す
+        LaunchedEffect(tray.focusRequests) {
+            if (tray.focusRequests > 0 && registry.active?.id == w.id) {
+                state.isMinimized = false
+                window.toFront()
+            }
+        }
+        LaunchedEffect(w.focusRequests) {
+            if (w.focusRequests > 0) {
+                state.isMinimized = false
+                window.toFront()
+                window.requestFocus()
+            }
+        }
+        // 見えている間だけ画面を消さない効きを許す(最小化・トレイに隠す・閉じるで戻す)
+        val shown = tray.windowVisible && !state.isMinimized
+        DisposableEffect(w.id, shown) {
+            ScreenAwake.shared.setWindowShown(w.id.toString(), shown)
+            onDispose { ScreenAwake.shared.setWindowShown(w.id.toString(), false) }
+        }
+        DisposableEffect(window) {
+            val l = object : WindowAdapter() {
+                override fun windowGainedFocus(e: WindowEvent?) {
+                    registry.activate(w.id)
+                    // 前に出た: 続けて失敗して止まった送り待ちを起こす
+                    app.records.persistence?.resume()
+                }
+
+                // 外で離した Space は届かない: 押しっぱなしの覚えを捨てる(次の押し下げを取りこぼさない)
+                override fun windowLostFocus(e: WindowEvent?) = resetSpaceRepeats()
+            }
+            window.addWindowFocusListener(l)
+            onDispose { window.removeWindowFocusListener(l) }
+        }
+        LaunchedEffect(Unit) {
+            // 6 列が潰れない最小(1 列 ≈ 50dp)
+            window.minimumSize = Dimension(360, 560)
+            snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(kind, size, pos) }
+        }
+        // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
+        CompositionLocalProvider(LocalTray provides tray, LocalAppThumbnails provides thumbnails) {
+            // 更新が要る時は中身を出さない・新しい版があれば上に帯(#2377)。文字の大きさは Ctrl + / Ctrl - / Ctrl 0(#2208)
+            TailorItTheme { UpdateGate(updates) {
+                ProvideTextZoom {
+                if (app.records.loading) {
+                    LoadingSkeleton()
+                } else key(app.dsl) {
+                    // 並びを直して保存したら DSL が替わるので作り直し、編集していた画面から開く(#3207)
+                    // アプリの版が変わって DSL を差し替えたら(#2809)も画面を新しい DSL で作り直して一言出す
+                    DesktopApp(
+                        app.dsl,
+                        startScreen = reopenScreen ?: w.key.screen ?: startScreen,
+                        onOpenApp = { registry.open(WindowKey.app(it)) },
+                        records = app.records,
+                        startRecordId = w.key.recordId,
+                        onOpenRecord = { screen, id -> registry.open(WindowKey.record(app.id, screen, id)) },
+                        // 画面の中の「閉じる」・Esc は終わらせない(最後の 1 枚ならアプリのウィンドウを開いてから閉じる)。トレイ・終了はタイトルバーの × だけ
+                        onCloseWindow = { registry.closeInApp(w.id) },
+                        isActive = { registry.active?.id == w.id },
+                        windowId = w.id,
+                        onWipeLocalData = hub::wipeLocalData,
+                        autoNav = autoNav,
+                        appId = app.id,
+                        onboarding = onboarding,
+                        showOnboardingAtLaunch = showOnboarding,
+                        onSaveLayout = { draft ->
+                            layouts.append(app.id, draft.patch)
+                            reopenScreen = draft.screenId
+                            hub.replaceDsl(app.id, draft.applied(app.dsl))
+                        },
+                        sendTo = sendTo,
+                        thumbnailAppId = w.key.appId.takeIf { kind == WindowKind.APP },
+                        serverApps = serverApps.takeIf { it.available },
+                        onOpenServerApp = openServerApp,
+                        hotSwapNotice = if (app.reloads > 0) Strings["runtime_hot_reloaded"] else null,
+                        newChat = chat.newChat,
+                        buildFromChat = chat.build,
+                        aiConsent = chat.consent,
+                        createdApps = chat.createdApps,
+                    )
+                }
+                }
+            } }
+        }
+    }
+}
+
+/** ホーム(#2379): サーバーのアプリの一覧。選んだらそのアプリのウィンドウを開き、ホームは閉じる。 */
+@Composable
+private fun ApplicationScope.HomeWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    tray: TrayController,
+    serverApps: ServerAppsModel,
+    openServerApp: suspend (ServerAppRow) -> Boolean,
+) {
+    val state = rememberWindowState(size = WindowBounds.defaultSize(WindowKind.APP))
+    Window(
+        onCloseRequest = { if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication() },
+        visible = tray.windowVisible,
+        title = Strings.format("desktop_window_title", Strings["settings_usage_apps"]),
+        state = state,
+    ) {
+        LaunchedEffect(Unit) { window.minimumSize = Dimension(360, 560) }
+        DisposableEffect(window) {
+            val l = object : WindowAdapter() {
+                override fun windowGainedFocus(e: WindowEvent?) = registry.activate(w.id)
+            }
+            window.addWindowFocusListener(l)
+            onDispose { window.removeWindowFocusListener(l) }
+        }
+        CompositionLocalProvider(LocalTray provides tray) {
+            TailorItTheme {
+                ServerAppsHome(serverApps) { row -> openServerApp(row).also { if (it) registry.close(w.id) } }
+            }
+        }
+    }
+}
+
+/** ウィンドウの大きさ・位置(java.util.prefs: Windows はレジストリ、Linux は ~/.java)。種類(アプリ / 詳細)ごとに覚える。 */
+internal object WindowBounds {
+    private val prefs by lazy { Preferences.userRoot().node("jp/kz2601/tailorit/desktop") }
+
+    data class Bounds(val size: DpSize, val position: WindowPosition)
+
+    /** 種類ごとの鍵の頭。アプリのウィンドウは前からの鍵(w・h・x・y)のまま。 */
+    fun prefix(kind: WindowKind): String = when (kind) {
+        WindowKind.APP -> ""
+        WindowKind.RECORD -> "record."
+    }
+
+    /** 覚えた物が無い時の大きさ。詳細は 1 件のフォームなので少し小さく。 */
+    fun defaultSize(kind: WindowKind): DpSize = when (kind) {
+        WindowKind.APP -> DpSize(480.dp, 820.dp)
+        WindowKind.RECORD -> DpSize(440.dp, 640.dp)
+    }
+
+    fun load(kind: WindowKind = WindowKind.APP): Bounds? {
+        val k = prefix(kind)
+        val w = prefs.getFloat("${k}w", -1f)
+        val h = prefs.getFloat("${k}h", -1f)
+        if (w < 360 || h < 560) return null
+        val x = prefs.getFloat("${k}x", Float.NaN)
+        val y = prefs.getFloat("${k}y", Float.NaN)
+        val pos = if (x.isNaN() || y.isNaN()) WindowPosition.PlatformDefault else WindowPosition(x.dp, y.dp)
+        return Bounds(DpSize(w.dp, h.dp), pos)
+    }
+
+    /** 同じ種類の [index] 枚目は右下へずらす(同じ場所にぴったり重ねない)。画面に収めるのは [fit]。 */
+    fun cascade(b: Bounds, index: Int): Bounds {
+        val pos = b.position as? WindowPosition.Absolute ?: return b
+        if (index <= 0) return b
+        return Bounds(b.size, WindowPosition(pos.x + CASCADE * index, pos.y + CASCADE * index))
+    }
+
+    private val CASCADE = 32.dp
+
+    /** 今つながっている画面(外した画面に開かないため)。分からなければ空。 */
+    fun screens(): List<Rectangle> = runCatching {
+        if (GraphicsEnvironment.isHeadless()) emptyList() else GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.map { it.defaultConfiguration.bounds }
+    }.getOrDefault(emptyList())
+
+    /**
+     * 覚えた位置・大きさを今の画面に収める。大きさは一番大きい画面まで。
+     * 見出し(左上)がどの画面にも乗らない位置(外した画面・解像度を下げた)は OS の既定の位置に戻す。
+     */
+    fun fit(b: Bounds, screens: List<Rectangle>): Bounds {
+        if (screens.isEmpty()) return b
+        val maxW = screens.maxOf { it.width }.toFloat()
+        val maxH = screens.maxOf { it.height }.toFloat()
+        val size = DpSize(b.size.width.value.coerceAtMost(maxW).dp, b.size.height.value.coerceAtMost(maxH).dp)
+        val pos = b.position as? WindowPosition.Absolute ?: return Bounds(size, b.position)
+        val title = Rectangle(pos.x.value.toInt(), pos.y.value.toInt(), size.width.value.toInt().coerceIn(1, TITLE_W), TITLE_H)
+        val onScreen = screens.firstOrNull { it.intersection(title).let { r -> !r.isEmpty && r.width >= TITLE_MIN_VISIBLE && r.height >= TITLE_H / 2 } }
+            ?: return Bounds(size, WindowPosition.PlatformDefault)
+        // 乗っている画面の中に収まるよう右下・左上を寄せる
+        val x = pos.x.value.coerceIn(onScreen.x.toFloat(), (onScreen.x + onScreen.width - size.width.value).coerceAtLeast(onScreen.x.toFloat()))
+        val y = pos.y.value.coerceIn(onScreen.y.toFloat(), (onScreen.y + onScreen.height - size.height.value).coerceAtLeast(onScreen.y.toFloat()))
+        return Bounds(size, WindowPosition(x.dp, y.dp))
+    }
+
+    private const val TITLE_W = 200
+    private const val TITLE_H = 32
+    private const val TITLE_MIN_VISIBLE = 48
+
+    fun save(kind: WindowKind, size: DpSize, pos: WindowPosition) {
+        if (!size.width.value.isFinite() || !size.height.value.isFinite()) return
+        val k = prefix(kind)
+        prefs.putFloat("${k}w", size.width.value)
+        prefs.putFloat("${k}h", size.height.value)
+        if (pos is WindowPosition.Absolute) {
+            prefs.putFloat("${k}x", pos.x.value)
+            prefs.putFloat("${k}y", pos.y.value)
+        }
+    }
+}
+
+/** 会話の入口(#2160)と作る流れ(#2163)。[newChat] が null ならパレットに出さない。 */
+private class ChatWiring(
+    val newChat: (() -> ChatSession)?,
+    val consent: AiConsentStore,
+    val creator: AppCreator? = null,
+) {
+    val build: (ChatBuild) -> Unit = { b -> creator?.start(b) }
+    val createdApps: () -> List<Pair<String, String>> = { creator?.created?.all?.toList().orEmpty() }
+}

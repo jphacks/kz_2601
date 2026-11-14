@@ -33,13 +33,19 @@ final class PublicDataUITests: XCTestCase {
         app.buttons["送信"].firstMatch.tap()
     }
 
-    /// 生成直後にダイアログ →「公開のままにする」→ 一覧とフォームに「誰でも見られます」
+    /// 生成直後: 要約カード → (閉じたら)ダイアログ →「公開のままにする」→ 一覧とフォームに「誰でも見られます」(H7: 1 つずつ)
     func testDialogAfterGeneratingPublicPersonalData() {
         launch(clarify: false, holdBanner: true)
         say("美容室の予約アプリを作って")
 
         let alert = app.alerts["個人の情報も公開されます"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 30), "meta.publicPersonalData があるのにダイアログが出ない")
+        let banner = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ほかの人に見られてよいか")).firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 30), "生成後の要約カードが無い")
+        XCTAssertFalse(alert.exists, "要約カードの上にダイアログを重ねない")
+        banner.tap() // 要約カード(タップで消える)を閉じると次が出る
+        XCTAssertTrue(waitGone(banner), "タップしても要約カードが消えない")
+
+        XCTAssertTrue(alert.waitForExistence(timeout: 15), "meta.publicPersonalData があるのにダイアログが出ない")
         XCTAssertTrue(alert.staticTexts["お名前・電話番号は、アプリを開いた人なら誰でも見られます。"].exists)
         XCTAssertTrue(alert.buttons["この欄を消す"].exists)
         XCTAssertTrue(alert.buttons["自分だけにする"].exists)
@@ -49,11 +55,6 @@ final class PublicDataUITests: XCTestCase {
         XCTAssertTrue(waitGone(alert))
         let notice = app.descendants(matching: .any)["publicDataNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 10), "公開の一覧に「誰でも見られます」が無い")
-        let banner = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ほかの人に見られてよいか")).firstMatch
-        // 上の要約カード(タップで消える)が一覧の見出しに被らないように閉じる
-        XCTAssertTrue(banner.waitForExistence(timeout: 10), "生成後の要約カードが無い")
-        banner.tap()
-        XCTAssertTrue(waitGone(banner), "タップしても要約カードが消えない")
         attach("pii-list-notice")
 
         app.buttons["予約を追加"].firstMatch.tap()
@@ -62,19 +63,20 @@ final class PublicDataUITests: XCTestCase {
         attach("pii-form-notice")
     }
 
-    /// 初めて作った後の「引き継ぎのためにサインイン」の案内は、このダイアログに答えてから出る(先に出るとダイアログが出ない)
-    func testLinkPromptWaitsForDialog() {
+    /// 引き継ぎのためにサインインの案内は、最初のアプリの直後には出さず(H7)、次の起動で出す
+    func testLinkPromptWaitsForNextLaunch() {
         launch(clarify: false, linkPrompted: false)
         say("美容室の予約アプリを作って")
 
         let alert = app.alerts["個人の情報も公開されます"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 30), "引き継ぎの案内が先に出てダイアログが出ない")
-        let link = app.staticTexts["作ったアプリを残しておきませんか"].firstMatch
-        XCTAssertFalse(link.waitForExistence(timeout: 5), "ダイアログに答える前に引き継ぎの案内が出た")
-        XCTAssertTrue(alert.exists, "引き継ぎの案内でダイアログが消えた")
-
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "ダイアログが出ない")
         alert.buttons["公開のままにする"].tap()
-        XCTAssertTrue(link.waitForExistence(timeout: 10), "ダイアログに答えた後に引き継ぎの案内が出ない")
+        let link = app.staticTexts["作ったアプリを残しておきませんか"].firstMatch
+        XCTAssertFalse(link.waitForExistence(timeout: 5), "最初のアプリの直後に引き継ぎの案内が出た")
+
+        app.terminate()
+        launch(clarify: false, linkPrompted: false)
+        XCTAssertTrue(link.waitForExistence(timeout: 15), "次の起動で引き継ぎの案内が出ない")
         app.buttons["あとで"].firstMatch.tap()
         XCTAssertTrue(waitGone(link))
     }

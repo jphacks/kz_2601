@@ -24,11 +24,11 @@ public struct HTTPSharingClient: SharingClient {
     }
 
     public func revokeShare(token: String) async throws {
-        _ = try await request("DELETE", "v1/shares/\(token)")
+        _ = try await request("DELETE", try Self.sharePath(token))
     }
 
     public func importShare(token: String) async throws -> InstalledApp {
-        try decode(try await request("POST", "v1/shares/\(token)/import"))
+        try decode(try await request("POST", try Self.sharePath(token) + "/import"))
     }
 
     public func publish(appId: String, description: String, tags: [String], authorName: String?) async throws -> PublicAppListing {
@@ -41,15 +41,25 @@ public struct HTTPSharingClient: SharingClient {
     }
 
     public func searchPublicApps(query: String, sort: String) async throws -> [PublicAppListing] {
-        var c = URLComponents()
-        c.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "sort", value: sort),
-                        URLQueryItem(name: "pageSize", value: "50")]
-        let path = "v1/public-apps?" + (c.percentEncodedQuery ?? "")
-        return try JSONDecoder().decode(ListResponse.self, from: try await request("GET", path)).items
+        // POST: 入力された検索語を URL に載せない
+        let body = SearchBody(q: query, sort: sort, pageSize: 50)
+        return try JSONDecoder().decode(ListResponse.self, from: try await request("POST", "v1/public-apps/search", body: body)).items
+    }
+
+    private struct SearchBody: Encodable {
+        let q: String
+        let sort: String
+        let pageSize: Int
     }
 
     public func install(publicAppId: String) async throws -> InstalledApp {
         try decode(try await request("POST", "v1/public-apps/\(publicAppId)/install"))
+    }
+
+    /// `v1/shares/<token>`。形の合わないトークンは送らない(点だけの値は URL の解決で別の道になる)。
+    static func sharePath(_ token: String) throws -> String {
+        guard ShareURL.isValidToken(token) else { throw APIError.invalidURL }
+        return "v1/shares/\(token)"
     }
 
     private func decode<T: Decodable>(_ data: Data) throws -> T {

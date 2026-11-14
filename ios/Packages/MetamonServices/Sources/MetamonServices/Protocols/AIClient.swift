@@ -11,14 +11,51 @@ public struct MorphResult: Sendable {
     public var unchanged: Bool
     /// #253: 新しく誰でも見られる記録に入った個人の情報の欄(`meta.publicPersonalData`)。旧サーバーは送らない(空)
     public var publicPersonalData: [PublicPersonalField]
+    /// 結果の DSL の封筒(`{appId, version, dsl}` の生 JSON・`DocumentCache` に置く形)。
+    /// `AppDocument` は書き出せないので、端末に残す側(Mac の作ったアプリ・#969)はこれを置く。iOS は使わない
+    public var envelope: Data?
 
     public init(document: AppDocument, summary: String? = nil, mode: String? = nil, unchanged: Bool = false,
-                publicPersonalData: [PublicPersonalField] = []) {
+                publicPersonalData: [PublicPersonalField] = [], envelope: Data? = nil) {
         self.document = document
+        self.envelope = envelope
         self.summary = summary
         self.mode = mode
         self.unchanged = unchanged
         self.publicPersonalData = publicPersonalData
+    }
+}
+
+/// 生成の途中経過(#636・`POST /v1/generate?stream=1` の SSE)。どれも仮置きで、最後の結果で置き直す。
+public enum GenerateProgress: Equatable, Sendable {
+    /// アプリ名とタブの見出し(`event: app`)
+    case app(name: String, tabs: [String], attempt: Int)
+    /// 最初に見える画面の部品 1 つ(`event: component`)
+    case component(StreamedComponent)
+    /// 作り直し(`event: restart`)。それまでの仮置きを捨てる。iOS 側でやり直す時(stream を諦めた・409)は attempt 0
+    case restart(attempt: Int)
+}
+
+/// `event: component` の部品(backend `ComponentEvent` + attempt / screen)。
+public struct StreamedComponent: Equatable, Sendable {
+    public var attempt: Int
+    public var screen: String
+    /// screens[].components の位置
+    public var index: Int
+    public var id: String?
+    public var type: String
+    public var area: String?
+    /// label | title | text | prompt
+    public var label: String?
+
+    public init(attempt: Int, screen: String = "", index: Int, id: String? = nil, type: String, area: String? = nil, label: String? = nil) {
+        self.attempt = attempt
+        self.screen = screen
+        self.index = index
+        self.id = id
+        self.type = type
+        self.area = area
+        self.label = label
     }
 }
 
@@ -28,6 +65,10 @@ public protocol AIClient: Sendable {
     func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult
     /// `locale`("ja" | "en" | nil=発話から自動判定)付きの生成(#45)。UI 言語を明示した時に生成アプリの文言言語を揃える。
     func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult
+    /// 途中経過付きの生成(#636・create だけで使う)。`progress` には届いた順に `app` / `component` / `restart` を渡す。
+    /// 仮置き用で、戻り値(最後の結果)が正。途中経過を出せない実装は何も渡さずに結果だけ返す。
+    func morph(transcript: String, appId: String, currentVersion: Int, locale: String?,
+               progress: @escaping @Sendable (GenerateProgress) -> Void) async throws -> MorphResult
     /// `POST /v1/chat`(#74 / #75)。iOS は手元の全履歴を毎回送る(2 件以上はサーバー側の会話状態を置き換える契約なので、
     /// ai の再起動や 30 分の期限切れでも会話が途切れない)。
     /// `mode`(#184): create = 新規作成の相談 / edit = 作ったアプリの改変・質問。nil は backend が appId の DSL 有無で判定。
@@ -42,6 +83,12 @@ public extension AIClient {
     /// locale を扱わない実装(モック等)は従来の morph に委ねる。
     func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult {
         try await morph(transcript: transcript, appId: appId, currentVersion: currentVersion)
+    }
+
+    /// 途中経過を出せない実装(モック等)は結果だけ返す。
+    func morph(transcript: String, appId: String, currentVersion: Int, locale: String?,
+               progress: @escaping @Sendable (GenerateProgress) -> Void) async throws -> MorphResult {
+        try await morph(transcript: transcript, appId: appId, currentVersion: currentVersion, locale: locale)
     }
 
     /// text を持たない実装(テストの偽物等)は使えない扱い。

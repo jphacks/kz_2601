@@ -7,14 +7,18 @@ extension AuthSession {
     /// 0. Apple でサインインしたユーザーは Apple に再認証してもらい、Firebase を再認証(requiresRecentLogin の回避)して
     ///    そのコードで Apple のトークンを取り消す(どちらも失敗しても続行)
     /// 1〜4. `AccountDeletionFlow`: サーバーで論理削除 → Firebase のユーザー削除 → 端末のデータ削除 → サインアウト
-    /// - Returns: 完了したら true。Apple の再認証をキャンセルしたら false(何も消していない)。
+    /// - Returns: 完了したら true。生成中・Apple の再認証をキャンセルしたら false(何も消していない)。
     func deleteAccount(account: any AccountClient, runtime: AppRuntime) async throws -> Bool {
+        guard !BuildConfig.isDebugTestAccount else { return false } // 試験用の枠は消さない(#2084)
+        guard runtime.canDelete else { return false } // 生成中は削除しない(何も消していない)
         let isApple = user.map { !$0.isAnonymous } == true && service is FirebaseAuthService
         if isApple {
             guard let apple = try await AppleReauth.credential() else { return false }
             // 失効の仕組みと人の作業(鍵の登録)は docs/legal/apple-token-revocation.md(#246)
             _ = await AppleTokenRevocation.run(auth: service, authorizationCode: apple.code, idToken: apple.idToken, nonce: apple.nonce)
         }
+        await runtime.settlePendingRecordDeletes() // 「元に戻す」を閉じる。削除に失敗しても消した記録は戻らない。成功すれば wipe で列ごと消える
+        await runtime.unregisterPushDevice() // `DELETE /v1/me` の後は送れない。送れなくても続ける(#269)
         try await AccountDeletionFlow.run(
             account: account,
             auth: service,

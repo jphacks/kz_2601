@@ -7,7 +7,7 @@ struct EmptyStateLeaf: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(c.title ?? "", systemImage: c.icon ?? "tray")
+            Label(c.title ?? "", systemImage: PlatformSymbol.name(c.icon, fallback: "tray"))
                 .foregroundStyle(.primary, RenderTheme.Colors.brandA.opacity(0.7))
         } description: {
             if let message = c.message { Text(message) }

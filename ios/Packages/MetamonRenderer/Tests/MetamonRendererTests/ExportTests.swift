@@ -127,6 +127,17 @@ final class ExportTests: XCTestCase {
         XCTAssertTrue(text.contains("\"¥1,200\""))
     }
 
+    @MainActor func testNextExportRemovesPreviousFiles() throws {
+        let dsl = try kakeibo()
+        let rt = ExportRuntime(dsl: dsl, store: records)
+        let first = try rt.makeExportFile(action(dsl, 0), screen: "home")
+        let second = try rt.makeExportFile(action(dsl, 0), screen: "home")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.url.path), "前の書き出し(記録の写し)は残さない")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.url.path))
+        ExportFiles.removeAll()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ExportFiles.directory.path), "アカウント削除で全部消せる")
+    }
+
     @MainActor func testMakePDFFileWithChart() throws {
         let dsl = try kakeibo()
         let rt = ExportRuntime(dsl: dsl, store: records)
@@ -183,7 +194,7 @@ final class ExportTests: XCTestCase {
         let view = ButtonLeaf(c: buttons[0], ctx: RenderContext(route: Route(screen: "home")))
             .frame(width: 320)
             .environment(\.dslRuntime, rt)
-        let image = try XCTUnwrap(ImageRenderer(content: view).uiImage)
+        let image = try XCTUnwrap(ImageRenderer(content: view).platformImage)
         XCTAssertGreaterThan(image.size.height, 40)
     }
 

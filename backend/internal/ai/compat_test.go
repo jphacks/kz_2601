@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -108,7 +109,15 @@ func TestCompat_OlderClientNeverReceivesNewerComponents(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("examples: %v", err)
 	}
-	checked, failed := 0, 0
+	checked := 0
+	var failed atomic.Int64
+	// The cases run in parallel; the totals are checked once all are done.
+	t.Cleanup(func() {
+		// Most apps must still open (the part is removed, the rest stays).
+		if n := int(failed.Load()); n*10 > checked {
+			t.Errorf("%d of %d older-client cases produced no app", n, checked)
+		}
+	})
 	for _, path := range files {
 		name := filepath.Base(path)
 		if name == "initial.json" || strings.HasPrefix(name, "gallery-") {
@@ -121,6 +130,7 @@ func TestCompat_OlderClientNeverReceivesNewerComponents(t *testing.T) {
 				continue
 			}
 			t.Run(name+"/"+part, func(t *testing.T) {
+				t.Parallel()
 				older := without(knownComponentTypes, part)
 				// The model ignores the restriction every time; the last
 				// attempt must strip the part rather than send it.
@@ -135,7 +145,7 @@ func TestCompat_OlderClientNeverReceivesNewerComponents(t *testing.T) {
 					if ge := asError(err); ge.Code != "generation_failed" {
 						t.Fatalf("unexpected error: %v", err)
 					}
-					failed++
+					failed.Add(1)
 					return
 				}
 				if componentTypes(t, res.DSL)[part] {
@@ -153,10 +163,6 @@ func TestCompat_OlderClientNeverReceivesNewerComponents(t *testing.T) {
 	}
 	if checked < 20 {
 		t.Fatalf("only %d cases: examples moved?", checked)
-	}
-	// Most apps must still open (the part is removed, the rest stays).
-	if failed*10 > checked {
-		t.Fatalf("%d of %d older-client cases produced no app", failed, checked)
 	}
 }
 

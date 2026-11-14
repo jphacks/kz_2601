@@ -38,7 +38,7 @@ func Middleware(verifier TokenVerifier, mode string) func(http.Handler) http.Han
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if debugUIDAllowed(mode) {
 				if uid := r.Header.Get(DebugUIDHeader); uid != "" {
-					next.ServeHTTP(w, withUID(r, uid))
+					next.ServeHTTP(w, r.WithContext(ContextWithIdentity(r.Context(), debugIdentity(uid))))
 					return
 				}
 			}
@@ -51,12 +51,13 @@ func Middleware(verifier TokenVerifier, mode string) func(http.Handler) http.Han
 				httpx.Error(w, http.StatusUnauthorized, httpx.CodeUnauthenticated, "invalid token")
 				return
 			}
-			uid, err := verifier.VerifyIDToken(r.Context(), raw)
-			if err != nil || uid == "" {
+			id, err := verifyIdentity(r.Context(), verifier, raw)
+			if err != nil || id.UID == "" {
 				httpx.Error(w, http.StatusUnauthorized, httpx.CodeUnauthenticated, "invalid token")
 				return
 			}
-			next.ServeHTTP(w, withUID(r, uid))
+			// anonymous accounts cannot run server rules (#338): the outbox records it
+			next.ServeHTTP(w, r.WithContext(ContextWithIdentity(r.Context(), id)))
 		})
 	}
 }

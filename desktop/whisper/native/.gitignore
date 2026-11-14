@@ -1,0 +1,3 @@
+# ビルドの途中物と出来たライブラリは git に入れない(build.sh / build.ps1 で作る)
+build/
+out/

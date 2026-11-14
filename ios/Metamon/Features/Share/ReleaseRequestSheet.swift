@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonRenderer
 import MetamonServices
 
 // 審査用ビルド(APP_STORE_REVIEW・#245)ではリリース申請を外す。
@@ -23,26 +24,7 @@ final class ReleaseUI {
         byApp = ReleaseRequest.latestByApp(items)
     }
 }
-
-extension ReleaseStatus {
-    var label: String {
-        switch self {
-        case .received: return L10n.tr("受付")
-        case .reviewing: return L10n.tr("検討中")
-        case .planned: return L10n.tr("リリース予定")
-        case .declined: return L10n.tr("見送り")
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .received: return "tray.and.arrow.down"
-        case .reviewing: return "magnifyingglass"
-        case .planned: return "shippingbox"
-        case .declined: return "xmark.circle"
-        }
-    }
-}
+// 状況の文言・記号と入力の決まりは Mac と共有(Shared/Release/ReleaseRequestForm.swift・#2249)
 #endif
 
 /// 変身一覧のカード右上: 「…」メニュー(シェア・公開 / リリース申請)+ 申請済みなら status の小さなバッジ。
@@ -74,8 +56,18 @@ struct AppCardActions: View {
                 Divider()
                 #endif
                 Button(role: .destructive) { confirmingDelete = true } label: {
-                    Label("削除", systemImage: "trash")
+                    if rt.canDelete {
+                        Label("削除", systemImage: "trash")
+                    } else {
+                        Label { // 生成中は押せない(理由をメニューの小さな文字で添える)
+                            Text("削除")
+                            Text(AppRuntime.deleteBlockedReason)
+                        } icon: {
+                            Image(systemName: "trash")
+                        }
+                    }
                 }
+                .disabled(!rt.canDelete)
                 .accessibilityIdentifier("switcher.delete")
                 AppManageMenuItems(app: app) // #277 名前を変える・複製・並べ替え
             } label: {
@@ -106,7 +98,7 @@ struct AppCardActions: View {
             Text("元に戻せません。")
             #else
             if rt.document.appId == app.id {
-                Text("元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。")
+                Text("元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ最初の画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。")
             } else {
                 Text("元に戻せません。シェアリンクと「探す」への掲載も取り下げます。")
             }
@@ -127,7 +119,7 @@ struct ReleaseStatusBadge: View {
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, 4)
             .background(.black.opacity(status == .declined ? 0.35 : 0.55), in: Capsule())
-            .accessibilityLabel(L10n.tr("リリース申請: \(status.label)"))
+            .accessibilityLabel(status.accessibilityLabel)
     }
 }
 
@@ -145,16 +137,15 @@ struct ReleaseRequestSheet: View {
     /// 今回送って受け付けられた(「受け付けました」表示)
     @State private var justSent = false
 
-    private static let maxPurpose = 200
-    private static let maxContact = 100
+    private static let maxPurpose = ReleaseRequestForm.maxPurpose
+    private static let maxContact = ReleaseRequestForm.maxContact
 
     /// 申請中(見送り以外)があればフォームの代わりに状況を出す
     private var open: ReleaseRequest? {
-        guard let r = ui.byApp[app.id], r.kind != .declined else { return nil }
-        return r
+        ReleaseRequestForm.open(ui.byApp[app.id])
     }
 
-    private var canSend: Bool { !purpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy }
+    private var canSend: Bool { ReleaseRequestForm.canSend(purpose: purpose, busy: busy) }
 
     var body: some View {
         ScrollView {
@@ -200,14 +191,7 @@ struct ReleaseRequestSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(Theme.Spacing.sm + 2)
-                    .background(Theme.Colors.surface, in: Circle())
-            }
-            .accessibilityLabel("閉じる")
+            SheetCloseButton { dismiss() }
         }
     }
 
@@ -215,6 +199,7 @@ struct ReleaseRequestSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Text("どんな用途で使っていますか?")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             TextField("用途の一言(必須) 例: 毎朝の体調記録に使っています", text: $purpose, axis: .vertical)
                 .lineLimit(2...5)
                 .metamonInputField() // 複数行(return で改行)・#196
@@ -254,6 +239,7 @@ struct ReleaseRequestSheet: View {
                 .foregroundStyle(Theme.brandGradient)
             Text(justSent ? L10n.tr("受け付けました") : L10n.tr("申請済みです"))
                 .font(.title3.weight(.bold))
+                .accessibilityAddTraits(.isHeader)
             HStack(spacing: Theme.Spacing.sm) {
                 Text("いまの状況")
                     .font(.subheadline)
@@ -296,7 +282,7 @@ struct ReleaseRequestSheet: View {
             justSent = true
             print("[Metamon] release request: id=\(r.id) status=\(r.status)")
         } catch {
-            self.error = L10n.tr("申請できませんでした: \(error.localizedDescription)")
+            self.error = ErrorCopy.failure(L10n.tr("申請できませんでした"), error, context: "ReleaseRequestSheet")
         }
     }
 }

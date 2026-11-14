@@ -14,6 +14,9 @@
 | --- | --- | --- |
 | chat 1 往復 | 1 | 短い出力・軽いモデル設定 |
 | text 1 回(aiButton generate のオンライン版・#417) | 1 | 出力 400 トークンまで・入力 4 KB まで・thinking なし |
+| text 1 回(aiButton の要約・分類・書き直し・抜き出し・提案のオンライン版・`task` 付き) | 2 | 出力 1000 トークンまで(書き直しは入力と同じくらい長い)・入力 4 KB まで・thinking なし |
+| text 1 回(aiButton の長文・`length: long`・task を問わない) | 3 | 出力 1500 トークンまで・入力 16 KB まで(約 4000 トークン)・thinking なし。短い text(入力 4 KB・出力 400〜1000)の約 3 回分の費用。オンライン AI だけで動く(端末内 AI を使わない) |
+| text 1 回(aiButton の写真つき・`inputPhoto`・本文に `image`) | 3 | 長い辺 1024px の写真は入力 約 1500 トークン。task / length の重さと大きい方を数える。オンライン AI だけで動く |
 | generate の修正(mode edit) | 2 | patch 中心 |
 | generate の新規作成(create / auto) | 3 | 全体生成 + 検証のやり直し + logic pass |
 | generate の undo | 0 | Claude を呼ばない |
@@ -29,7 +32,9 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | 502 / 503 / 504(Claude の 5xx・タイムアウト・Claude や appconfig に届かない) | 数えた分の全部 | サーバー側の失敗。iOS の「もう一度」で 2 回分にならない |
 | 200 で、mode auto が修正(edit)になった | 3 − 2 = 1(新規 − 修正の重さ) | 修正の重さは表の 2。auto だけ安くも高くもしない |
 | 200 で、mode auto が「元に戻す」(undo)になった | 3 全部 | Claude を呼ばない |
+| 200 で、修正が何も変えなかった(`unchanged`・auto も含む) | 数えた分の全部。ただし 1 人 1 日 `RATE_LIMIT_UNCHANGED_DAILY` 回まで(既定 5・`0` で返さない)。超えた分は上の mode の行どおり | 「何も変わらないのに回数だけ減る」を無くす。handler が `ratelimit.ReportUnchanged` で伝え、1 依頼 1 回だけ返す。上限は `{env}_{日}_unchanged_{uid}` で数え、利用上限を返すのに失敗したら数えた 1 回も戻す。ログ `ratelimit.refund` の `reason=unchanged` |
 | 4xx(入力の誤り・422・Claude の 429 も含む)と 500 | 返さない | 利用者が起こせる失敗、または原因が分からない失敗 |
+| `/v1/text` の 402 `pro_required`(Pro が無い・`creator_needs_pro`)と 429 `scope: app`(作成者が払う呼び出しの 1 日の上限) | 数えた分の全部(応答の前)。ただし 1 人 1 時間 30 回まで(下の「返した依頼の上限」) | Claude を呼ばない。handler が `ratelimit.Waive` で応答の前に返し、`X-RateLimit-Remaining` もこの依頼を数えない値に書き直す。400 / 403(写真のスイッチ off)/ 413 は上の 4xx と同じく返さない |
 | 503 `ai_paused` | (数えていない) | 一時停止はレートリミットの手前で返す(`cmd/ai/main_test.go` で順番を固定) |
 | 途中で端末が切断した(ストリームの途中など) | 返さない | Claude の 1 回分の費用はもうかかっている。控えめな方を選んだ |
 
@@ -37,8 +42,45 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 - 通常の JSON 応答は HTTP の status で判断する。SSE(`/v1/generate?stream=1`)は最初に 200 を返すので、`event: error` の status を handler が `ReportStatus` で伝え、ストリームの終わりに返す。
 - mode は generate が決めた実際の mode(create / edit / undo)。保存の形(full / patch)ではない(修正の検証が通らず全体で保存しても、修正の重さ)。
 - 返すのは数えたのと同じストア・同じドキュメント(その日の id)。Firestore は 1 トランザクションで全部を読んで引き、`expireAt` も数える時と同じ値で書く。もう無いドキュメント(TTL で消えた)は作り直さない。数える時に Firestore が落ちてメモリで数えた依頼は、メモリに返す。
-- 応答の `X-RateLimit-Remaining` は依頼の前に書くので、返した分は入らない(次の依頼から反映)。
+- 応答の `X-RateLimit-Limit` / `-Remaining` / `-Reset` は利用者の上限の数(iOS の「今日の残り」#630 が読む)。依頼の前に書くので、返した分は入らない(次の依頼から反映)。
+  - 重み 0 の依頼(generate の undo)は数えないが、今日の消費を読み取り 1 回(トランザクション・書き込みなし)で読み、正しい残りを返す。上限のまま返すと「元に戻す」の後で残りが満タンに見えるため。読めなかった時はヘッダーを付けない。
+  - 利用者の上限が 0(数えない)の時はヘッダーを付けない(「残り 0」と出さないため)。iOS はヘッダーの無い応答では前の値を変えない(日付が変わると隠す)。429 は今までどおり付ける。
 - 返した時はログに `ratelimit.refund`(units・status・mode・path)が出る。
+
+### 返した依頼の上限
+
+返した依頼(`ratelimit.Waive`)も、サーバーでは Firestore の読み書き(数える・返す・作成者や参加の確認)を使う。そこで返した回数を利用者ごと・1 時間ごと(`RATE_LIMIT_WAIVED_HOURLY`・既定 30)と、IP ごと・1 時間ごと(`RATE_LIMIT_WAIVED_IP_HOURLY`・既定 120・匿名のアカウントを作り直しても同じ IP で数える)に別に数える。2 つは 1 回のトランザクションで数え、どちらかが上限なら数えない。
+
+```
+rateLimits/{env}_{yyyy-mm-ddTHH}_waived_{uid}                    {count, scope: waived, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-ddTHH}_waived_ip_{sha256 先頭 8 バイト}   同上(生の IP は残さない・IPv6 は /64 単位)
+```
+
+- 上限までは今までどおり、1 日の利用上限を数えない(`X-RateLimit-Remaining` も変わらない)。
+- どちらかの上限を超えた分は返さず、その依頼の重さを 1 日の利用上限で数える。上限に届くと、それ以降はミドルウェアの 429 で止まり、handler まで届かない。
+- 数える時に Firestore が失敗したら返す(今までと同じ)。
+- 返した回数を数えた後で 1 日の利用上限を返すのに失敗したら、返した回数も戻す(その依頼は返さなかったものとして利用上限を数えたまま。返した回数だけが増えて食い違うことはない)。戻すのにも失敗した時は返した回数が 1 多いまま残る(上限に早く届く側にずれるだけ・ログ `ratelimit: waive count give-back failed`)。
+- 実装: `backend/internal/ratelimit/waive_cap.go`。
+
+### 作成者が払う呼び出しの上限
+
+共有のアプリの参加者の `/v1/text` は作成者の Pro で通る([pro.md](features/pro.md))。作成者が払う呼び出しを、アプリの部品の設定と照らし合わせ、アプリごとの 1 日の回数で数える。
+
+> コイン(#630)はこの呼び出しでも参加者(呼び出した人)から引く。ここでの「作成者が払う」は作成者の Pro で通ることを指し、作成者のコインは使わない。1 日の回数は暴走の歯止めとして残す([630-token-billing.md](../decisions/630-token-billing.md#共有アプリの払う人))。
+
+- 照らし合わせ: 依頼がアプリの公開中の DSL(`apps_public/{appId}`)の部品と合う時だけ作成者が払う。aiButton は同じ task(無ければ generate)で、instruction が prompt の `{{input}}`(端末が書く「下の材料」/「the data below」)と `{{項目}}`(どんな文字でもよい)を埋めたもの。端末と同じく、置き換えるのは `{{input}}` と `{{項目の id}}` がそのままの形の時だけ(`{{ input }}` のように中に空白があるものは文字のまま)。aiChat は instruction が persona と同じ。`length: long` は部品も long の時、写真つきは部品に inputPhoto がある時だけ。端末が 500 字で切った instruction は、途中までが合えばよい。合わなければ呼び出した人の Pro で判定する(Pro でなければ理由なしの 402)。
+  - 項目で埋める文字は合計 400 字まで(DSL に項目ごとの長さの上限は無いので合計だけ)。
+  - `{{項目}}` があって、prompt の自分の文字(空白と `{{…}}` を除く)が 20 字に満たない部品と、`{{項目}}` が 20 個を超える部品は、作成者が払う対象にしない。
+  - prompt は RE2 の正規表現にして照らし合わせる(入力の長さに比例する時間で終わる)。1 つのアプリで見る aiButton / aiChat は 100 個まで。公開中の DSL を読んで組み立てた結果は、インスタンスごとにアプリ 128 件まで 60 秒覚える(公開し直しは最大 60 秒遅れて効く)。
+- 回数: アプリごと・1 日(0:00 JST)ごとに `AI_CREATOR_PAID_APP_DAILY` 回まで(既定 300)、さらにアプリ × 参加者ごと・1 日ごとに `AI_CREATOR_PAID_MEMBER_DAILY` 回まで(既定 30・aiChat も含む)。どちらも `0` で数えない。2 つは 1 回のトランザクションで数え、どちらかが上限なら数えない。超えると 429 `rate_limited`(`details.scope: app` / `app_member`)で、Claude は呼ばず、利用上限も数えない(上の「返す時」)。Firestore が失敗した時はインスタンスのメモリで数える。
+- Claude が 502 / 503 / 504 で終わった時は、数えた 1 回を返す(利用上限の「返す時」と同じ。途中で切れた依頼は返さない)。
+
+```
+rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}             {count, scope: app, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}_uid_{uid}   {count, scope: app_member, expireAt, updatedAt}
+```
+
+- 実装: `backend/internal/ai/text_payer_scope.go`。
 
 ## 上限の既定値(1 日・0:00 JST で切り替え)
 
@@ -47,9 +89,14 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | `RATE_LIMIT_ANON_DAILY` | 30 | 新規 3 回(9)+ 修正・対話で 21。端末の無料枠(新規 3 回/日)に合わせた |
 | `RATE_LIMIT_USER_DAILY` | 60 | サインイン済みは匿名の 2 倍 |
 | `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
+| `RATE_LIMIT_ANON_DAILY_<OS>` / `_USER_DAILY_<OS>` / `_PRO_DAILY_<OS>` | 未設定(上の 3 つのまま) | OS ごとの上書き(#2133)。`<OS>` は `IOS` / `ANDROID` / `MACOS` / `WINDOWS` / `LINUX` / `OTHER`。ヘッダ `X-Client-Platform` を決まった語彙にそろえた値で選ぶ(ヘッダ無し・未知は `OTHER`・#2132)。数える箱は OS をまたいで 1 つ(`{env}_{日}_uid_{uid}`)なので、低い上書きの OS では他の OS で使った分も含めて止まる。ヘッダは端末の申告で偽れるため、上書きは「その OS だけ絞る」使い方が前提(高くすると他の OS からヘッダを偽って使える)。どの OS にどの値を入れるかは #1750 で決める |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
-| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` | 3 / 2 / 1 / 1 | |
+| `RATE_LIMIT_WAIVED_HOURLY` | 30 | 1 人 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `RATE_LIMIT_WAIVED_IP_HOURLY` | 120 | 同じ IP から 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `RATE_LIMIT_UNCHANGED_DAILY` | 5 | 1 人 1 日に、何も変えなかった修正(`unchanged`)を返す回数(上の「返す時」)。`0` で返さない |
+| `AI_CREATOR_PAID_APP_DAILY` / `AI_CREATOR_PAID_MEMBER_DAILY` | 300 / 30 | 作成者が払う呼び出しの、アプリごと / アプリ × 参加者ごとの 1 日の回数(上の「作成者が払う呼び出しの上限」)。`0` で数えない |
+| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時と `task: "chat"`(aiChat)の時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |
 | `RATE_LIMIT_COLLECTION` | rateLimits | |
@@ -58,16 +105,58 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 
 費用ブレーカーの目安: 1 回の新規作成を $0.03〜0.10 と置くと(入力 1〜2 万トークン + 出力数千トークン。実測で直す)、2000 単位 ≒ 最大 $20〜65/日/環境。stg と prod は別々に数える。
 
+### OS ごとの上書き(#2133)
+
+上の表の `_<OS>` の行を 1 つずつ並べたもの。読むのは `ratelimit.ConfigFromEnv`(`backend/internal/ratelimit/config.go`)、選ぶのは `Config.PlatformDailyLimit`(`peek.go`)。OS は `X-Client-Platform` を `httpx.NormalizePlatform` でそろえた値(大文字小文字と前後の空白は無視・ヘッダ無し・未知・33 文字以上は `other`)。上書きできるのは 1 人 1 日の枠だけで、IP・global・waived・unchanged・重みは OS で変わらない。
+
+| 環境変数 | 既定(未設定の時) | 効く依頼 |
+| --- | --- | --- |
+| `RATE_LIMIT_ANON_DAILY_ANDROID` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`X-Client-Platform: android` |
+| `RATE_LIMIT_ANON_DAILY_IOS` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`ios` |
+| `RATE_LIMIT_ANON_DAILY_LINUX` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`linux` |
+| `RATE_LIMIT_ANON_DAILY_MACOS` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`macos` |
+| `RATE_LIMIT_ANON_DAILY_OTHER` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・ヘッダ無し / 未知の値 |
+| `RATE_LIMIT_ANON_DAILY_WINDOWS` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`windows` |
+| `RATE_LIMIT_PRO_DAILY_ANDROID` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`android` |
+| `RATE_LIMIT_PRO_DAILY_IOS` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`ios` |
+| `RATE_LIMIT_PRO_DAILY_LINUX` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`linux` |
+| `RATE_LIMIT_PRO_DAILY_MACOS` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`macos` |
+| `RATE_LIMIT_PRO_DAILY_OTHER` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・ヘッダ無し / 未知の値 |
+| `RATE_LIMIT_PRO_DAILY_WINDOWS` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`windows` |
+| `RATE_LIMIT_USER_DAILY_ANDROID` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`android` |
+| `RATE_LIMIT_USER_DAILY_IOS` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`ios` |
+| `RATE_LIMIT_USER_DAILY_LINUX` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`linux` |
+| `RATE_LIMIT_USER_DAILY_MACOS` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`macos` |
+| `RATE_LIMIT_USER_DAILY_OTHER` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・ヘッダ無し / 未知の値 |
+| `RATE_LIMIT_USER_DAILY_WINDOWS` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`windows` |
+
+- 変数の名前は大文字だけ読む(`_ios` のような小文字は読まない)。負の数・数でない値は起動の時にエラー。
+- `0` はほかの上限と同じく「数えない」。下げるつもりで `0` を入れない。
+- ai と appconfig の両方に同じ値を入れる(appconfig の `GET /v1/me/usage` も同じ上書きで上限を出すため。ずれると ai の `X-RateLimit-Limit` と画面の上限が合わない)。
+- 入っているかは ai の起動ログ `ai: rate limit on (...)` の `platformLimits=` で見る(上書きがある時だけ出る)。
+
+上書きの例(値は例。どの OS にどの値を入れるかは #1750 で決める)。サインイン済みの Windows だけ 1 日 20 単位に絞る:
+
+```sh
+for SERVICE in ai-stg appconfig-stg; do
+  gcloud run services update "$SERVICE" --region asia-northeast1 --project jphacks-kz2601 \
+    --update-env-vars RATE_LIMIT_USER_DAILY_WINDOWS=20
+done
+```
+
+戻す時は `--remove-env-vars RATE_LIMIT_USER_DAILY_WINDOWS`(上の `RATE_LIMIT_USER_DAILY` に戻る)。
+
 ## 数える場所(Firestore・appconfig と同じ DB)
 
 ```
 rateLimits/{env}_{yyyy-mm-dd}_uid_{uid}        {count, scope, expireAt, updatedAt}
 rateLimits/{env}_{yyyy-mm-dd}_ip_{sha256 先頭 8 バイト}   匿名だけ。生の IP は残さない(IPv6 は /64 単位)
-rateLimits/{env}_{yyyy-mm-dd}_global
+rateLimits/{env}_{yyyy-mm-dd}_global_{0〜9}     global の分割(下の「global の分割」)
+rateLimits/{env}_{yyyy-mm-dd}_global          分割前の 1 ドキュメント。読むだけで、もう書かない
 ```
 
 - `env` は `APP_ENV`(stg / prod)。同じ Firestore でも環境ごとに分かれる。
-- 1 回の依頼 = 1 トランザクション。全部の数を読み、どれか 1 つでも超えるなら**何も書かず** 429。超えなければ全部に足す。返す時(上)ももう 1 トランザクション。
+- 1 回の依頼 = 1 トランザクション。全部の数を読み、どれか 1 つでも超えるなら**何も書かず** 429。超えなければ全部に足す。返す時(上)ももう 1 トランザクション。global だけは読み方が違う(下の「global の分割」)。
 - Firestore が使えない時(障害・権限)は、インスタンスのメモリで数え続ける(止めない・青天井にもしない)。
 - `expireAt` = その日の終わり + 1 日。TTL ポリシーで自動で消える(下の手順)。
 
@@ -75,7 +164,103 @@ rateLimits/{env}_{yyyy-mm-dd}_global
 
 1 回の依頼で 読み 2〜3・書き 2〜3(匿名は IP の分が増える)。1000 人 × 10 回/日 = 1 万回なら 読み 3 万・書き 3 万/日。無料枠(読み 5 万・書き 2 万/日)を少し超えても数セント/日で、Claude の 1 回分より安い。返す時(サーバーの失敗と、mode auto が修正になった時。iOS は auto を送るので修正のたび)は、同じ数の読み書きがもう 1 回増える。
 
-`global` は 1 つのドキュメントに全員が書く。Firestore は 1 ドキュメントあたり毎秒 1 回程度が目安で、Claude の 1 回が数十秒かかる今の規模なら足りる。毎秒数回を超えるようなら、global を数個に分ける(shard)。
+global は数える時に分割の 10 個と分割前の 1 個を読むので、global の読みは 1 回 → 11 回になる(1 万回/日なら 読み +10 万/日 ≒ 6 セント)。書きは 1 個だけで変わらない。
+
+### global の分割
+
+`global` は環境の全員が書くので、1 ドキュメントだと Firestore の目安(1 ドキュメントあたり毎秒 1 回程度)で詰まり、トランザクションが待ち・やり直しになる(エミュレータでもロック待ちが出た・#732)。そこで global だけを 10 個(`ratelimit.GlobalShards`)のドキュメントに分ける。利用者・IP は 1 人の分なので分けない。
+
+- **数える時**: 10 個 + 分割前の 1 個をトランザクションの外で読んで合計する(ロックを取らない)。上限まで 50 単位(`ratelimit.ShardStrictMargin`)より余裕があれば、トランザクションは利用者・IP を今までどおり読んで書き、global は乱数で選んだ 1 個に足すだけ(読まずに `Increment`)。同じ 1 個を選んだ依頼どうしでも、読みのロックが無いので取り消し合わない。
+- **上限の近く**: 残りが 50 単位以内なら、トランザクションの中で 11 個を全部読んで確かめる(分割前と同じ正確さ。この時だけ依頼どうしが順番待ちになる)。
+- **超え得る量(最悪)**: 余裕がある時の判断は少し古い合計を使う。同時に通った依頼はみな「上限より 50 以上下」を見ているので、上限を超えるのは、その瞬間に同時に通った依頼の重さの合計が 50 を超えた分だけ(新規作成なら 17 件以上が同時)。1 件ずつ来る時は超えない。
+- **返す時**: 数えた時に足した 1 個(`Usage.Charged` に入る)から引く。
+- **分割前のドキュメント**: その日の分(切り替えの日)はそのまま合計に入る。もう書かないので、TTL で翌日に消える。古い版のインスタンスが残っている間はそちらが書くが、それも合計に入る。
+- 10 個は固定。途中で減らすと、外れた分割の数が合計から落ちるので変えない(変えるなら日付の切り替わりで)。
+
+## プランごとの上限(#317)
+
+無料と Tailor It Pro で使える量の表。値は環境変数で変えられる(`0` = 数えない)。コードの表は `backend/internal/plan`(`plan.Default`・`plan.FromEnv`)の 1 か所。生成・チャットの回数は上の ratelimit がそのまま数え、ここには同じ環境変数を読んで載せているだけ。
+
+| 上限 | 無料 | Pro | 環境変数 | 数える所 |
+| --- | --- | --- | --- | --- |
+| 生成・チャット / 日(単位・上の「重さ」) | 60(匿名は 30) | 300 | `RATE_LIMIT_USER_DAILY`(`_ANON_DAILY`)/ `RATE_LIMIT_PRO_DAILY` | ai(429 `rate_limited`) |
+| 持てるアプリの数 / 人 | 2 | 5 | `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig: 自分で作ったもの + 参加した共有のアプリ。コインで買った枠を足す。下の「[持てるアプリの数](#持てるアプリの数630)」 |
+| レコードの件数 / アプリ | 5000 | 50000 | `PLAN_FREE_RECORDS_PER_APP` / `PLAN_PRO_RECORDS_PER_APP` | appconfig: レコードの作成。その人が見える分(自分の分 + 共有の分)の全 entity の合計。single の entity は数えない |
+| 写真の枚数 / アプリ(= 容量) | 500(約 150 MB) | 5000(約 1.5 GB) | `PLAN_FREE_PHOTOS_PER_APP` / `PLAN_PRO_PHOTOS_PER_APP` | appconfig: 写真の項目が空から入る作成・更新(差し替えは数えない)。1 枚は 300 KB まで(レコード 1 件の上限)なので、枚数で容量を抑える |
+
+- **持てるアプリの数はオーナーの決定(2026-11-10)**: 無料 2・Pro 5。それ以外の**既定は緩い**(今の使い方では当たらない)。暴走だけを止める値で、本当の値は #298 の 1 人あたりの費用と #325 の価格から人が決める。
+- **誰のプランで数えるか**: 自分のアプリは呼び出した人、他の人が作ったアプリ(共有のアプリの参加者)は作成者。作った人が払い、参加者は無料(`docs/00_decisions.md`「課金・Pro」)。Pro は ai と同じ検証済みの権利(`users/{uid}/entitlements/pro`)。
+- **強制の段階**: `PLAN_LIMITS_MODE` = `enforce`(既定)/ `log`(止めずに `plan_limit.would_block` を出すだけ)/ `off`。`PRO_GATE_MODE` と同じ考えで、出す時は `log` で量を見てから `enforce`。`plan_limit.would_block` は止めた時(enforce)も出る(`blocked`・`plan`・`resource`・`uid_hash`・`used`・`limit`)。
+- **数え方**: Firestore の count 集計(1000 件で読み 1 回)。レコードの作成のたびに entity の数だけ、写真が入る時は写真の項目の数だけ増える。数えるのに失敗した時は通す(保存を止めるほどのものではない)。
+- **超えた時**(記録・写真): 403 `plan_limit_reached`。アプリの数は 402 `app_limit_reached`(下)。`details` は `resource`(`apps` / `recordsPerApp` / `photosPerApp`)・`plan`(`free` / `pro`)・`limit`・`used`・`upgrade`(Pro にすると上がる)・`reason: creator_plan_limit`(作成者のプランの上限。参加者は払えないので課金画面ではなく案内を出す。`pro_required` の `creator_needs_pro` と同じ考え)。ai の generate が新しいアプリで当たった時もそのまま中継する。
+- 消すと空きができる(数は今の件数で、累計ではない)。上限を下げても、もうあるものは消さない(新しく足すのが止まるだけ)。
+
+## 持てるアプリの数(#630)
+
+オーナーの決定(2026-11-10): 1 人が**持てる**アプリは無料 2・Pro 5。足りなければコインで枠を 1 つずつ買える(期限なし)。コードは `backend/internal/appconfig/app_slots.go`・`backend/internal/coins/slots.go`。
+
+| 項目 | 中身 |
+| --- | --- |
+| 数えるもの | `users/{uid}/apps` のうち version が 1 より大きいもの = 一覧に出るアプリ。自分で作ったもの・複製・シェアリンクや「探す」から入れたもの・参加した共有のアプリ(`joined`)を全部数える。version 1 のまま(新しい appId を開いただけで一度も生成していない空のアプリ・iOS の `isBlank`)は数えない |
+| 上限 | プランの数(`PLAN_FREE_APPS` / `PLAN_PRO_APPS`)+ コインで買った枠(財布の `appSlots`) |
+| 止める所(前もって) | 新しいアプリになる時に数える: 新しい appId の最初の `GET /dsl`(ai の generate もここを通るので、生成の前に止まる)・`POST /apps`・duplicate・`POST /shares/{token}/import`・`POST /public-apps/{id}/install`。もう持っているアプリ(参加済みの共有アプリを開き直す等)は数えない |
+| 止める所(確実に) | 空のアプリが最初の版になる保存(PUT / PATCH /dsl・restore・複製と取り込みの 2 版目)で、**同じトランザクション**の中で数える(`store.Commit.HeldLimit`)。`users/{uid}` の `heldAppsAt` を読んで書くので、同じ人の 2 つの依頼は順番になり、2 つめは 1 つめの分を数える。同時に 2 つ作っても上限を超えない。複製・取り込みが ここで負けたら、作りかけの空のアプリを消す |
+| 超えた時 | 402 `app_limit_reached`。`details`: `held`・`limit`・`base`・`purchasedSlots`・`canBuySlot`・`slotCoins`・`balance`・`upgrade`・`apps`(`{id, name, mine, updatedAt}`)。ai は `details` ごと中継する |
+| 置き換え | iOS は「上限に達しています。どのアプリと置き換えますか?」を出す。自分のアプリは削除(データも消える・共有していれば参加者からも消える)、参加したアプリは抜ける(参加者から外れて自分の写しを消す)。そのあと同じ操作をやり直す |
+| 枠を買う | `POST /v1/me/coins/slot`(`requestId` ごとに 1 回・冪等)。`COIN_PRICE_APP_SLOT` コイン(値は repo に書かない)。台帳は `spend_slot`。`COIN_BILLING_MODE=enforce` かつ値段 > 0 の時だけ。`log` は前に買った枠を数えるだけ・`off` は財布を読まない(プランの数だけ) |
+| 強制の段階 | `PLAN_LIMITS_MODE`(上と同じ)。`log` は止めずに `plan_limit.would_block`(`resource: apps`)を出すだけ |
+| 上限を下げた時 | もう持っているアプリは消さない。新しく持つのが止まるだけ(置き換えれば作れる) |
+
+## 今の使用量(#317・#630)
+
+iOS が「今日の残り N」「上限に近い」を、断られる前に出すための読み取り。appconfig が答える(認証・App Check は他の `/v1/me` と同じ・本人の分だけ)。形は `openapi-appconfig.yaml` の tag `usage`。
+
+| API | 返すもの | 読み取りの費用 |
+| --- | --- | --- |
+| `GET /v1/me/usage` | `plan`・`tier`・`resetAt`(次の 0:00 JST)・`ai`(生成・チャット・text の今日の合計: `used` / `limit` / `remaining` と `weights`)・`apps`(持っているアプリの数と上限 = プランの数 + 買った枠)・`appSlots`(上限の内訳と、枠を買えるか)・`perApp`(自分のプランのアプリごとの上限) | `ai` は上の「数える場所」の `uid` のドキュメントを 1 回読む(キャッシュしない)。`apps` は count 集計 1 回を、インスタンスごとに 30 秒キャッシュ |
+| `GET /v1/apps/{appId}/usage` | このアプリの `records` / `photos`(`used` / `limit` / `remaining`)・払う人の `plan`・`payer`(`self` / `creator`)・`upgrade` | entity ごと(+ 写真の項目ごと)の count 集計。(呼び出した人・アプリ・版)ごとに 30 秒キャッシュ |
+
+- **2 本に分けた理由**: 記録・写真はアプリごとで、数えるのに entity の数だけ集計が要る。既存の API もアプリのものは `/v1/apps/{appId}/...`、自分のものは `/v1/me/...` に置いている。一覧や設定で `/v1/me/usage` を、アプリを開いた時に `/v1/apps/{appId}/usage` を呼ぶ想定。
+- **今日の残り(`ai`)は iOS の表示と同じ数**: iOS(#653・#669 の `RemainingToday`)は ai の応答の `X-RateLimit-Remaining` / `-Limit` / `-Reset` を出している。`ai` は同じドキュメント・同じ上限(匿名 30・サインイン 60・Pro 300)・同じ 0:00 JST から出すので、`remaining` はヘッダーと同じ。違うのは、返した分(#548)がすぐ入ること(ヘッダーは次の依頼から)。生成とチャットは 1 つの枠(単位)なので分けない。「新しく作るのはあと何回」は `remaining / weights.create`。
+- **上限の値は ai の環境変数**: appconfig も `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `RATE_LIMIT_WEIGHT_*` / `RATE_LIMIT_COLLECTION` を読む。運用で ai の値を変えた時は appconfig にも同じ値を入れる([runtime-config.md](../infra/runtime-config.md))。`RATE_LIMIT_STORE=memory`(ai がインスタンスのメモリで数える)では `ai` は null。
+- **参加者が見る範囲**: 他の人が作ったアプリでは、作成者のプランの名前と上限・自分から見える分の数だけ。作成者の uid は返さない。scope:"shared" の entity は参加していなければ数えない。
+- `limit` / `remaining` が null = 数えない(環境変数が 0・`PLAN_LIMITS_MODE=off`)。集計に失敗した所は null で、他の所は返す。
+- 自分の写しが無いアプリは 404(`GET /dsl` と違い、ここでは写しを作らない・アプリの数も増えない)。
+
+## 全体の遮断(#317)
+
+1 日の AI の費用(#298 の `ai.usage` の `est_cost_usd`)の合計が閾値を超えたら、**無料プランの生成を一時停止**する。Pro は止めない(上の上限まで使える)。既定は無効。
+
+| 環境変数 | 既定 | 中身 |
+| --- | --- | --- |
+| `AI_FREE_DAILY_BUDGET_USD` | 無し(無効) | その日(0:00 JST から)の費用の閾値(USD)。`0` / 無しで無効 |
+| `AI_FREE_BUDGET_RESUME_DAY` | 無し | 手で戻す: `2026-11-07` のように JST の日付を入れると、その日だけ止めない。翌日からはまた効く(戻し忘れても次の日に遮断が死なない) |
+
+- 止めるもの: Pro でない人の `POST /v1/generate`(`mode=undo` を除く)と `POST /v1/chat`。`POST /v1/text` は Pro の機能(onlineAI)なので止めない。
+- 応答: 503 `free_plan_paused`。`details` は `reason: daily_budget`・`plan: free`・`resumeAt`(次の 0:00 JST)・`retryAfterSec`。`Retry-After` も付く。ログは `budget.free_paused`。
+- 順番: 上限(ratelimit)の内側で判定する(呼び出した人が確かめられていて Pro が分かる)。503 なので数えた分は返す(上の「返す時」)。
+- 費用の数え方: ai のログの出口(`ai.usage` の行)で `est_cost_usd` を足す(`backend/internal/budget`)。料金表に無いモデル(`est_cost_usd` が無い行)は数えない。合計は上限と同じコレクションの `rateLimits/{env}_{yyyy-mm-dd}_ai_cost {usd, expireAt, updatedAt}`(足すのは `Increment`・TTL も同じ)。各インスタンスは 30 秒ごとに読み直し、自分が足した分はすぐ数える。Firestore が読めない時は最後に分かっている合計のまま(止めも解きもしない)。
+- 戻り方: 0:00 JST に自動で戻る。その日のうちに戻すのは `AI_FREE_BUDGET_RESUME_DAY` を今日にする、または `AI_FREE_DAILY_BUDGET_USD` を消す / 上げる(どちらも新しいリビジョン・[runtime-config.md](../infra/runtime-config.md#変え方))。
+- 他の止め方との違い: `RATE_LIMIT_GLOBAL_DAILY` は全員(Pro も)を単位で止める。`AI_PAUSED` は全員を今すぐ止める(障害用)。これは費用で無料だけを止める。
+- 閾値は人が決める(下の「人の判断」)。目安は `scripts/ai-cost.sh prod --days 30` の 1 日の合計の最大より上(普段は当たらず、暴れた日だけ当たる値)。
+- **stg で試す(人の作業)**: ai-stg に `AI_FREE_DAILY_BUDGET_USD=0.01` を入れる → 無料のアカウントで 1 回生成(費用が付く)→ 30 秒以内にもう 1 回生成して 503 `free_plan_paused` → Pro のアカウントは通る → `AI_FREE_BUDGET_RESUME_DAY` を今日にして通る → 両方消す。
+
+## 上限に近い・超えた時の文言(案・#317)
+
+iOS の表示は別の PR(#669 が `ErrorCopy` を変えているため、その後)。サーバーの `message` も同じ考えで書いてある(`plan.Message`・`budget.Message`)。「何が起きたか + 次にすること」の 2 文にする。
+
+| 場面 | 見分け方 | 文言(案) |
+| --- | --- | --- |
+| 生成の残りが少ない(残り 2 割以下) | `X-RateLimit-Remaining` / `Limit` | 今日の生成はあと {n} 回分です。0:00 にまた増えます。 |
+| 生成の上限(無料) | 429 `rate_limited`・`tier` が `signed_in` | 今日の生成の上限に達しました。0:00 からまた使えます。Tailor It Pro にすると 1 日に使える回数が増えます。 |
+| 持てるアプリの数の上限 | 402 `app_limit_reached`(#630) | 上限に達しています。どのアプリと置き換えますか?(持っているアプリを並べ、消す / 抜ける。`canBuySlot` なら「枠を 1 つ買う(N コイン)」も出す) |
+| レコードの件数の上限 | `resource: recordsPerApp` | このアプリに保存できるデータ({limit} 件)がいっぱいです。古いデータを消すか、Tailor It Pro にすると上限が上がります。 |
+| 写真の上限 | `resource: photosPerApp` | このアプリに保存できる写真({limit} 枚)がいっぱいです。古い写真を消すか、Tailor It Pro にすると上限が上がります。 |
+| Pro でも上限 | `upgrade: false`・`plan: pro` | {件数 / 枚数}の上限に達しました。古いものを消すと続けて保存できます。 |
+| 参加者(作った人の上限) | `reason: creator_plan_limit` | このアプリを作った人のプランの上限に達しました。作った人に知らせてください(作った人が Tailor It Pro にすると上限が上がります)。課金画面は出さない |
+| 全体の遮断 | 503 `free_plan_paused` | 今日は利用が集中しているため、無料プランの新しい生成を止めています。{resumeAt}(0:00)に再開します。Tailor It Pro なら続けて使えます。「もう一度」は出さない(`Retry-After` が翌日まで) |
+
+- 「近い」は、生成の回数なら応答のヘッダー、アプリの数・件数・写真は下の「今の使用量」の API で分かる。
 
 ## 抜け道への対策
 

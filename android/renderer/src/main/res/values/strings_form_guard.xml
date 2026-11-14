@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 保存していない入力の破棄の確認と、空の必須欄の読み上げ(#1111・iOS の discardFormConfirmation / RequiredFieldMark)。 -->
+<resources>
+    <string name="renderer_discard_title">編集内容を破棄しますか?</string>
+    <string name="renderer_discard_message">保存していない入力は失われます。</string>
+    <string name="renderer_discard_confirm">破棄</string>
+    <string name="renderer_discard_keep_editing">編集を続ける</string>
+    <string name="renderer_required_fill_in">%1$s を入力してください</string>
+</resources>

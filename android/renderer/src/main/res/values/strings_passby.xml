@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- すれ違い通信(nearbyShare mode:passby・#1383)。iOS の Localizable.xcstrings と同じ文 -->
+<resources>
+    <string name="passby_agree">同意してはじめる</string>
+    <string name="passby_anonymous">近くの人</string>
+    <string name="passby_cancel">やめる</string>
+    <string name="passby_consent_anonymous_footer">オンにすると、表示名の代わりに「近くの人」と渡します。</string>
+    <string name="passby_consent_display_name">表示名</string>
+    <string name="passby_consent_fields_line">・項目: %1$s</string>
+    <string name="passby_consent_intro">オンの間、近くで同じアプリを開いている人と自動でつながり、次のものを渡します。</string>
+    <string name="passby_consent_name_line">・表示名: %1$s</string>
+    <string name="passby_consent_no_fields">(送る項目がありません)</string>
+    <string name="passby_consent_records">相手の記録はこの端末に追加されます。写真・動画や、それ以外の項目は送りません。</string>
+    <string name="passby_consent_shared">相手に渡るもの</string>
+    <string name="passby_consent_stops">この画面を閉じるか、アプリを裏に回すと止まります。</string>
+    <string name="passby_consent_title">すれ違い通信をはじめますか？</string>
+    <string name="passby_distance_unsupported">この端末は距離・方向の測定に対応していません</string>
+    <string name="passby_hide_name">名前を出さない</string>
+    <string name="passby_ios_not_supported">iOS の端末とはつながりません(Android どうしで送り合えます)</string>
+    <string name="passby_measuring">測定中</string>
+    <string name="passby_no_encounters">まだ誰ともすれ違っていません</string>
+    <string name="passby_no_fields">送る項目がありません</string>
+    <string name="passby_off_hint">オンにすると、この画面を開いている間 近くの同じアプリの人と%1$sを交換します</string>
+    <string name="passby_paused">一時停止中</string>
+    <string name="passby_public_name">相手に見える名前: %1$s</string>
+    <string name="passby_searching">近くの人を探しています</string>
+    <string name="passby_stops_note">画面を閉じる・アプリを裏に回すと止まります</string>
+    <plurals name="passby_times">
+        <item quantity="other">%1$d 回</item>
+    </plurals>
+</resources>

@@ -59,10 +59,18 @@ type AccountPurgeResult struct {
 	Reports int
 	// users/{uid}/blocks/*
 	Blocks int
+	// users/{uid}/devices/* left after DeactivateUser (#269; normally 0)
+	Devices int
+	// users/{uid}/notifyConsent/* (#339)
+	NotifyConsents int
 	// apps_public/*/match_pairs/* that include uid (#507), with match_quota/{uid}
 	MatchPairs int
 	// uid's records in match profile / matched entities (#507: erased, not kept as posts)
 	MatchRecords int
+	// apps_public/*/follows/{uid}, and uid taken out of others' follows (#270)
+	Follows int
+	// users/{uid}/connections/* (external API OAuth tokens and revoked markers, #1493)
+	ExtConnections int
 }
 
 // LogAttrs returns the counts as slog attrs, one per line, for the
@@ -85,6 +93,10 @@ func (r AccountPurgeResult) LogAttrs() []any {
 		slog.Int("feedback", r.Feedback),
 		slog.Int("matchPairs", r.MatchPairs),
 		slog.Int("matchRecords", r.MatchRecords),
+		slog.Int("devices", r.Devices),
+		slog.Int("notifyConsents", r.NotifyConsents),
+		slog.Int("follows", r.Follows),
+		slog.Int("extConnections", r.ExtConnections),
 	}
 }
 

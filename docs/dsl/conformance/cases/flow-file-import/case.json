@@ -1,0 +1,159 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "部員名簿"
+    },
+    "initialScreen": "home",
+    "entities": [
+      {
+        "id": "team",
+        "name": "チーム",
+        "titleField": "name",
+        "fields": [
+          {
+            "id": "name",
+            "name": "チーム名",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "id": "member",
+        "name": "部員",
+        "titleField": "name",
+        "fields": [
+          {
+            "id": "name",
+            "name": "名前",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "grade",
+            "name": "学年",
+            "type": "integer"
+          },
+          {
+            "id": "team",
+            "name": "チーム",
+            "type": "ref",
+            "refEntity": "team"
+          },
+          {
+            "id": "joined",
+            "name": "入部日",
+            "type": "date"
+          },
+          {
+            "id": "active",
+            "name": "在籍",
+            "type": "boolean"
+          }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "home",
+        "title": "部員名簿",
+        "components": [
+          {
+            "type": "stat",
+            "id": "count",
+            "area": "A1:F2",
+            "label": "部員",
+            "entity": "member",
+            "aggregate": "count"
+          },
+          {
+            "type": "list",
+            "id": "members",
+            "area": "A3:F9",
+            "entity": "member",
+            "item": {
+              "title": "name",
+              "subtitle": "team",
+              "trailing": "grade"
+            },
+            "sort": {
+              "field": "name",
+              "direction": "asc"
+            }
+          },
+          {
+            "type": "fileImport",
+            "id": "import_members",
+            "area": "A10:F11",
+            "entity": "member",
+            "accept": [
+              "csv"
+            ],
+            "label": "名簿の CSV を取り込む",
+            "map": [
+              {
+                "column": "氏名",
+                "field": "name"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "records": {
+    "team": [
+      {
+        "id": "t1",
+        "data": {
+          "name": "A チーム"
+        }
+      },
+      {
+        "id": "t2",
+        "data": {
+          "name": "B チーム"
+        }
+      }
+    ],
+    "member": [
+      {
+        "id": "m1",
+        "data": {
+          "name": "高橋",
+          "grade": 3,
+          "team": "t1",
+          "joined": "2024-04-01",
+          "active": true
+        }
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  },
+  "operations": [
+    {
+      "importCsv": {
+        "component": "import_members",
+        "text": [
+          "氏名,学年,チーム,入部日,在籍,備考",
+          "山田,1,A チーム,2026/4/1,はい,新入生",
+          "佐藤,2,B チーム,2026-04-02,いいえ,",
+          "鈴木,いち,A チーム,2026/4/3,はい,",
+          ",3,A チーム,2026/4/4,はい,"
+        ]
+      }
+    },
+    {
+      "importCsv": {
+        "text": [
+          "名簿",
+          "山田"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feedback_cancel">Cancel</string>
+    <string name="feedback_close">Close</string>
+    <string name="feedback_deleted">Deleted</string>
+    <string name="feedback_edit_hint_body">Tap the mic on the screen and talk.</string>
+    <string name="feedback_edit_hint_close">Close</string>
+    <string name="feedback_edit_hint_examples">“Make the buttons bigger” “Add a notes field” “Undo”</string>
+    <string name="feedback_edit_hint_talk">Try talking</string>
+    <string name="feedback_edit_hint_title">Try saying this to change it</string>
+    <string name="feedback_no_earlier">There\'s no earlier version</string>
+    <string name="feedback_redo">Redo</string>
+    <string name="feedback_redo_failed">Couldn\'t redo the change</string>
+    <string name="feedback_redone">Redid the change</string>
+    <string name="feedback_undo">Undo</string>
+    <string name="feedback_undone">Undone</string>
+</resources>

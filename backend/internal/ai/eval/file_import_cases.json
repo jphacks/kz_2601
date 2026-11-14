@@ -1,0 +1,6 @@
+[
+  {"id": "fi_roster_csv", "kind": "create", "group": "file_import", "transcript": "部活の名簿アプリ。Excel の名簿を CSV にしてあるから、それをまとめて取り込みたい。名前と学年とパート", "note": "名簿の CSV を fileImport{accept: [csv]} で一括で足す(tk_2413)", "expect": {"has": ["fileImport", "list"], "substitution": false, "unreachable": 0}},
+  {"id": "fi_pdf_text", "kind": "create", "group": "file_import", "transcript": "授業で配られた PDF の本文を取り込んで、資料ごとに残しておきたい。あとで要約も見たい", "note": "PDF の本文を text field に入れる fileImport{accept: [pdf, text], field}(NG_2313・os_2511 の代案)", "expect": {"has": ["fileImport"], "unreachable": 0}},
+  {"id": "fi_manual_pdf", "kind": "create", "group": "file_import", "transcript": "家具の取扱説明書の PDF を読み込んで、組み立ての手順をチェックしながら進めたい", "note": "取説 PDF の本文を記録に入れ、手順はチェックの list(os_2507 の代案)", "expect": {"has": ["fileImport", "list"], "unreachable": 0}},
+  {"id": "fi_edit_import_csv", "kind": "edit", "base": "fi_roster_csv", "group": "file_import", "transcript": "書き出した CSV を別の端末で取り込み直せるようにもして", "note": "既存の fileImport を残し、export csv を足す(読み戻しは fileImport のまま)", "expect": {"patch": true, "has": ["fileImport"]}}
+]

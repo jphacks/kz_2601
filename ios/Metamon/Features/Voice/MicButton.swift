@@ -12,6 +12,8 @@ struct MicButton: View {
     var size: CGFloat = 132
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         Button(action: action) {
             ZStack {
@@ -33,6 +35,13 @@ struct MicButton: View {
     private var halo: some View {
         switch mode {
         case .idle(ready: true):
+            if reduceMotion {
+                // 動きを減らす: 止まった輪だけ
+                Circle()
+                    .stroke(Theme.brandAngular, lineWidth: 3)
+                    .frame(width: size * 1.28, height: size * 1.28)
+                    .opacity(0.7)
+            } else {
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 let breath = 0.5 + 0.5 * sin(t * (2 * .pi / 3.2)) // 3.2 秒周期
@@ -50,7 +59,18 @@ struct MicButton: View {
                         .blur(radius: 18)
                 }
             }
+            }
         case .listening:
+            if reduceMotion {
+                // 動きを減らす: 止まった輪を録音色で示す
+                Circle()
+                    .stroke(Theme.recordGradient, lineWidth: 4)
+                    .frame(width: size * 1.28, height: size * 1.28)
+                Circle()
+                    .fill(Theme.recordGradient.opacity(0.18))
+                    .frame(width: size * 1.3, height: size * 1.3)
+                    .blur(radius: 14)
+            } else {
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 // 擬似音量: 周期の異なる sin を重ねて「話している」揺らぎを作る
@@ -69,6 +89,7 @@ struct MicButton: View {
                         .scaleEffect(1 + 0.25 * level)
                         .blur(radius: 14)
                 }
+            }
             }
         case .transcribing:
             Circle()
@@ -131,8 +152,11 @@ struct WaveformBars: View {
     var barCount = 5
     var height: CGFloat = 40
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
+        // 動きを減らす時は止める(paused)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             HStack(spacing: height * 0.12) {
                 ForEach(0..<barCount, id: \.self) { i in

@@ -7,8 +7,8 @@ import (
 )
 
 // photoField.analyze (#418): after a photo is taken or picked, iOS reads it on
-// the device (Vision OCR / image classification / body pose, plus Foundation
-// Models when available) and writes each result into the draft's Into field.
+// the device (Vision OCR / image classification / body pose / barcodes / faces
+// and people / pixel colors, plus Foundation Models when available) and writes each result into the draft's Into field.
 // Nothing leaves the device and nothing is saved until the user saves.
 
 // PhotoAnalyzeJoints lists the jointAngle joints (bare names = the better
@@ -30,7 +30,16 @@ var photoAnalyzeInto = map[string][]FieldType{
 	"classify":   {FieldEnum, FieldString, FieldText},
 	"describe":   {FieldString, FieldText},
 	"jointAngle": {FieldNumber, FieldInteger},
+	// #418 拡張: 分類のラベル名・バーコード・人数・主な色
+	"label":       {FieldString, FieldText},
+	"labels":      {FieldString, FieldText},
+	"barcode":     {FieldString, FieldText},
+	"peopleCount": {FieldInteger, FieldNumber},
+	"color":       {FieldString, FieldText},
 }
+
+// photoAnalyzeKinds is the error-message list (same order as the schema enum).
+const photoAnalyzeKinds = "text|amount|date|classify|describe|jointAngle|label|labels|barcode|peopleCount|color"
 
 func checkPhotoAnalyze(where string, c *Component, form *Entity, add func(string, ...any)) {
 	if len(c.Analyze) == 0 || form == nil {
@@ -44,7 +53,7 @@ func checkPhotoAnalyze(where string, c *Component, form *Entity, add func(string
 		at := fmt.Sprintf("%s.analyze[%d]", where, i)
 		types, ok := photoAnalyzeInto[a.Kind]
 		if !ok {
-			add("%s: kind %q must be one of text|amount|date|classify|describe|jointAngle", at, a.Kind)
+			add("%s: kind %q must be one of %s", at, a.Kind, photoAnalyzeKinds)
 			continue
 		}
 		if a.Joint != "" && a.Kind != "jointAngle" {

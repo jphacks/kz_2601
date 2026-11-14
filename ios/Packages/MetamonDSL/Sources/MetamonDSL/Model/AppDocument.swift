@@ -46,14 +46,25 @@ public struct AppDSL: Decodable, Sendable {
     public var initialScreen: String
     @Lossy public var entities: [Entity]
     @Lossy public var screens: [Screen]
+    /// サーバーの自動の動き(トップの `serverRules`)の数。中身は iOS では使わない(#340)。設定の「自動の動き」を出すかだけに使う(#347)。
+    public var serverRuleCount: Int = 0
 
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
+    /// entity id → 暗号化して保存する field id(#233・暗号化の field が無い entity は入れない)。
+    public var encryptedFields: [String: Set<String>] {
+        Dictionary(entities.compactMap { e in
+            let ids = e.encryptedFieldIds
+            return ids.isEmpty ? nil : (e.id, ids)
+        }, uniquingKeysWith: { first, _ in first })
+    }
 
     /// 画面の描画に要る entity(部品が直接使うもの + computed / Stat.value の agg 先 + ref の参照先を推移的に)。
     public func entitiesNeeded(by screen: Screen) -> Set<String> {
         var out = screen.referencedEntities
         for c in screen.allComponents { out.formUnion(c.valueExpr?.referencedEntities ?? []) }
+        // {"setting": ...}(#267)はどの式からも読めるので、single の entity(1 件ずつ)はいつも読む
+        out.formUnion(entities.filter(\.single).map(\.id))
         var queue = Array(out)
         while let id = queue.popLast() {
             guard let e = entity(id) else { continue }
@@ -89,14 +100,14 @@ public struct AppDSL: Decodable, Sendable {
     public static let fallback: AppDSL = {
         let json = """
         {"schemaVersion":1,"app":{"name":"Tailor It","voiceEntry":"none"},"initialScreen":"home","entities":[],
-         "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
+         "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"\(L("DSL を読み込めませんでした"))"}]}]}
         """
         return try! JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
     }()
 }
 
 extension AppDSL {
-    private enum Keys: String, CodingKey { case schemaVersion, app, initialScreen, entities, screens }
+    private enum Keys: String, CodingKey { case schemaVersion, app, initialScreen, entities, screens, serverRules }
 
     /// 毎日リセットのチェック(#132)の toggle field は、デコード時に新規作成の既定値(今日)を外す。
     public init(from decoder: Decoder) throws {
@@ -106,6 +117,8 @@ extension AppDSL {
         initialScreen = try c.decode(String.self, forKey: .initialScreen)
         _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
         _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
+        // 形を問わず数だけ(未知の形でも落とさない)
+        serverRuleCount = (try? c.decodeIfPresent([JSONValue].self, forKey: .serverRules))?.count ?? 0
         clearDailyToggleDefaults()
     }
 }
@@ -184,15 +197,42 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     /// 条件で知らせる(#265・app.notifications のみ): 真偽の式(ref 不可・agg で集計)。偽 → 真に変わった時に 1 回すぐ知らせる。
     /// 時刻・レコードの日付の通知とは組み合わせない(backend が拒否)。式が読めない通知は `Lossy` が落とす(誤って時刻で鳴らさない)。
     public var when: Expr?
+    /// 止めるまで鳴るアラーム(iOS 26.1 以降の AlarmKit)。使えない時(古い iOS・許可が無い・審査用の版)は同じ時刻の普通の通知。
+    /// 古い版はこのキーを知らずに普通の通知として予約する(それが落とし方)。
+    public var alarm: Bool?
+    /// 場所に着いたら知らせる(app.notifications のみ): `entity` の各レコードの location field の場所(端末内の領域監視)。
+    /// 時刻・レコードの日付・条件の通知とは組み合わせない(backend が拒否)。古い版はこのキーを知らないので、backend は
+    /// `supportedFeatures` に `notification.near` が無い版には出さない。読めない near は `Lossy` が通知ごと落とす。
+    public var near: Near?
+    /// 時刻の通知を回ごとに ±N 分ずらす(1〜60・回ごとに決まった値)。
+    public var jitterMinutes: Int?
 
-    public var isRecordBased: Bool { when == nil && entity?.isEmpty == false && field?.isEmpty == false }
+    public struct Near: Decodable, Sendable, Equatable {
+        public static let defaultRadius = 200
+        public var entity: String
+        public var locationField: String
+        public var radiusM: Int?
+        /// m。範囲外は 100〜2000 に寄せる。
+        public var radius: Double { Double(min(max(radiusM ?? Self.defaultRadius, 100), 2000)) }
+        public init(entity: String, locationField: String, radiusM: Int? = nil) {
+            self.entity = entity
+            self.locationField = locationField
+            self.radiusM = radiusM
+        }
+    }
+
+    public var isRecordBased: Bool { when == nil && near == nil && entity?.isEmpty == false && field?.isEmpty == false }
+    /// 場所に着いたら知らせる通知。
+    public var isNearBased: Bool { when == nil && near != nil }
+    /// 予約に読むレコードの entity(レコードの時刻・場所の通知)。
+    public var recordEntity: String? { isNearBased ? near?.entity : (isRecordBased ? entity : nil) }
     /// 条件の通知(#265)。予約(時刻・レコードの日付)には入れず、レコードの保存・同期の後に評価する。
     public var isConditional: Bool { when != nil }
 
     public init(
         id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
         entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil,
-        when: Expr? = nil
+        when: Expr? = nil, alarm: Bool? = nil, near: Near? = nil, jitterMinutes: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -206,6 +246,9 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
         self.titleField = titleField
         self.enabledField = enabledField
         self.when = when
+        self.alarm = alarm
+        self.near = near
+        self.jitterMinutes = jitterMinutes
     }
 }
 
@@ -223,6 +266,14 @@ public struct Entity: Decodable, Identifiable, Sendable {
     @LossyPositiveInt public var retentionDays: Int?
     /// 仲間探しでの役割(#507): "profile"(みんなが見るプロフィール)/ "matched"(つながった人だけが読む)。未知の値は無視。
     public var match: String?
+    /// 設定値の置き場(#267)。レコードは常に 1 件(`SingleRecord`)。フォームは開くとその 1 件の編集、一覧には出さない。式 `{"setting": ...}` で読む。
+    @LossyBool public var single: Bool = false
+    /// 一意制約(#273)。field id か "$author" の組が同じレコードは 1 件だけ(サーバーが 409 で断る)。端末は表示に使わない。
+    public var unique: [String]?
+    /// 共有レコードを誰が消せるか(#272): "author"(省略時)/ "admins" / "authorOrAdmins"。`RecordPermission.canDelete` が読む。
+    public var deleteBy: String?
+    /// 宛先の field id(#271)。この entity の記録は作った人と宛先の人だけが読める(サーバーが一覧から外す)。端末は表示に使わない。
+    public var addressedTo: String?
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
@@ -250,6 +301,10 @@ public struct Entity: Decodable, Identifiable, Sendable {
 
     /// hidden(#262)の field id。
     public var hiddenFieldIds: Set<String> { Set(fields.filter(\.hidden).map(\.id)) }
+    /// 暗号化して保存する(#233)string / text の field id。
+    public var encryptedFieldIds: Set<String> {
+        Set(fields.filter { $0.encrypted && ($0.type == .string || $0.type == .text) && !$0.isComputed }.map(\.id))
+    }
 }
 
 public enum FieldType: String, Decodable, Sendable {
@@ -263,6 +318,10 @@ public enum FieldType: String, Decodable, Sendable {
     /// 別 entity のレコードの複数選択(保存値はレコード id の配列・#231)。空 / 無し = 全員(割り勘する人)。
     /// 式では `len`(選んだ件数)と filter op `contains` だけが読む。
     case refs
+    /// 共有データの参加者(保存値は uid・#272)。入力は参加者の一覧から選び、一覧には表示名を出す。
+    case member
+    /// 共有データの参加者の複数選択(保存値は uid の配列・#271)。グループ宛てのメッセージの宛先。
+    case members
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
     public var isNumeric: Bool { self == .integer || self == .number || self == .currency }
@@ -287,13 +346,19 @@ public struct Field: Decodable, Identifiable, Sendable {
     /// 回答者に見せない項目(クイズの正解・#262)。レコードの作者のフォームにだけ出し、一覧・表・グラフ・見出しには出さない。
     /// 式(比較)からは読める。値は端末に届いているので厳密な秘匿ではない(docs/dsl/expressions.md §7.6)。
     public var hidden: Bool
+    /// "admins" = 管理者だけが入れる・変えられる項目(#272)。サーバーが守り、端末は断られた理由を出す。
+    public var editableBy: String?
+    /// 値を端末で暗号化して保存する(#233)。レコードには `enc:v1:` の暗号文が入り、表示・編集の時に端末で復号する(`FieldCipher`)。
+    public var encrypted: Bool
 
     public var isComputed: Bool { computed != nil }
+    /// 管理者だけが変えられる項目(#272)。
+    public var isAdminOnly: Bool { editableBy == "admins" }
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
 
-    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden, editableBy, encrypted }
 
     /// 予約値の仮 Field 用(`RecordValue`)。
     init(id: String, name: String, type: FieldType) {
@@ -301,6 +366,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         self.name = name
         self.type = type
         self.hidden = false
+        self.encrypted = false
     }
 
     public init(from decoder: Decoder) throws {
@@ -316,6 +382,8 @@ public struct Field: Decodable, Identifiable, Sendable {
         computed = try? c.decodeIfPresent(Expr.self, forKey: .computed)
         health = try? c.decodeIfPresent(String.self, forKey: .health)
         hidden = (try? c.decodeIfPresent(Bool.self, forKey: .hidden)) ?? false
+        editableBy = try? c.decodeIfPresent(String.self, forKey: .editableBy)
+        encrypted = (try? c.decodeIfPresent(Bool.self, forKey: .encrypted)) ?? false
     }
 }
 

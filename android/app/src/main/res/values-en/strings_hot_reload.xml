@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hot reload connection status (#1108). The banner text is runtime_hot_reloaded in strings_runtime.xml -->
+<resources>
+    <string name="hot_reload_polling">Polling</string>
+    <string name="hot_reload_polling_a11y">Hot reload: polling. The live connection is down, so the app checks for updates periodically</string>
+    <string name="hot_reload_realtime">Live</string>
+    <string name="hot_reload_realtime_a11y">Hot reload: receiving live updates</string>
+</resources>

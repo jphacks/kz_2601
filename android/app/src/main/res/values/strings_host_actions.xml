@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- export / addToCalendar / lookupBook(#911)。iOS の L10n キーと同じ文 -->
+<resources>
+    <string name="host_book_filled">「%1$s」の情報を入れました(出典: %2$s)</string>
+    <string name="host_book_form_only">本の情報はフォームの画面で読み込めます</string>
+    <string name="host_book_isbn_empty">先に ISBN を入力してください</string>
+    <string name="host_book_isbn_invalid">ISBN を確かめてください(10 桁か 13 桁)</string>
+    <string name="host_book_not_found">この ISBN の本は見つかりませんでした。手で入力してください</string>
+    <string name="host_book_off">本の情報の取得は今使えません。手で入力してください</string>
+    <string name="host_book_unavailable">本の情報を読み込めません。手で入力してください</string>
+    <string name="host_calendar_no_app">予定を追加できるアプリが見つかりません</string>
+    <string name="host_calendar_no_record">カレンダーに入れる記録が見つかりません</string>
+    <string name="host_calendar_no_start">「%1$s」を入力してください</string>
+    <string name="host_export_count">%1$d 件</string>
+    <string name="host_export_date">書き出し日 %1$s</string>
+    <string name="host_export_empty">記録がありません</string>
+    <string name="host_export_failed">書き出せませんでした</string>
+    <string name="host_export_file_fallback">書き出し</string>
+    <string name="host_export_no_entity">書き出す記録が見つかりません</string>
+</resources>

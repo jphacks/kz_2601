@@ -1,0 +1,153 @@
+{
+  "app": {
+    "description": "近くのカフェを探して「記録に追加」で名前・場所・住所を入れ、行った所を地図と一覧で見返す(placeSearch・locationButton.addressField)",
+    "icon": "cup.and.saucer.fill",
+    "name": "近くのカフェ記録",
+    "theme": {
+      "primaryColor": "#6D4C41"
+    },
+    "voiceEntry": "floating"
+  },
+  "entities": [
+    {
+      "fields": [
+        {
+          "id": "name",
+          "name": "名前",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "id": "place",
+          "name": "場所",
+          "type": "location"
+        },
+        {
+          "id": "address",
+          "name": "住所",
+          "type": "string"
+        },
+        {
+          "id": "memo",
+          "name": "メモ",
+          "type": "text"
+        }
+      ],
+      "id": "spot",
+      "name": "カフェ",
+      "titleField": "name"
+    }
+  ],
+  "initialScreen": "home",
+  "schemaVersion": 1,
+  "screens": [
+    {
+      "components": [
+        {
+          "area": "A1:F6",
+          "entity": "spot",
+          "id": "map",
+          "locationField": "place",
+          "titleField": "name",
+          "type": "mapView",
+          "zoom": "near"
+        },
+        {
+          "area": "A7:F10",
+          "children": [
+            {
+              "emptyText": "まだ記録がありません",
+              "entity": "spot",
+              "item": {
+                "subtitle": "address",
+                "title": "name"
+              },
+              "onItemTap": {
+                "presentation": "push",
+                "screen": "spot_form",
+                "type": "navigate"
+              },
+              "swipeToDelete": true,
+              "type": "list"
+            }
+          ],
+          "id": "spots",
+          "title": "行ったカフェ",
+          "type": "section"
+        },
+        {
+          "action": {
+            "presentation": "sheet",
+            "screen": "spot_form",
+            "type": "navigate"
+          },
+          "area": "D11:F12",
+          "icon": "magnifyingglass",
+          "id": "add",
+          "label": "近くを探す",
+          "type": "button"
+        }
+      ],
+      "id": "home",
+      "title": "カフェ"
+    },
+    {
+      "components": [
+        {
+          "addressField": "address",
+          "area": "A1:F6",
+          "category": "cafe",
+          "id": "search",
+          "label": "近くのカフェ",
+          "locationField": "place",
+          "nameField": "name",
+          "near": "current",
+          "pins": true,
+          "type": "placeSearch"
+        },
+        {
+          "area": "A7:F7",
+          "field": "name",
+          "id": "name_in",
+          "label": "名前",
+          "type": "textField"
+        },
+        {
+          "addressField": "address",
+          "area": "A8:F8",
+          "field": "place",
+          "id": "here",
+          "label": "今いる場所を記録",
+          "type": "locationButton"
+        },
+        {
+          "area": "A9:F9",
+          "field": "address",
+          "id": "address_in",
+          "label": "住所",
+          "type": "textField"
+        },
+        {
+          "area": "A10:F11",
+          "field": "memo",
+          "id": "memo_in",
+          "placeholder": "メモ",
+          "type": "textEditor"
+        }
+      ],
+      "entity": "spot",
+      "id": "spot_form",
+      "title": "カフェを記録",
+      "toolbar": [
+        {
+          "action": {
+            "entity": "spot",
+            "type": "saveRecord"
+          },
+          "icon": "checkmark",
+          "label": "保存"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// schema `SemanticColor` の red/green/orange/blue を、本文サイズの文字色として使っても
@@ -91,11 +95,17 @@ enum SemanticPalette {
     }
 
     static func color(_ pair: (light: RGB, dark: RGB), lightAlpha: Double, darkAlpha: Double) -> Color {
+        #if canImport(UIKit)
         Color(UIColor { trait in
             let dark = trait.userInterfaceStyle == .dark
             let c = dark ? pair.dark : pair.light
             return UIColor(red: c.r, green: c.g, blue: c.b, alpha: dark ? darkAlpha : lightAlpha)
         })
+        #else
+        Color(PlatformColor.dynamic(
+            light: { NSColor(srgbRed: pair.light.r, green: pair.light.g, blue: pair.light.b, alpha: lightAlpha) },
+            dark: { NSColor(srgbRed: pair.dark.r, green: pair.dark.g, blue: pair.dark.b, alpha: darkAlpha) }))
+        #endif
     }
 }
 

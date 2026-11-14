@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "シフト割り当て", "voiceEntry": "none"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "staff", "name": "スタッフ", "scope": "shared", "titleField": "name", "fields": [
+      {"id": "name", "name": "名前", "type": "string", "required": true}
+    ]},
+    {"id": "shifts", "name": "シフト", "scope": "shared", "titleField": "day", "fields": [
+      {"id": "day", "name": "日付", "type": "date", "required": true},
+      {"id": "staff", "name": "担当", "type": "ref", "refEntity": "staff"}
+    ]},
+    {"id": "offs", "name": "休み", "scope": "shared", "titleField": "day", "fields": [
+      {"id": "staff", "name": "スタッフ", "type": "ref", "refEntity": "staff", "required": true},
+      {"id": "day", "name": "日付", "type": "date", "required": true}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "シフト", "components": [
+      {"type": "list", "entity": "shifts", "item": {"title": "day", "subtitle": "staff"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "assign_new", "on": {"record": "created", "entity": "shifts"},
+     "if": {"op": "eq", "args": [{"op": "coalesce", "args": [{"ref": "staff"}, "-"]}, "-"]},
+     "pick": {"entity": "staff", "order": "fewest", "count": {"entity": "shifts", "field": "staff"}, "exclude": {"entity": "offs", "field": "staff", "match": {"field": "day", "equals": "day"}}},
+     "do": [
+       {"updateRecord": {"values": {"staff": {"ref": "$pick"}}}},
+       {"notify": {"to": {"kind": "authorOf", "field": "$pick"}, "title": "シフトが入りました", "body": "{day} は {$pick.name} さんの担当です"}}
+     ]},
+    {"id": "assign_daily", "on": {"every": "daily", "time": "07:00", "each": "shifts"},
+     "if": {"op": "eq", "args": [{"op": "coalesce", "args": [{"ref": "staff"}, "-"]}, "-"]},
+     "pick": {"entity": "staff", "order": "fewest", "count": {"entity": "shifts", "field": "staff"}},
+     "do": [
+       {"updateRecord": {"values": {"staff": {"ref": "$pick"}}}}
+     ]}
+  ]
+}

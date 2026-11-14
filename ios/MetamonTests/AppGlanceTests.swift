@@ -1,0 +1,321 @@
+import XCTest
+import MetamonDSL
+import MetamonServices
+@testable import Metamon
+
+private let glanceRows: [String: [Record]] = ["expense": [
+    Record(id: "a", data: ["amount": .number(38000), "memo": .string("家賃")], createdAt: "2026-11-01T00:00:00Z"),
+    Record(id: "b", data: ["amount": .number(200), "memo": .string("コーヒー")], createdAt: "2026-11-02T00:00:00Z"),
+]]
+
+/// link-10: アプリの一覧のひと目の数字(既定の選び方・書式・端末の中だけで数える・消す)。
+@MainActor
+final class AppGlanceTests: XCTestCase {
+    private func dsl() throws -> AppDSL {
+        let json = """
+        {"schemaVersion":1,"app":{"name":"家計簿","tabs":[{"screen":"home","title":"ホーム"},{"screen":"log","title":"記録"}]},
+         "initialScreen":"home",
+         "entities":[{"id":"expense","name":"支出","titleField":"memo","fields":[
+           {"id":"amount","name":"金額","type":"currency","unit":"円"},
+           {"id":"memo","name":"メモ","type":"string","encrypted":true}]}],
+         "screens":[
+           {"id":"log","title":"記録","components":[
+             {"id":"memo_latest","type":"stat","label":"最後のメモ","entity":"expense","aggregate":"latest","field":"memo"}]},
+           {"id":"home","title":"家計簿","components":[
+             {"id":"total","type":"stat","label":"合計","entity":"expense","aggregate":"sum","field":"amount","format":"currency"},
+             {"id":"times","type":"stat","label":"回数","entity":"expense","aggregate":"count"}]}]}
+        """
+        return try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+    }
+
+    private var records: [String: [Record]] { glanceRows }
+
+    private func freshDefaults() -> UserDefaults {
+        let name = "AppGlanceTests.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
+    // MARK: - 選び方
+
+    func testDefaultIsFirstStatOfInitialScreen() throws {
+        let d = try dsl()
+        XCTAssertEqual(AppGlance.choices(in: d).map(\.id), ["total", "times", "memo_latest"], "初期画面 → タブ順")
+        XCTAssertEqual(AppGlance.chosen(in: d, setting: nil)?.id, "total")
+        XCTAssertEqual(AppGlance.chosen(in: d, setting: "")?.id, "total")
+        XCTAssertEqual(AppGlance.chosen(in: d, setting: "gone")?.id, "total", "DSL に無い id は既定に戻す")
+        XCTAssertEqual(AppGlance.chosen(in: d, setting: "times")?.id, "times")
+        XCTAssertNil(AppGlance.chosen(in: d, setting: AppGlance.hidden))
+    }
+
+    func testNoStatShowsNothing() throws {
+        let d = try JSONDecoder().decode(AppDSL.self, from: Data(#"""
+        {"schemaVersion":1,"app":{"name":"メモ"},"initialScreen":"home","entities":[],
+         "screens":[{"id":"home","title":"メモ","components":[{"id":"t","type":"text","text":"こんにちは"}]}]}
+        """#.utf8))
+        XCTAssertNil(AppGlance.compute(dsl: d, records: [:], setting: nil))
+    }
+
+    // MARK: - 書式
+
+    func testValueUsesWidgetFormatting() throws {
+        let d = try dsl()
+        let v = try XCTUnwrap(AppGlance.compute(dsl: d, records: records, setting: nil))
+        XCTAssertEqual(v.statId, "total")
+        XCTAssertEqual(v.label, "合計")
+        let expr = ExprEvaluator(dsl: d, records: { glanceRows[$0] ?? [] })
+        XCTAssertEqual(v.value, WidgetSnapshotWriter.statText(AppGlance.chosen(in: d, setting: nil)!, dsl: d, records: records, evaluator: expr))
+        XCTAssertEqual(AppGlance.line(v), "合計 \(v.value)")
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "times")?.value, WidgetSnapshotWriter.formattedValue(
+            AppGlance.chosen(in: d, setting: "times")!, entity: d.entity("expense"), value: 2))
+        XCTAssertNil(AppGlance.compute(dsl: d, records: [:], setting: nil), "記録が未取得なら出さない")
+    }
+
+    func testAccessibilityLabelReadsNameLabelValue() {
+        let v = AppGlance.Value(statId: "total", label: "今月", value: "¥38,200", at: .now)
+        XCTAssertEqual(AppGlance.accessibilityLabel(appName: "家計簿", value: v), "家計簿, 今月, ¥38,200")
+        XCTAssertEqual(AppGlance.accessibilityLabel(appName: "家計簿", value: nil), "家計簿")
+    }
+
+    func testEncryptedFieldIsLockedWithoutKey() throws {
+        let d = try dsl()
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "memo_latest")?.value, "🔒", "復号できても数えない")
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "total")?.value.contains("38,200"), true)
+    }
+
+    /// 式・絞り込み・computed から暗号化した項目に触れる stat も「🔒」。
+    private func encryptedDSL() throws -> AppDSL {
+        let json = """
+        {"schemaVersion":1,"app":{"name":"日記"},"initialScreen":"home",
+         "entities":[{"id":"entry","name":"日記","fields":[
+           {"id":"mood","name":"気分","type":"string","encrypted":true},
+           {"id":"score","name":"点","type":"string","computed":{"op":"concat","args":[{"ref":"mood"},"!"]}},
+           {"id":"steps","name":"歩数","type":"number"}]}],
+         "screens":[{"id":"home","title":"日記","components":[
+           {"id":"expr_mood","type":"stat","label":"最後の気分","value":{"agg":"latest","entity":"entry","field":"mood"}},
+           {"id":"expr_filter","type":"stat","label":"良い日","value":{"agg":"count","entity":"entry","filter":[{"field":"mood","op":"eq","value":"good"}]}},
+           {"id":"computed","type":"stat","label":"点","entity":"entry","aggregate":"latest","field":"score"},
+           {"id":"filtered","type":"stat","label":"歩数","entity":"entry","aggregate":"sum","field":"steps","filter":{"field":"mood","op":"eq","value":"good"}},
+           {"id":"plain","type":"stat","label":"歩数","entity":"entry","aggregate":"sum","field":"steps"},
+           {"id":"plain_expr","type":"stat","label":"件数","value":{"agg":"count","entity":"entry"}}]}]}
+        """
+        return try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+    }
+
+    func testStatsTouchingEncryptedFieldsAreLocked() throws {
+        let d = try encryptedDSL()
+        let stats = Dictionary(uniqueKeysWithValues: AppGlance.choices(in: d).map { ($0.id, $0) })
+        XCTAssertEqual(stats.count, 6)
+        for id in ["expr_mood", "expr_filter", "computed", "filtered"] {
+            XCTAssertTrue(AppGlance.touchesEncrypted(try XCTUnwrap(stats[id]), in: d), id)
+        }
+        for id in ["plain", "plain_expr"] {
+            XCTAssertFalse(AppGlance.touchesEncrypted(try XCTUnwrap(stats[id]), in: d), id)
+        }
+        let rows: [String: [Record]] = ["entry": [Record(id: "x", data: ["mood": .string("good"), "steps": .number(3000)])]]
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: rows, setting: "expr_mood")?.value, "🔒")
+    }
+
+    /// 使用中のアプリ(復号済みの記録)でも、暗号化した項目の数字は端末に残さない。
+    func testLockedValueIsNeverPersisted() async throws {
+        let defaults = freshDefaults()
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: defaults)
+        await store.update(appId: "a", dsl: d, records: glanceRows, setting: "memo_latest")
+        XCTAssertEqual(store.values["a"]?.value, "🔒")
+        await store.update(appId: "b", dsl: d, records: glanceRows, setting: "total")
+        let raw = String(decoding: defaults.data(forKey: AppGlanceStore.defaultsKey) ?? Data(), as: UTF8.self)
+        XCTAssertFalse(raw.contains("コーヒー"))
+        XCTAssertFalse(raw.contains("\"a\""), "🔒 も残さない")
+        XCTAssertNotNil(AppGlanceStore(defaults: defaults).values["b"])
+    }
+
+    func testLegacySavedValuesAreDropped() {
+        let defaults = freshDefaults()
+        defaults.set(Data("{}".utf8), forKey: "metamon.appGlance.v1")
+        _ = AppGlanceStore(defaults: defaults)
+        XCTAssertNil(defaults.data(forKey: "metamon.appGlance.v1"))
+    }
+
+    /// 読み込みの途中でサインアウト(clear)したら、前の人の数字を書き戻さない。
+    func testClearDuringLoadDropsResult() async throws {
+        let defaults = freshDefaults()
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: defaults)
+        let source = AppGlanceSource(document: { _ in d }, cached: { _, e in
+            await MainActor.run { store.clear() }
+            return glanceRows[e] ?? []
+        })
+        await store.load(appId: "a", setting: nil, source: source)
+        XCTAssertNil(store.values["a"])
+        XCTAssertNil(defaults.data(forKey: AppGlanceStore.defaultsKey))
+    }
+
+    // MARK: - 端末の中だけで数える
+
+    func testLoadReadsOnlyLocalCacheAndOnlyNeededEntity() async throws {
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: freshDefaults())
+        let log = ReadLog()
+        let rows = glanceRows
+        let source = AppGlanceSource(document: { $0 == "kakeibo" ? d : nil },
+                                     cached: { appId, entity in log.reads.append("\(appId)/\(entity)"); return rows[entity] ?? [] })
+        await store.load(appId: "kakeibo", setting: nil, source: source)
+        XCTAssertEqual(store.values["kakeibo"]?.statId, "total")
+        XCTAssertEqual(log.reads, ["kakeibo/expense"])
+        XCTAssertEqual(store.choices["kakeibo"]?.map(\.id), ["total", "times", "memo_latest"])
+
+        // 少しの間は読み直さない(一覧の出し入れでローカル DB を読み続けない)
+        await store.load(appId: "kakeibo", setting: nil, source: source)
+        XCTAssertEqual(log.reads.count, 1)
+
+        // 端末に DSL の無いアプリは何も読まない
+        await store.load(appId: "other", setting: nil, source: source)
+        XCTAssertNil(store.values["other"])
+        XCTAssertEqual(log.reads.count, 1)
+    }
+
+    func testEmptyLocalRecordsKeepPreviousValue() async throws {
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: freshDefaults())
+        let full = AppGlanceSource(document: { _ in d }, cached: { _, e in glanceRows[e] ?? [] })
+        let empty = AppGlanceSource(document: { _ in d }, cached: { _, _ in [] })
+        await store.load(appId: "a", setting: nil, source: empty)
+        XCTAssertNil(store.values["a"], "この端末で開いていないアプリを「0」と言い切らない")
+        await store.load(appId: "b", setting: nil, source: full)
+        let before = store.values["b"]
+        store.invalidate("b")
+        await store.load(appId: "b", setting: nil, source: empty)
+        XCTAssertEqual(store.values["b"], before)
+    }
+
+    func testRuntimeLoadGlanceNeverCallsRecordsAPI() async throws {
+        let client = CountingClient()
+        var services = BuildConfig.make(environment: .mock)
+        services.appConfig = client
+        let rt = AppRuntime(document: try DSLExamples.document("kakeibo", version: 3), services: services)
+        let store = AppGlanceStore(defaults: freshDefaults())
+        let before = await client.lists
+        await rt.loadGlance(for: AppSummary(id: "not-cached-\(UUID().uuidString)", name: "x", currentVersion: 2), store: store)
+        await rt.loadGlance(for: AppSummary(id: rt.document.appId, name: "家計簿", currentVersion: 3), store: store)
+        let after = await client.lists
+        XCTAssertEqual(after, before, "一覧の数字のために記録の API を呼ばない")
+    }
+
+    // MARK: - main actor の外で数える
+
+    func testLoadReadsDecryptsAndComputesOffMainWithSameResult() async throws {
+        let d = try dsl()
+        let threads = ThreadLog()
+        let rows = glanceRows
+        let source = AppGlanceSource(
+            document: { _ in threads.note("document"); return d },
+            cached: { _, e in rows[e] ?? [] },
+            open: { threads.note("open"); return $0 },
+            compute: { threads.note("compute"); return AppGlance.compute($0) })
+        for setting in [nil, "times", "memo_latest"] as [String?] {
+            let store = AppGlanceStore(defaults: freshDefaults())
+            await store.load(appId: "a", setting: setting, source: source)
+            let expected = AppGlance.compute(dsl: d, records: rows, setting: setting)
+            XCTAssertEqual(store.values["a"]?.statId, expected?.statId)
+            XCTAssertEqual(store.values["a"]?.label, expected?.label)
+            XCTAssertEqual(store.values["a"]?.value, expected?.value, "main の外で数えても同じ数字(\(setting ?? "既定"))")
+        }
+        XCTAssertEqual(threads.values.compactMap { $0.value ? $0.key : nil }, [], "DSL の読み出し・復号・集計は main で走らない")
+        XCTAssertEqual(Set(threads.values.keys), ["document", "open", "compute"])
+    }
+
+    func testEncryptedStatStaysLockedWhenComputedOffMain() async throws {
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: freshDefaults())
+        await store.load(appId: "a", setting: "memo_latest",
+                         source: AppGlanceSource(document: { _ in d }, cached: { _, e in glanceRows[e] ?? [] }))
+        XCTAssertEqual(store.values["a"]?.value, "🔒", "ローカル DB から数える時は暗号化した項目を出さない")
+    }
+
+    func testUpdateComputesOffMainWithSameResult() async throws {
+        let d = try dsl()
+        let threads = ThreadLog()
+        let store = AppGlanceStore(defaults: freshDefaults())
+        await store.update(appId: "a", dsl: d, records: records, setting: "times",
+                           compute: { threads.note("compute"); return AppGlance.compute($0) })
+        XCTAssertEqual(store.values["a"]?.value, AppGlance.compute(dsl: d, records: records, setting: "times")?.value)
+        XCTAssertEqual(threads.values, ["compute": false], "使用中のアプリの数字も main の外で数える")
+    }
+
+    func testClearWhileLoadingDoesNotWriteBack() async throws {
+        let d = try dsl()
+        let defaults = freshDefaults()
+        let store = AppGlanceStore(defaults: defaults)
+        // 記録を読んでいる間にサインアウトした(この後 main の外で数えて戻ってくる)
+        await store.load(appId: "a", setting: nil, source: AppGlanceSource(
+            document: { _ in d }, cached: { _, e in store.clear(); return glanceRows[e] ?? [] }))
+        XCTAssertNil(store.values["a"], "サインアウト後に前の人の数字を書き戻さない")
+        XCTAssertNil(defaults.data(forKey: AppGlanceStore.defaultsKey))
+    }
+
+    // MARK: - 保存・消す
+
+    func testSetGlanceStatSavesToServerAndRollsBackOnFailure() async throws {
+        var services = BuildConfig.make(environment: .mock)
+        let mem = try XCTUnwrap(services.appConfig as? InMemoryAppConfigClient)
+        let app = AppSummary(id: "a", name: "家計簿", currentVersion: 3)
+        await mem.setApps([app])
+        let rt = AppRuntime(document: try DSLExamples.document("kakeibo", version: 3), services: services)
+        rt.apps = [app]
+        let store = AppGlanceStore(defaults: freshDefaults())
+        await rt.setGlanceStat(app, to: "times", store: store)
+        XCTAssertEqual(rt.apps[0].glanceStat, "times")
+        let saved = try await mem.listApps()
+        XCTAssertEqual(saved.first?.glanceStat, "times")
+
+        services.appConfig = CountingClient()
+        let failing = AppRuntime(document: try DSLExamples.document("kakeibo", version: 3), services: services)
+        failing.apps = [app]
+        await failing.setGlanceStat(app, to: AppGlance.hidden, store: store)
+        XCTAssertNil(failing.apps[0].glanceStat, "保存に失敗したら戻す")
+        XCTAssertNotNil(failing.toast)
+    }
+
+    func testClearWipesValuesAndSavedCopy() async throws {
+        let defaults = freshDefaults()
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: defaults)
+        await store.load(appId: "a", setting: nil, source: AppGlanceSource(document: { _ in d }, cached: { _, e in glanceRows[e] ?? [] }))
+        XCTAssertNotNil(store.values["a"])
+        XCTAssertNotNil(AppGlanceStore(defaults: defaults).values["a"], "次に開いた時はすぐ出す")
+        store.clear()
+        XCTAssertTrue(store.values.isEmpty)
+        XCTAssertTrue(store.choices.isEmpty)
+        XCTAssertNil(defaults.data(forKey: AppGlanceStore.defaultsKey))
+        XCTAssertTrue(AppGlanceStore(defaults: defaults).values.isEmpty, "サインアウト後に前の人の数字が残らない")
+    }
+
+    private final class ReadLog: @unchecked Sendable { var reads: [String] = [] }
+
+    /// 呼ばれた処理ごとに「main thread で走ったか」(1 度でも main なら true)。
+    private final class ThreadLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var log: [String: Bool] = [:]
+        var values: [String: Bool] { lock.withLock { log } }
+        func note(_ name: String) {
+            let main = Thread.isMainThread
+            lock.withLock { log[name] = (log[name] ?? false) || main }
+        }
+    }
+
+    /// 記録の取得を数えるだけのクライアント(書き換えは失敗)。
+    private actor CountingClient: AppConfigClient {
+        private(set) var lists = 0
+        struct Boom: Error {}
+        func fetchDocument(appId: String) async throws -> AppDocument { try DSLExamples.document(DSLExamples.initial) }
+        func listVersions(appId: String) async throws -> [VersionSummary] { [] }
+        func restore(appId: String, toVersion version: Int) async throws -> AppDocument { throw Boom() }
+        func list(appId: String, entity: String) async throws -> [Record] { lists += 1; return [] }
+        func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record { throw Boom() }
+        func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record { throw Boom() }
+        func delete(appId: String, entity: String, id: String) async throws {}
+        func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary { throw Boom() }
+    }
+}

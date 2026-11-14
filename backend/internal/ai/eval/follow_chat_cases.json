@@ -1,0 +1,6 @@
+[
+  {"id": "fc_sns_can", "group": "follow", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#270 フォローのタイムラインはできる(断らない)",
+   "steps": [{"say": "インスタみたいに、フォローした人の投稿が流れてくるアプリって作れる?", "textNot": ["できません", "できない", "public", "private", "shared", "entity", "myFollows", "$author"]}]},
+  {"id": "fc_followers", "group": "follow", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#270 フォロワーの一覧・人数はできない(正直に)",
+   "steps": [{"say": "自分のフォロワーが何人いるか見られる?", "textAny": ["できません", "できない", "出せません"], "textNot": ["entity", "myFollows"]}]}
+]

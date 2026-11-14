@@ -4,7 +4,7 @@ import MetamonDSL
 import MetamonRenderer
 @testable import Metamon
 
-/// すれ違い通信(#425): 同意・オンの前は通信しない / 自分の記録だけ送る / 受け取りの重複除け。通信路は差し替え。
+/// すれ違い通信(#425): 同意・オンの前は通信しない / 匿名なら名前を出さない / 自分の記録だけ送る / 受け取りの重複除け。通信路は差し替え。
 @MainActor
 final class PassbyControllerTests: XCTestCase {
     private final class FakeTransport: PassbyTransport {
@@ -44,10 +44,15 @@ final class PassbyControllerTests: XCTestCase {
         XCTAssertNil(fake.started, "オンにするまで探さない")
         c.setOptIn(true, config: config)
         XCTAssertNil(fake.started, "同意の前は探さない")
-        c.agree()
+        c.agree(anonymous: true)
         c.setOptIn(true, config: config)
+        let anon = try XCTUnwrap(fake.started)
+        XCTAssertEqual(anon.hello.name, NearbyLimits.anonymousName, "匿名なら表示名の代わりに決まった文言")
+        XCTAssertEqual(anon.payload().name, NearbyLimits.anonymousName)
+        c.setAnonymous(false)
         let start = try XCTUnwrap(fake.started)
         XCTAssertTrue(c.isAdvertising)
+        XCTAssertEqual(start.hello.name, NearbyLimits.publicName(rt.nearbyDisplayName, anonymous: false), "切り替えたら名前を変えて探し直す")
         XCTAssertEqual(start.hello.app, NearbyPassby.appTag(appId))
 
         _ = await rt.createRecord(entity: "profile", data: ["name": "太郎", "hobby": "釣り", "memo": "秘密"])

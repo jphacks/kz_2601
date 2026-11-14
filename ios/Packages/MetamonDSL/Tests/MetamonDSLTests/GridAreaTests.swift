@@ -12,6 +12,15 @@ final class GridAreaTests: XCTestCase {
         XCTAssertNil(GridArea("A1"))
     }
 
+    /// 巨大な行は上限(backend の MaxGridRows と同じ 48)に丸める。桁あふれは不正扱い。
+    func testRowsClampToMax() {
+        XCTAssertEqual(GridArea.maxRows, 48)
+        XCTAssertEqual(GridArea("A1:F100000000").map { [$0.row1, $0.row2] }, [1, 48])
+        XCTAssertEqual(GridArea("A60:B70").map { [$0.row1, $0.row2] }, [48, 48])
+        XCTAssertEqual(GridArea("A1:F48")?.row2, 48)
+        XCTAssertNil(GridArea("A1:F99999999999999999999999"))
+    }
+
     func testOverlap() {
         XCTAssertTrue(GridArea("A1:C3")!.overlaps(GridArea("C3:F6")!))
         XCTAssertFalse(GridArea("A1:C3")!.overlaps(GridArea("D1:F3")!))

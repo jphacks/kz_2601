@@ -115,7 +115,11 @@ func normalizeData(ent *dsl.Entity, in map[string]any, create bool) (map[string]
 			out[f.ID] = nil // sentinel: PATCH removes the key
 			continue
 		}
-		nv, err := normalizeValue(f, v)
+		normalize := normalizeValue
+		if f.Encrypted {
+			normalize = normalizeEncrypted // encrypted.go
+		}
+		nv, err := normalize(f, v)
 		if err != nil {
 			return nil, invalidRecord(f.ID, err.Error())
 		}
@@ -219,6 +223,12 @@ func asFloat(v any) (float64, bool) {
 	}
 	return 0, false
 }
+
+// NormalizeValue is the check and stored form of one value of f that a
+// device write gets (normalizeValue), for server writers that must store
+// the same thing: the scheduled sheet import (#1712). f must not be
+// encrypted (normalizeEncrypted is the device's door for those).
+func NormalizeValue(f *dsl.Field, v any) (any, error) { return normalizeValue(f, v) }
 
 func normalizeValue(f *dsl.Field, v any) (any, error) {
 	switch f.Type {
@@ -367,6 +377,15 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 			return nil, fmt.Errorf("must be \"lat,lng\" within range")
 		}
 		return strconv.FormatFloat(lat, 'f', -1, 64) + "," + strconv.FormatFloat(lng, 'f', -1, 64), nil
+	case dsl.FieldMember:
+		// uid of a participant (#272); participation is checked in data_rules.go
+		s, ok := asString(v)
+		if !ok || !idRe.MatchString(s) {
+			return nil, fmt.Errorf("must be the uid of a participant")
+		}
+		return s, nil
+	case dsl.FieldMembers:
+		return normalizeMembers(v) // #271: addressed.go
 	}
 	return nil, fmt.Errorf("has unsupported type %q", f.Type)
 }

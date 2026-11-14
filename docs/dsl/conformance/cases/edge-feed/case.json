@@ -1,0 +1,48 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "今日のお知らせ"
+    },
+    "initialScreen": "home",
+    "entities": [],
+    "screens": [
+      {
+        "id": "home",
+        "title": "今日",
+        "components": [
+          {
+            "type": "feed",
+            "id": "weather",
+            "area": "A1:F4",
+            "provider": "weather",
+            "region": "170000",
+            "title": "石川県の天気",
+            "limit": 3
+          },
+          {
+            "type": "feed",
+            "id": "holidays",
+            "area": "A5:F8",
+            "provider": "holidays",
+            "title": "祝日"
+          },
+          {
+            "type": "feed",
+            "id": "news",
+            "area": "A9:F12",
+            "provider": "rss",
+            "feedId": "digital-news",
+            "title": "デジタル庁のお知らせ",
+            "emptyText": "お知らせはありません"
+          }
+        ]
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  }
+}

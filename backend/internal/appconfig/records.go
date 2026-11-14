@@ -5,11 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -64,6 +66,9 @@ func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity
 	if err != nil {
 		return nil, mapStoreErr(err, "record")
 	}
+	if !canRead(ent, rec, uidOf(r)) { // #271: an addressed record of others
+		return nil, recordNotFound()
+	}
 	if forUpdate && ent.MembersCanEdit() {
 		return rec, nil
 	}
@@ -73,19 +78,57 @@ func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity
 	return rec, nil
 }
 
+// recordsQuery is the filter / sort / paging of one records list: the GET
+// query or the POST .../records/query body. PageSize is nil when not sent.
+type recordsQuery struct {
+	FilterField string `json:"filterField"`
+	FilterOp    string `json:"filterOp"`
+	FilterValue string `json:"filterValue"`
+	SortField   string `json:"sortField"`
+	SortDir     string `json:"sortDir"`
+	PageSize    *int   `json:"pageSize"`
+	PageToken   string `json:"pageToken"`
+}
+
+// listRecords: GET .../records?filterField=&filterOp=&filterValue=&sortField=&sortDir=&pageSize=&pageToken=
+// The filter form is deprecated (kept for older iOS builds): a filterValue
+// such as a uid belongs in the POST .../records/query body.
 func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	in := recordsQuery{
+		FilterField: q.Get("filterField"), FilterOp: q.Get("filterOp"), FilterValue: q.Get("filterValue"),
+		SortField: q.Get("sortField"), SortDir: q.Get("sortDir"), PageToken: q.Get("pageToken"),
+	}
+	h.serveRecords(w, r, in, q.Get("pageSize"))
+}
+
+// queryRecords: POST .../records/query {"filterField","filterOp","filterValue","sortField","sortDir","pageSize","pageToken"}
+func (h *Handler) queryRecords(w http.ResponseWriter, r *http.Request) {
+	var in recordsQuery
+	if !decodeLookupBody(w, r, &in) {
+		return
+	}
+	size := ""
+	if in.PageSize != nil {
+		size = strconv.Itoa(*in.PageSize) // < 1: the same 400 as the query
+	}
+	h.serveRecords(w, r, in, size)
+}
+
+// serveRecords is the list shared by GET and POST (entity, authorization,
+// filter, sort, paging, reply). size is pageSize as sent ("" = default).
+func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in recordsQuery, size string) {
 	cur, ent, eid, err := h.entityOf(r)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	p, err := parsePaging(r)
+	p, err := pagingFrom(size, in.PageToken)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	q := r.URL.Query()
-	sortField, sortDir := q.Get("sortField"), q.Get("sortDir")
+	sortField, sortDir := in.SortField, in.SortDir
 	if sortField == "" {
 		sortField = "createdAt"
 	}
@@ -100,7 +143,11 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown sortField").With("field", sortField))
 		return
 	}
-	pred, err := buildFilter(ent, q.Get("filterField"), q.Get("filterOp"), q.Get("filterValue"))
+	if err := encryptedQueryField(ent.FieldByID(sortField)); err != nil {
+		fail(w, err)
+		return
+	}
+	pred, err := h.recordFilter(r, cur.ID, ent, in.FilterField, in.FilterOp, in.FilterValue) // follows.go (#270)
 	if err != nil {
 		fail(w, err)
 		return
@@ -111,26 +158,26 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedRead, len(all)) // #2298: what the store read, not the page
 	if len(all) > store.MaxRecordsPerEntity {
 		fail(w, apiErr(http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "too many records to sort in memory"))
 		return
 	}
-	var blocked map[string]bool // #321: posts of users the caller blocked
-	// #507: profile / matched-only rules of matching apps (matching.go)
-	var matchOK func(author string) bool
+	// #321 blocks either way, #507 matching rules (matching_age.go)
+	var readable func(rec *store.Record) bool
 	if ent.IsShared() {
-		if blocked, err = h.blockedBy(r); err != nil {
-			fail(w, err)
-			return
-		}
-		if matchOK, err = h.matchFilter(r, cur.ID, eid, recordAuthors(all)); err != nil {
+		if readable, err = h.sharedFilter(r, cur.ID, eid, all); err != nil {
 			fail(w, err)
 			return
 		}
 	}
 	items := make([]store.Record, 0, len(all))
+	uid := uidOf(r)
 	for i := range all {
-		if blocked[all[i].Author] || (matchOK != nil && !matchOK(all[i].Author)) {
+		if !canRead(ent, &all[i], uid) { // #271: only the author and recipients
+			continue
+		}
+		if readable != nil && !readable(&all[i]) {
 			continue
 		}
 		if pred == nil || pred(&all[i]) {
@@ -192,6 +239,9 @@ func buildFilter(ent *dsl.Entity, field, op, value string) (func(*store.Record) 
 	f := ent.FieldByID(field)
 	if f == nil {
 		return nil, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown filterField").With("field", field)
+	}
+	if err := encryptedQueryField(f); err != nil {
+		return nil, err
 	}
 	switch op {
 	case "today", "thisMonth":
@@ -266,12 +316,40 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "data is required"))
 		return
 	}
+	if err := h.checkSharedWrite(r, cur, ent); err != nil { // #316
+		fail(w, err)
+		return
+	}
+	profile := false
+	if ent.IsShared() {
+		if profile, err = h.checkProfileWrite(r, cur.ID, eid); err != nil { // #507: 18+ declaration
+			fail(w, err)
+			return
+		}
+	}
 	data, err := normalizeData(ent, body.Data, true)
 	if err != nil {
 		fail(w, err)
 		return
 	}
+	if err := h.checkRecordRules(r, cur, ent, nil, data); err != nil { // #272
+		fail(w, err)
+		return
+	}
+	if err := h.checkAddressed(r, cur, ent, nil, data); err != nil { // #271
+		fail(w, err)
+		return
+	}
+	// after the permission checks: a refused write is a 403, not a 422 (#321)
+	if err := h.checkRecordText(r, ent, body.Data, body.AuthorName); err != nil {
+		fail(w, err)
+		return
+	}
 	if err := checkRecordSize(data); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkRecordLimits(r, cur, ent, data, nil, true); err != nil { // #317
 		fail(w, err)
 		return
 	}
@@ -291,18 +369,46 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "authorName too long"))
 			return
 		}
+		rec.Readers = recordReaders(ent, rec.Author, data) // #271
+		rec.OwnerAgeConfirmed = profile                    // #507: checkProfileWrite needed the declaration
 		// the collection is shared, so two users' idempotency keys must not collide
 		clientKey = rec.Author + "/" + body.ClientID
 	}
 	if body.ClientID != "" {
 		rec.ID = store.IDFromClientID(clientKey)
 	}
-	out, _, err := h.store.CreateRecord(r.Context(), recordSet(r, cur, ent, eid), rec)
+	if ent.Single {
+		h.upsertSingle(w, r, cur, ent, recordSet(r, cur, ent, eid), rec)
+		return
+	}
+	out, _, err := h.createRecordKept(r, cur, ent, recordSet(r, cur, ent, eid), rec) // #273
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
 	httpx.WriteJSON(w, http.StatusCreated, toRecordOut(out))
+}
+
+// upsertSingle (#267): a single entity keeps one record per user under a fixed
+// id, whatever clientId the client sent. Creating it again (another device, a
+// build that does not know single and adds) overwrites its data: 200, not 201.
+func (h *Handler) upsertSingle(w http.ResponseWriter, r *http.Request, cur *store.App, ent *dsl.Entity, rs store.RecordSet, rec store.Record) {
+	rec.ID = store.IDFromClientID(dsl.SingleRecordKey)
+	out, created, err := h.createRecordOutbox(r, cur, ent, rs, rec)
+	if err == nil && !created {
+		out, err = h.updateRecordOutbox(r, cur, ent, rs, rec.ID, rec.Data)
+	}
+	if err != nil {
+		fail(w, mapStoreErr(err, "entity"))
+		return
+	}
+	status := http.StatusCreated
+	if !created {
+		status = http.StatusOK
+	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
+	httpx.WriteJSON(w, status, toRecordOut(out))
 }
 
 func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
@@ -318,10 +424,16 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	rec, err := h.store.GetRecord(r.Context(), rs, rid)
+	if err == nil {
+		sharedUsage(r, cur.ID, ent, metrics.SharedRead, 1)
+	}
+	if err == nil && !canRead(ent, rec, uidOf(r)) {
+		err = store.ErrNotFound // #271: an addressed record of others
+	}
 	if err == nil && ent.IsShared() {
-		var ok func(string) bool
-		if ok, err = h.matchFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && ok != nil && !ok(rec.Author) {
-			err = store.ErrNotFound // #507: not matched with the author
+		var ok func(*store.Record) bool
+		if ok, err = h.sharedFilter(r, cur.ID, eid, []store.Record{*rec}); err == nil && !ok(rec) {
+			err = store.ErrNotFound // #321 blocked either way / #507 not matched with the author
 		}
 	}
 	if err != nil {
@@ -357,14 +469,31 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "data must have at least one key"))
 		return
 	}
+	if err := h.checkSharedWrite(r, cur, ent); err != nil { // #316
+		fail(w, err)
+		return
+	}
 	delta, err := normalizeData(ent, body.Data, false)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	rs := recordSet(r, cur, ent, eid)
-	existing, err := h.ownRecord(r, rs, ent, rid, true)
+	existing, err := h.recordForPatch(r, rs, cur, ent, rid, delta) // #272: admins may change admin-only fields
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkRecordRules(r, cur, ent, existing, delta); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkAddressed(r, cur, ent, existing, delta); err != nil { // #271
+		fail(w, err)
+		return
+	}
+	// after the author / admin checks: a non-author's PATCH is a 403, not a 422 (#321)
+	if err := h.checkRecordText(r, ent, body.Data, ""); err != nil {
 		fail(w, err)
 		return
 	}
@@ -389,7 +518,14 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.store.UpdateRecord(r.Context(), rs, rid, merged)
+	if err := h.checkRecordLimits(r, cur, ent, delta, existing.Data, false); err != nil { // #317
+		fail(w, err)
+		return
+	}
+	rec, err := h.updateRecordKept(r, cur, ent, rs, existing, merged) // #273
+	if err == nil {
+		sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
+	}
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
@@ -415,7 +551,7 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	if ent.IsShared() {
-		if _, err := h.ownRecord(r, rs, ent, rid, false); err != nil {
+		if err := h.checkDelete(r, rs, cur, ent, rid); err != nil { // #272: entity.deleteBy
 			fail(w, err)
 			return
 		}
@@ -424,6 +560,7 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -448,20 +585,29 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	everyone, err := h.deleteAllScope(r, cur, ent) // #272: an admin clears everyone's
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	all, err := h.store.ListRecords(r.Context(), rs, 0)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
 	uid := uidOf(r)
+	sharedUsage(r, cur.ID, ent, metrics.SharedRead, len(all))
+	deleted := 0
+	defer func() { sharedUsage(r, cur.ID, ent, metrics.SharedWrite, deleted) }()
 	for i := range all {
-		if all[i].Author != uid {
+		if !everyone && all[i].Author != uid {
 			continue
 		}
 		if err := h.store.DeleteRecord(r.Context(), rs, all[i].ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 			fail(w, err)
 			return
 		}
+		deleted++
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

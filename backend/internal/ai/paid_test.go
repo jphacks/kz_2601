@@ -10,9 +10,13 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
-func TestPaidCatalog_DefaultHasSharedDataOnly(t *testing.T) {
-	if len(defaultPaidCatalog.features) != 1 || defaultPaidCatalog.features[0].ID != "sharedData" {
-		t.Fatalf("初期の有料リストは sharedData だけ: %+v", defaultPaidCatalog.features)
+func TestPaidCatalog_DefaultList(t *testing.T) {
+	var ids []string
+	for _, d := range defaultPaidCatalog.c.Defs() {
+		ids = append(ids, d.ID+":"+d.Gate)
+	}
+	if strings.Join(ids, ",") != "sharedData:save,serverRules:save,onlineAI:use,encryptedFields:save" {
+		t.Fatalf("有料リスト(#316): %v", ids)
 	}
 }
 
@@ -30,6 +34,8 @@ func TestPaidCatalog_Detect(t *testing.T) {
 		{"共有ボタン付きの日記", false}, // iOS の共有シート(シェア)は有料ではない
 		{"体重を記録してグラフで見る。共有はしない、共有せずに自分だけ", false},
 		{"A habit tracker with a share sheet", false},
+		{"日記の本文は暗号化して保存して", true}, // #233 encryptedFields
+		{"メモ帳。暗号化しないでいい", false},
 	}
 	for _, tc := range cases {
 		got := c.Detect(tc.text, LocaleJA)

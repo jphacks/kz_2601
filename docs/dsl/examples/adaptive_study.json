@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "勉強量の調整",
+    "description": "勉強の予定を記録して終わったら印を付け、先週の達成率から今週の目標の分数を決める",
+    "icon": "book",
+    "theme": { "primaryColor": "#5E35B1" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "週の目標", "icon": "target" },
+      { "screen": "logs", "title": "予定", "icon": "checklist" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "weeks",
+      "name": "週の目標",
+      "titleField": "start",
+      "fields": [
+        { "id": "start", "name": "週の初め", "type": "date", "required": true },
+        { "id": "base", "name": "基準の量", "type": "integer", "unit": "分", "required": true, "defaultValue": 300 },
+        { "id": "last_total", "name": "先週の予定", "type": "integer", "unit": "件",
+          "computed": { "agg": "count", "entity": "logs",
+            "filter": [
+              { "field": "date", "op": "gte", "value": { "op": "addDays", "args": [{ "ref": "start" }, -7] } },
+              { "field": "date", "op": "lt", "value": { "ref": "start" } }
+            ] } },
+        { "id": "last_done", "name": "先週の完了", "type": "integer", "unit": "件",
+          "computed": { "agg": "count", "entity": "logs",
+            "filter": [
+              { "field": "date", "op": "gte", "value": { "op": "addDays", "args": [{ "ref": "start" }, -7] } },
+              { "field": "date", "op": "lt", "value": { "ref": "start" } },
+              { "field": "done", "op": "eq", "value": true }
+            ] } },
+        { "id": "last_rate", "name": "先週の達成率", "type": "integer", "unit": "%",
+          "computed": { "if": { "op": "gt", "args": [{ "ref": "last_total" }, 0] },
+            "then": { "op": "round", "args": [{ "op": "mul", "args": [{ "op": "div", "args": [{ "ref": "last_done" }, { "ref": "last_total" }] }, 100] }] },
+            "else": 80 } },
+        { "id": "target", "name": "今週の目標", "type": "integer", "unit": "分",
+          "computed": { "op": "clamp", "args": [
+            { "op": "round", "args": [{ "op": "div", "args": [{ "op": "mul", "args": [{ "ref": "base" }, { "ref": "last_rate" }] }, 80] }] },
+            { "op": "round", "args": [{ "op": "mul", "args": [{ "ref": "base" }, 0.5] }] },
+            { "op": "round", "args": [{ "op": "mul", "args": [{ "ref": "base" }, 1.5] }] }
+          ] } }
+      ]
+    },
+    {
+      "id": "logs",
+      "name": "勉強の予定",
+      "titleField": "task",
+      "fields": [
+        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "now" },
+        { "id": "task", "name": "内容", "type": "string", "required": true },
+        { "id": "minutes", "name": "時間", "type": "integer", "unit": "分", "defaultValue": 30 },
+        { "id": "done", "name": "完了", "type": "boolean", "defaultValue": false }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "週の目標",
+      "toolbar": [
+        { "label": "週を足す", "icon": "plus", "action": { "type": "navigate", "screen": "week_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "stat", "id": "rate_now", "area": "A1:F2", "label": "今週の達成率", "format": "percent",
+          "value": { "op": "div", "args": [
+            { "agg": "count", "entity": "logs", "filter": [{ "field": "date", "op": "thisWeek", "value": null }, { "field": "done", "op": "eq", "value": true }] },
+            { "agg": "count", "entity": "logs", "filter": { "field": "date", "op": "thisWeek", "value": null } }
+          ] } },
+        { "type": "table", "id": "weeks", "area": "A3:F7", "entity": "weeks",
+          "columns": [
+            { "field": "start", "title": "週の初め" },
+            { "field": "last_rate", "title": "先週の達成率" },
+            { "field": "target", "title": "今週の目標" }
+          ],
+          "sort": { "field": "start", "direction": "desc" } },
+        { "type": "list", "id": "week_list", "area": "A8:F12", "entity": "weeks",
+          "item": { "title": "start", "subtitle": "base", "trailing": "target" },
+          "sort": { "field": "start", "direction": "desc" }, "emptyText": "週がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "week_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "week_form",
+      "title": "週の目標",
+      "entity": "weeks",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "weeks" } }],
+      "components": [
+        { "type": "datePicker", "id": "start_in", "field": "start", "area": "A1:F2", "label": "週の初め(月曜)" },
+        { "type": "numberField", "id": "base_in", "field": "base", "area": "A3:F4", "label": "基準の量(分)", "placeholder": "300" }
+      ]
+    },
+    {
+      "id": "logs",
+      "title": "予定",
+      "toolbar": [
+        { "label": "予定を足す", "icon": "plus", "action": { "type": "navigate", "screen": "log_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "list", "id": "all", "area": "A1:F12", "entity": "logs", "item": { "title": "task", "subtitle": "date", "trailing": "minutes" },
+          "sort": { "field": "date", "direction": "desc" }, "emptyText": "予定がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "log_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "log_form",
+      "title": "勉強の予定",
+      "entity": "logs",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "logs" } }],
+      "components": [
+        { "type": "datePicker", "id": "date_in", "field": "date", "area": "A1:F2", "label": "日付" },
+        { "type": "textField", "id": "task_in", "field": "task", "area": "A3:F4", "label": "内容", "placeholder": "英単語 50 個" },
+        { "type": "numberField", "id": "minutes_in", "field": "minutes", "area": "A5:F6", "label": "時間(分)", "placeholder": "30" },
+        { "type": "toggle", "id": "done_in", "field": "done", "area": "A7:F8", "label": "完了" }
+      ]
+    }
+  ]
+}

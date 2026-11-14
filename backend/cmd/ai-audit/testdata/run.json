@@ -1,0 +1,25 @@
+{
+  "model": "test-model",
+  "tag": "test",
+  "cases": [
+    {
+      "id": "small",
+      "ok": true,
+      "dsl": {
+        "app": {"tabs": [{"screen": "home"}]},
+        "entities": [{"id": "task", "fields": [{"id": "done", "type": "boolean"}]}],
+        "screens": [
+          {
+            "id": "home",
+            "components": [
+              {"type": "stat", "entity": "task", "value": {"agg": "count", "filter": [{"field": "createdAt", "op": "thisMonth"}]}},
+              {"type": "card", "children": [{"type": "toggle", "field": "done"}]}
+            ]
+          }
+        ]
+      }
+    },
+    {"id": "gen_failed", "ok": false, "error": "timeout"},
+    {"id": "bad_dsl", "ok": true, "dsl": "not an object"}
+  ]
+}

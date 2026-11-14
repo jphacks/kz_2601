@@ -26,6 +26,7 @@ struct TextFieldLeaf: View {
                             .font(RenderTheme.Fonts.inputValue)
                             .focused($focused)
                             .keyboardAnchor(c, $focused)
+                            .macFormTabStop(c, $focused, insertsTab: true)
                     } else {
                         TextField(c.placeholder ?? "", text: form.string(field))
                             .textFieldStyle(.plain)
@@ -33,6 +34,7 @@ struct TextFieldLeaf: View {
                             .singleLineSubmit()
                             .focused($focused)
                             .keyboardAnchor(c, $focused)
+                            .macFormTabStop(c, $focused)
                     }
                 }
                 .renderInputChrome(focused: focused)

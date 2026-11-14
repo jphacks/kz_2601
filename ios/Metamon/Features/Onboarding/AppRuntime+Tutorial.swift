@@ -14,9 +14,28 @@ extension AppRuntime {
         showTutorial = true
     }
 
+    /// 起動時のチュートリアルの段(`LaunchConsentHold.Step.tutorial`)。スプラッシュ → 同意の画面が閉じきってから、
+    /// 閉じるアニメーションの分だけ待って出す。出さない(見た・同意の説明が済んでいない)・取り消された時はすぐ次の段へ。
+    /// 出した時は `tutorialDismissed()`(閉じきった時)で次の段へ進む。
+    func runLaunchTutorialStep(hold: LaunchConsentHold = .shared, splash: SplashPresence = .shared,
+                               settle: Duration = .milliseconds(700)) async {
+        await splash.waitUntilHidden()
+        await hold.waitUntilReleased(before: .tutorial)
+        try? await Task.sleep(for: settle)
+        guard !Task.isCancelled else { hold.end(.tutorial); return }
+        presentTutorialIfNeeded()
+        if !showTutorial { hold.end(.tutorial) }
+    }
+
+    /// チュートリアルが閉じきった時(`TutorialHost` の onDismiss)。待たせていたシェアリンク・Intent を出す。
+    func tutorialDismissed(hold: LaunchConsentHold = .shared) {
+        hold.end(.tutorial)
+    }
+
     /// 設定の「使い方を見る」。シートを閉じきってから出す(シートの同時表示は SwiftUI が無視する)。
     func replayTutorial() {
         showVoiceSheet = false
+        showAppSwitcher = false // 変身一覧の歯車から開いた設定(H10)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(600))
             self?.showTutorial = true
@@ -29,7 +48,8 @@ extension AppRuntime {
         showTutorial = false
     }
 
-    /// 初期画面から最初のアプリができた直後に 1 回だけ、要約カードが消えた頃に直し方の例を出す。
+    /// 初期画面から最初のアプリができた直後に 1 回だけ、直し方の例を出す。
+    /// 出す順番は `PostBuildNotice`(H7): 課金画面・要約バナー・確認が閉じてから `TutorialHost` が出す。
     func scheduleFirstEditHint(createdFromInitial: Bool) {
         guard let tutorial, tutorial.shouldShowEditHint(createdFromInitial: createdFromInitial) else { return }
         tutorial.markEditHintShown()
@@ -40,8 +60,8 @@ extension AppRuntime {
         }
     }
 
-    /// 要約カード(3〜6 秒)と重ならない待ち時間。
-    static let editHintDelaySeconds: Double = 6.5
+    /// 完成の切り替えが落ち着くまでの待ち(要約バナーとの重なりは順番で避ける・H7)。
+    static let editHintDelaySeconds: Double = 0.8
 
     /// 直し方の例のボタン: 発話シートを開く。
     func openVoiceFromEditHint() {
@@ -49,13 +69,16 @@ extension AppRuntime {
         showVoiceSheet = true
     }
 
-    /// 音声モデルのダウンロード確認は、同意 → チュートリアル → β の案内(#313)が済んでから出す(初回の順序・#274)。
+    /// 音声モデルのダウンロード確認は、同意・チュートリアル・β の案内(#313)が出ている間は出さない(#274)。
+    /// 確認は利用者の操作(案内のボタン・マイク)でだけ出す(M14)。β の案内は最初のアプリの後なので待たない。
     var canShowModelDownloadConfirm: Bool {
         #if APP_STORE_REVIEW
         showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial
         #else
-        showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial
-            && !showBetaWelcome && !isBetaWelcomePending
+        showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial && !showBetaWelcome
         #endif
     }
+
+    /// 最初のアプリを作ったか(初期画面からの作成で「直し方の例」を予約した = `hasShownEditHint`)。β の案内はこの後(H1)。
+    var hasMadeFirstApp: Bool { tutorial?.hasShownEditHint ?? true }
 }

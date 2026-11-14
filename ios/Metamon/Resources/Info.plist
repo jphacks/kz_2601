@@ -35,11 +35,20 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>UISupportsFullScreenInAssistiveAccess</key>
+	<true/>
+	<!-- 起動画面は SplashView の最初のコマ(無地の紺)と同じ色にして、つなぎ目を見せない -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+	<!-- 横向き(左右)も使える(#625)。上下逆さまは無し。iPad は対象外(TARGETED_DEVICE_FAMILY = 1) -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
@@ -52,6 +61,9 @@
 	<string>$(METAMON_AI_BASE_URL)</string>
 	<key>MetamonAppConfigBaseURL</key>
 	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+	<!-- Firebase の環境(stg / prod)。build setting METAMON_FIREBASE_ENV(project.yml)。開発用メニューの「今の環境」に出す(#2079) -->
+	<key>MetamonFirebaseEnv</key>
+	<string>$(METAMON_FIREBASE_ENV)</string>
 	<!-- 「アップデートしてください」のボタンの行き先(#302)。build setting METAMON_APP_STORE_URL(project.yml)。空なら App Store で「Tailor It」を検索。
 	     appconfig の IOS_APP_STORE_URL があればそちらが優先 -->
 	<key>MetamonAppStoreURL</key>
@@ -85,6 +97,12 @@
 		</dict>
 	</array>
 
+	<!-- 連係の Handoff(#1851): 開いている生成アプリの画面を iPhone ⇄ Mac で引き継ぐ。Shared/Runtime/HandoffActivity.swift の type と同じ -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>jp.kz2601.metamon.view</string>
+	</array>
+
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
 	<key>MetamonWhisperModel</key>
 	<string></string>
@@ -107,25 +125,55 @@
 
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画やドラレコの音声、ボイスメモ・会議などを録音するために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容を端末の中で文字にしたり、動画やドラレコの音声、ボイスメモ・会議などを録音したり、みんなで使うアプリで参加者と通話したりするために、マイクを使用します。</string>
+	<!-- 止めるまで鳴るアラーム(Notification.alarm・AlarmKit・iOS 26.1 以降)。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSAlarmKitUsageDescription</key>
+	<string>生成したアプリで、設定した時刻にアラームを鳴らすために使用します。</string>
+	<!-- U5: 音声モデル(WhisperKit)の準備中だけ、Apple の端末内の音声認識(requiresOnDeviceRecognition)で仮に聞き取る。声は端末の外に送らない -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画するために、カメラを使用します。</string>
+	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画したり、みんなで使うアプリで参加者とビデオ通話したりするために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>生成したアプリで写真や動画を選択・保存するために、写真ライブラリを使用します。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>生成したアプリの共有ボタンや QR コードの画像、ドラレコで保存した映像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したりするために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
-	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->
-	<!-- sensorValue(#419): 気圧・高度(CMAltimeter)。傾き・加速度(device motion)は許可不要 -->
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit。睡眠・心拍などは読むだけ(#1986)。気分(State of Mind)は読み書き(#2234)。ワークアウトは読むだけ(#2236)。英訳は InfoPlist.xcstrings -->
+	<!-- sensorValue(#419): 気圧・高度(CMAltimeter)。今の動き(#2225・CMMotionActivityManager)。傾き・加速度(device motion)は許可不要。英語は InfoPlist.xcstrings -->
 	<key>NSMotionUsageDescription</key>
-	<string>生成したアプリで今日や最近の歩数、気圧や高度の変化を表示・記録するために、モーションとフィットネスのデータを使用します。</string>
+	<string>生成したアプリで今日や最近の歩数、気圧や高度の変化、今の動き(歩いている・走っている・自転車や乗り物で移動しているなど)を表示・記録するために、モーションとフィットネスのデータを使用します。</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>生成したアプリで歩数や体重を表示するために、ヘルスケアのデータを読み取ります。</string>
+	<string>生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間・ワークアウト・気分を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<string>生成したアプリで記録した体重と気分をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<!-- 端末のカレンダー・リマインダーを読む(#1987・DeviceCalendarSource)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>生成したアプリで、リマインダーを一覧や期限の近いものとして表示したり、新しいリマインダーを追加したりするために、リマインダーを読み書きします。リマインダーの題名や内容は端末の外に送りません。</string>
+	<!-- HomeKit の家・部屋・機器と今の状態を読む(#2245・DeviceHomeSource)。読むだけで機器は操作しない。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSHomeKitUsageDescription</key>
+	<string>生成したアプリで、家の部屋と機器の名前・電源・明るさ・温度・湿度を表示するために、ホームのデータを読み取ります。機器の操作はしません。機器の名前は端末の外に送りません。</string>
+	<!-- NFC タグ(NDEF)を読む・書く(#2233・NFCTagSessionSource)と、交通系 IC カードの残高と履歴を読む(#2246・LiveFeliCaTransitReader。Core NFC の FeliCa・読むだけ)。
+	     説明文は両方の用途を 1 文で。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh)。
+	     entitlement com.apple.developer.nfc.readersession.formats = NDEF・TAG(Metamon.entitlements)。
+	     App ID 側に NFC Tag Reading の capability と、下のシステムコード(0003)の登録が要る(人の作業) -->
+	<key>NFCReaderUsageDescription</key>
+	<string>生成したアプリで、NFC タグに書かれた文字や URL を読み取ったり、タグに書き込んだりするためと、交通系 IC カードの残高と最近の利用履歴を表示するために使用します。読み取った内容は端末の外に送りません。</string>
+	<key>com.apple.developer.nfc.readersession.felica.systemcodes</key>
+	<array>
+		<string>0003</string>
+	</array>
+	<!-- 端末の連絡先の名前・誕生日・グループを読む(#2218・DeviceContactsSource)。1 人を選ぶ ContactPick は許可不要。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSContactsUsageDescription</key>
+	<string>生成したアプリで、連絡先の名前・誕生日・グループを一覧などに表示するために、連絡先を読み取ります。連絡先の内容は端末の外に送りません。</string>
+	<!-- Bluetooth の心拍ベルト(#2237・BLEHeartRate。標準の Heart Rate サービスだけ・アプリが前にいる間だけ)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>生成したアプリで、Bluetooth の心拍計(胸のベルトなど)から心拍数を読み取って表示・記録するために、Bluetooth を使用します。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
 	<!-- すれ違い通信(#425): _tailorit-pb は MCPassbyTransport.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
@@ -138,7 +186,26 @@
 		<string>_tailorit-pb._udp</string>
 	</array>
 	<!-- すれ違い通信の distance(#425): Nearby Interaction(UWB)で近くの人との距離・方向を測る -->
+	<!-- 記録のコピー・貼り付け(#1871): クリップボードに載せる独自の型。RecordClipboard.typeIdentifier と一致させる -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>app.tailorit.record</string>
+			<key>UTTypeDescription</key>
+			<string>Tailor It Record</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+	</array>
 	<key>NSNearbyInteractionUsageDescription</key>
 	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
+	<!-- 集中モード中か(#1990・FocusStatusSource)。取れるのは「集中中か」だけでモードの名前は取れない。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSFocusStatusUsageDescription</key>
+	<string>生成したアプリで、集中モードの間は表示や通知を控えめにするために、集中モード中かどうかを使用します。モードの名前は読み取らず、端末の外に送りません。</string>
 </dict>
 </plist>

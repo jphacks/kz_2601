@@ -1,0 +1,190 @@
+import Foundation
+import Observation
+
+/// iOS と Mac で共有する(#1885)。Mac にスプラッシュは無いので `SplashPresence` は出ないまま(待たずに進む)。
+/// スプラッシュのアニメの合図(`SplashStartGate`)は iOS だけ(Metamon/App/SplashStartGate.swift)。
+
+/// スプラッシュが前に出ているか。出ている間はシート・吹き出し・保留中のリンク/通知を出さない(スプラッシュの上に重なるため)。
+@MainActor
+@Observable
+final class SplashPresence {
+    static let shared = SplashPresence()
+
+    private(set) var isShowing = false
+    @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func begin() { isShowing = true }
+
+    func end() {
+        guard isShowing else { return }
+        isShowing = false
+        let pending = waiters
+        waiters = []
+        pending.forEach { $0.resume() }
+    }
+
+    /// スプラッシュが出ていなければすぐ戻る。出ていれば終わるまで待つ。
+    func waitUntilHidden() async {
+        guard isShowing else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    #if DEBUG
+    func resetForTesting() { isShowing = false; waiters = [] }
+    #endif
+}
+
+/// 起動時に出す画面の順番待ち: 同意(`ConsentHost`)→ チュートリアル(`TutorialHost`)→ シェアリンク(`SharingHooks`)→ Intent(開く/話しかける)。
+/// シートを同時に出すと SwiftUI が片方を捨て、状態が残ったまま止まるため、前の画面が閉じきってから(出さないと決まってから)次へ進む。
+/// 各段は出さなかった・閉じた時に必ず `end(_:)` する(待たせたままにしない)。サインアウトの時は `endAll()`。
+/// 画面を出す側(RootView)が出ていて(`hostsAppeared`)、番が来て(前の段が全部終わり・スプラッシュが閉じて)から `showDeadline` 秒たっても画面が出なかった段(`markShown` が無い)は
+/// 捨てられたとみなして放す。1 つの表示が失われても、後ろの段がずっと止まらないようにする。
+/// Mac(#1885)は同じ段を `MacOnboarding`(同意・チュートリアル)・`MacShareFlow`(シェアリンク)・`MacIntentRoute`(Intent)が使う。
+@MainActor
+@Observable
+final class LaunchConsentHold {
+    static let shared = LaunchConsentHold()
+
+    /// 出す順。後ろの段は前の段がすべて終わるまで待つ。Intent は全段の後。
+    enum Step: Int, Comparable, CaseIterable {
+        case consent, tutorial, shareLink
+        static func < (a: Step, b: Step) -> Bool { a.rawValue < b.rawValue }
+
+        /// 番が来てから画面が出るまでに待つ上限。シェアリンクはプレビューの通信がある分だけ長め
+        var showDeadline: Duration {
+            switch self {
+            case .consent, .tutorial: .seconds(10)
+            case .shareLink: .seconds(20)
+            }
+        }
+    }
+
+    private(set) var pending: Set<Step> = []
+    /// 画面が出た段(出ている間は時間で放さない。閉じた時に `end`)
+    @ObservationIgnored private var shown: Set<Step> = []
+    @ObservationIgnored private var watchdogs: [Step: Task<Void, Never>] = [:]
+    /// 起動時の段が一度すべて終わった(以後の `beginDuringLaunch` は待たせない)
+    @ObservationIgnored private(set) var launchFinished = false
+    @ObservationIgnored private var waiters: [(before: Step?, continuation: CheckedContinuation<Void, Never>)] = []
+    /// 番が来た段の見張りの長さ。nil なら段ごとの `showDeadline`(テストで縮める)
+    @ObservationIgnored var deadlineOverride: Duration?
+    @ObservationIgnored var splash: SplashPresence = .shared
+    /// 段の画面を出す側(RootView の ConsentHost)が出ているか。サインイン画面の間は時間で放さない
+    @ObservationIgnored private(set) var hostsReady = false
+
+    /// どれかの段が残っている(Intent を待たせる)。
+    var isHolding: Bool { !pending.isEmpty }
+
+    /// `step` より前の段が残っているか(`step` の番がまだ来ていない)。
+    func isHolding(before step: Step) -> Bool { pending.contains { $0 < step } }
+
+    func begin(_ step: Step = .consent) {
+        pending.insert(step)
+        shown.remove(step)
+        armWatchdogs()
+    }
+
+    /// 起動の途中(最初に全段が終わる前)だけ待たせる。途中で届いたシェアリンク等は順番待ちにしない
+    /// (他のシートが出ていると確認が出せず、段が放されないまま残るため)。
+    func beginDuringLaunch(_ step: Step) {
+        guard !launchFinished else { return }
+        begin(step)
+    }
+
+    /// 起動の処理が済んだ時(`MetamonApp` の bootstrap の後)。待たせている段が無ければ起動の順番待ちを終える。
+    func finishLaunchIfIdle() {
+        if pending.isEmpty { launchFinished = true }
+    }
+
+    /// 段の画面を出す側(RootView)が出た。ここから見張りを始める。
+    func hostsAppeared() {
+        hostsReady = true
+        armWatchdogs()
+    }
+
+    /// 段の画面が実際に出た(`onAppear`)。以後は時間で放さず、閉じた時の `end` を待つ。
+    func markShown(_ step: Step) {
+        guard pending.contains(step) else { return }
+        shown.insert(step)
+        watchdogs.removeValue(forKey: step)?.cancel()
+    }
+
+    func end(_ step: Step = .consent) {
+        guard pending.remove(step) != nil else { return }
+        shown.remove(step)
+        watchdogs.removeValue(forKey: step)?.cancel()
+        resumeReleased()
+    }
+
+    /// サインアウトした時: 残りを全部放す。
+    func endAll() {
+        hostsReady = false
+        guard !pending.isEmpty else { return }
+        pending = []
+        shown = []
+        watchdogs.values.forEach { $0.cancel() }
+        watchdogs = [:]
+        resumeReleased()
+    }
+
+    /// 全段が終わるまで待つ(Intent)。待たせていなければすぐ戻る。
+    func waitUntilReleased() async { await wait(before: nil) }
+
+    /// `step` より前の段が終わるまで待つ。
+    func waitUntilReleased(before step: Step) async { await wait(before: step) }
+
+    private func wait(before step: Step?) async {
+        guard isBlocked(before: step) else { return }
+        await withCheckedContinuation { waiters.append((step, $0)) }
+    }
+
+    private func isBlocked(before step: Step?) -> Bool {
+        guard let step else { return isHolding }
+        return isHolding(before: step)
+    }
+
+    private func resumeReleased() {
+        if pending.isEmpty { launchFinished = true }
+        armWatchdogs()
+        var still: [(before: Step?, continuation: CheckedContinuation<Void, Never>)] = []
+        var ready: [CheckedContinuation<Void, Never>] = []
+        for w in waiters {
+            if isBlocked(before: w.before) { still.append(w) } else { ready.append(w.continuation) }
+        }
+        waiters = still
+        ready.forEach { $0.resume() }
+    }
+
+    /// 番が来た(前の段が残っていない)・まだ出ていない段に見張りを付ける。
+    private func armWatchdogs() {
+        guard hostsReady else { return }
+        for step in pending where !isHolding(before: step) && !shown.contains(step) && watchdogs[step] == nil {
+            let deadline = deadlineOverride ?? step.showDeadline
+            let splash = self.splash
+            watchdogs[step] = Task { @MainActor [weak self] in
+                await splash.waitUntilHidden()
+                try? await Task.sleep(for: deadline)
+                guard !Task.isCancelled, let self, self.pending.contains(step), !self.shown.contains(step) else { return }
+                print("[Metamon] launch hold: \(step) was not shown in time, releasing")
+                self.watchdogs[step] = nil
+                self.end(step)
+            }
+        }
+    }
+
+    #if DEBUG
+    func resetForTesting() {
+        pending = []
+        shown = []
+        watchdogs.values.forEach { $0.cancel() }
+        watchdogs = [:]
+        launchFinished = false
+        hostsReady = false
+        deadlineOverride = nil
+        splash = .shared
+        let pending = waiters
+        waiters = []
+        pending.forEach { $0.continuation.resume() }
+    }
+    #endif
+}

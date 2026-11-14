@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ホットリロードのつながり方の表示(#1108)。バナーの文は strings_runtime.xml の runtime_hot_reloaded -->
+<resources>
+    <string name="hot_reload_polling">ポーリング中</string>
+    <string name="hot_reload_polling_a11y">ホットリロード: ポーリング中。リアルタイムの接続が切れているため、定期的に最新を確認しています</string>
+    <string name="hot_reload_realtime">リアルタイム</string>
+    <string name="hot_reload_realtime_a11y">ホットリロード: リアルタイムで受信中</string>
+</resources>

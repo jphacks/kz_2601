@@ -20,4 +20,18 @@ final class ReviewWordingIntentsTests: XCTestCase {
         XCTAssertTrue(notFound.hasSuffix("Tailor It でアプリを確認してください"), notFound)
         #endif
     }
+
+    /// 数字を読む(#1994): 審査用の版でも「作ったアプリ・変身」を言わない
+    func testStatIntentWording() {
+        let words = [GetStatValueIntent.title.key, GetStatNumberIntent.title.key, StatEntity.typeDisplayRepresentation.name.key,
+                     TailorIntentError.statNotFound.localizedStringResource.key]
+        for w in words {
+            XCTAssertFalse(w.contains("作ったアプリ") || w.contains("変身"), w)
+        }
+        #if APP_STORE_REVIEW
+        XCTAssertTrue(words[3].contains("記録帳"), words[3])
+        #else
+        XCTAssertTrue(words[3].contains("アプリ"), words[3])
+        #endif
+    }
 }

@@ -17,7 +17,7 @@ extension AppRuntime {
                 for kg in weights { try await HealthData.source.saveWeight(kg: kg, at: Date()) }
                 toast = L10n.tr("ヘルスケアにも保存しました")
             } catch {
-                toast = L10n.tr("ヘルスケアに保存できませんでした(\(error.localizedDescription))")
+                toast = ErrorCopy.failure(L10n.tr("ヘルスケアに保存できませんでした"), error, context: "Health")
             }
         }
     }

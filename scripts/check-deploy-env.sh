@@ -31,7 +31,8 @@ ops_keys="$(table_keys '運用で変える値' | sort -u)"
 [ -n "$deploy_keys" ] || err "$doc の「デプロイが決める値」の表が読めない"
 [ -n "$ops_keys" ] || err "$doc の「運用で変える値」の表が読めない"
 
-flags="$(grep -o -- '--update-env-vars="[^"]*"' <<<"$body" | sed 's/^--update-env-vars="//; s/"$//')"
+# 0 件でも pipefail で止めず、次の行の err で理由を出して落とす
+flags="$({ grep -o -- '--update-env-vars="[^"]*"' <<<"$body" || true; } | sed 's/^--update-env-vars="//; s/"$//')"
 [ -n "$flags" ] || err "$wf に --update-env-vars が無い"
 
 used=""

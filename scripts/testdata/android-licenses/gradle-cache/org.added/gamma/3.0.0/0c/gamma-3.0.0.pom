@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <groupId>org.added</groupId>
+  <artifactId>gamma</artifactId>
+  <version>3.0.0</version>
+  <scm><url>https://example.org/gamma</url></scm>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+    </license>
+  </licenses>
+</project>

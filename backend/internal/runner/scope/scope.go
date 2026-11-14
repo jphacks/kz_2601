@@ -1,0 +1,519 @@
+// Package scope is the runner's appId-bound handle (#337 layers 1-3). A Handle
+// is made from one trigger and touches that app only: no method takes an
+// appId, every record path is built in one place (recordSet) and checked
+// against the handle's appId, and records can be read only when they are the
+// trigger record or a record its ref fields point to, or listed by List (all
+// records of one entity on the handle's side: on.each / agg, #340 reads) and
+// the records their ref fields point to. A record only its readers see
+// (#271 addressed records) is never given to a rule's expressions.
+//
+// It implements engine.RefReader and notify.Directory / notify.Accounts /
+// notify.Consent, and reads device tokens (#269).
+package scope
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/runner/engine"
+	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
+	"github.com/jphacks/kz_2601/backend/internal/store"
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
+	"github.com/jphacks/kz_2601/backend/pkg/dsl/expreval"
+)
+
+// Errors.
+var (
+	// ErrViolation: a path outside the handle's app was built (must never
+	// happen; logged as runner.scope_violation).
+	ErrViolation = errors.New("scope: path outside the app")
+	// ErrNotReadable: the record is neither the trigger record nor one of its ref targets.
+	ErrNotReadable = errors.New("scope: record is not readable by this run")
+	// ErrNotBound: Bind has not been called.
+	ErrNotBound = errors.New("scope: handle is not bound to a trigger")
+)
+
+// ViolationEvent is the log message of a scope violation.
+const ViolationEvent = "runner.scope_violation"
+
+// Backend is the part of the store a handle uses.
+type Backend interface {
+	GetApp(ctx context.Context, uid, appID string) (*store.App, error)
+	GetVersion(ctx context.Context, uid, appID string, n int) (*store.Version, error)
+	GetPublicApp(ctx context.Context, appID string) (*store.PublicApp, error)
+	AppOwner(ctx context.Context, appID string) (string, error)
+	GetMember(ctx context.Context, appID, uid string) (*store.Member, error)
+	ListMembers(ctx context.Context, appID string, limit int) ([]store.Member, error)
+	GetRecord(ctx context.Context, rs store.RecordSet, id string) (*store.Record, error)
+	ListRecords(ctx context.Context, rs store.RecordSet, limit int) ([]store.Record, error)
+	CreateRecord(ctx context.Context, rs store.RecordSet, rec store.Record) (*store.Record, bool, error)
+	UserDeleted(ctx context.Context, uid string) (bool, error)
+	ListBlocks(ctx context.Context, uid string) ([]store.Block, error)
+	ListDevices(ctx context.Context, uid string) ([]store.Device, error)
+	DeleteDeviceToken(ctx context.Context, uid, token string) (int, error)
+	NotifyAllowed(ctx context.Context, uid, appID string) (bool, error)
+	RunnerApp(ctx context.Context, env, key string) (store.RunnerApp, error)
+	store.RunnerWrites
+}
+
+// Handle is bound to one app (and, for private data, one user).
+type Handle struct {
+	b      Backend
+	env    string
+	appID  string
+	uid    string // private: whose records; "" for shared / public
+	shared bool
+	log    *slog.Logger
+
+	owner     string
+	ownerRead bool
+
+	// set by Bind
+	app      *dsl.App
+	readable map[string]bool // entity + "\x00" + id
+}
+
+var (
+	_ engine.RefReader = (*Handle)(nil)
+	_ notify.Directory = (*Handle)(nil)
+	_ notify.Accounts  = (*Handle)(nil)
+	_ notify.Consent   = (*Handle)(nil)
+)
+
+// New binds a handle to the app of ev (an outbox event of env).
+func New(b Backend, env string, ev store.OutboxEvent, logger *slog.Logger) (*Handle, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	h := &Handle{b: b, env: env, appID: ev.AppID, shared: ev.Scope != string(dsl.ScopePrivate) && ev.Scope != "", log: logger}
+	if !h.shared {
+		h.uid = ev.UID
+	}
+	if h.appID == "" || (!h.shared && h.uid == "") {
+		return nil, fmt.Errorf("scope: event without appId or private uid")
+	}
+	return h, nil
+}
+
+// AppID is the app this handle is bound to.
+func (h *Handle) AppID() string { return h.appID }
+
+// Shared reports whether the handle works on shared / public data.
+func (h *Handle) Shared() bool { return h.shared }
+
+// Bind sets the DSL of the run and what it may read: the trigger record
+// (entity/id) and the records its ref fields (in data) point to.
+func (h *Handle) Bind(app *dsl.App, entity, id string, data map[string]any) {
+	h.app = app
+	h.readable = map[string]bool{entity + "\x00" + id: true}
+	ent := app.EntityByID(entity)
+	if ent == nil {
+		return
+	}
+	for _, f := range ent.Fields {
+		if f.Type != dsl.FieldRef {
+			continue
+		}
+		if ref, _ := data[f.ID].(string); ref != "" {
+			h.readable[f.RefEntity+"\x00"+ref] = true
+		}
+	}
+}
+
+// recordSet is the only place a record path is built.
+func (h *Handle) recordSet(ctx context.Context, entity string) (store.RecordSet, error) {
+	if h.app == nil {
+		return store.RecordSet{}, ErrNotBound
+	}
+	ent := h.app.EntityByID(entity)
+	if ent == nil {
+		return store.RecordSet{}, fmt.Errorf("scope: entity %q is not in the app", entity)
+	}
+	var rs store.RecordSet
+	if ent.IsShared() {
+		rs = store.PublicRecords(h.appID, entity)
+	} else {
+		rs = store.PrivateRecords(h.uid, h.appID, entity)
+	}
+	return rs, h.check(ctx, rs)
+}
+
+// check rejects a record set outside the handle's app (and side).
+func (h *Handle) check(ctx context.Context, rs store.RecordSet) error {
+	ok := rs.AppID == h.appID && rs.Public == h.shared && (rs.Public || (rs.UID != "" && rs.UID == h.uid))
+	if ok {
+		return nil
+	}
+	h.log.ErrorContext(ctx, ViolationEvent,
+		slog.String("event", ViolationEvent),
+		slog.String("app_id", h.appID),
+		slog.String("path_app_id", rs.AppID),
+		slog.Bool("public", rs.Public),
+		slog.String("path_uid_hash", httpx.UIDHash(rs.UID)))
+	return ErrViolation
+}
+
+func (h *Handle) readableSet(ctx context.Context, entity, id string) (store.RecordSet, error) {
+	if h.readable == nil {
+		return store.RecordSet{}, ErrNotBound
+	}
+	if !h.readable[entity+"\x00"+id] {
+		return store.RecordSet{}, ErrNotReadable
+	}
+	return h.recordSet(ctx, entity)
+}
+
+// ---- app state (the run's pre-checks) ----------------------------------------
+
+// PublicApp is apps_public/{appId} (shared / public apps).
+func (h *Handle) PublicApp(ctx context.Context) (*store.PublicApp, error) {
+	return h.b.GetPublicApp(ctx, h.appID)
+}
+
+// PrivateApp is users/{uid}/apps/{appId} (private apps).
+func (h *Handle) PrivateApp(ctx context.Context) (*store.App, error) {
+	if h.shared {
+		return nil, ErrViolation
+	}
+	return h.b.GetApp(ctx, h.uid, h.appID)
+}
+
+// Version is version n of the DSL the rules come from: the creator's
+// versions for shared / public data, the user's own for private.
+func (h *Handle) Version(ctx context.Context, n int) (*store.Version, error) {
+	who := h.uid
+	if h.shared {
+		o, err := h.Owner(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if o == "" {
+			return nil, store.ErrNotFound
+		}
+		who = o
+	}
+	v, err := h.b.GetVersion(ctx, who, h.appID, n)
+	if err == nil && v.AppID != "" && v.AppID != h.appID {
+		return nil, h.check(ctx, store.RecordSet{AppID: v.AppID, Public: h.shared, UID: h.uid})
+	}
+	return v, err
+}
+
+// RunnerApp is the app's runner state (last opened, the creator's time
+// zone): runner/{env}/apps/{store.TenantKey(appId, uid)}, uid "" for
+// shared / public data.
+func (h *Handle) RunnerApp(ctx context.Context) (store.RunnerApp, error) {
+	return h.b.RunnerApp(ctx, h.env, store.TenantKey(h.appID, h.uid))
+}
+
+// CreatedAt is when the creator's app was created (zero when it is gone).
+func (h *Handle) CreatedAt(ctx context.Context) (time.Time, error) {
+	who, err := h.Owner(ctx)
+	if err != nil || who == "" {
+		return time.Time{}, err
+	}
+	a, err := h.b.GetApp(ctx, who, h.appID)
+	if errors.Is(err, store.ErrNotFound) {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	return a.CreatedAt, nil
+}
+
+// ---- engine.RefReader ---------------------------------------------------------
+
+// Record implements engine.RefReader: the values a rule's expressions read.
+// A record only its readers see reads as not found.
+func (h *Handle) Record(ctx context.Context, entity, id string) (expreval.Record, bool, error) {
+	r, err := h.stored(ctx, entity, id)
+	if r == nil || err != nil || h.restricted(entity, r) {
+		return expreval.Record{}, false, err
+	}
+	return ToExpr(r), true, nil
+}
+
+// stored reads a readable record (nil = it does not exist).
+func (h *Handle) stored(ctx context.Context, entity, id string) (*store.Record, error) {
+	rs, err := h.readableSet(ctx, entity, id)
+	if err != nil {
+		return nil, err
+	}
+	r, err := h.b.GetRecord(ctx, rs, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, nil
+	}
+	return r, err
+}
+
+// restricted reports whether only r's readers see it: stored readers decide
+// whatever the DSL says now, an addressed entity covers older records.
+func (h *Handle) restricted(entity string, r *store.Record) bool {
+	return len(r.Readers) > 0 || h.addressed(entity)
+}
+
+func (h *Handle) addressed(entity string) bool {
+	e := h.app.EntityByID(entity)
+	return e != nil && e.IsAddressed()
+}
+
+// TriggerInfo is the display name on the trigger record ("" when it is gone)
+// and whether only its readers see it: not the record's values, which the
+// event carries.
+func (h *Handle) TriggerInfo(ctx context.Context, entity, id string) (authorName string, restricted bool, err error) {
+	r, err := h.stored(ctx, entity, id)
+	if r == nil || err != nil {
+		return "", false, err
+	}
+	return r.AuthorName, h.restricted(entity, r), nil
+}
+
+// ErrTooMany: List found more records than its limit.
+var ErrTooMany = errors.New("scope: more records than the limit")
+
+// List returns the records of entity on the handle's side (the user's own
+// for private data) for on.each / agg (#340 reads), newest first. More than
+// limit records (limit > 0) is ErrTooMany. Listed records and the records
+// their ref fields point to become readable by Record. An addressed entity
+// is ErrNotReadable; records only their readers see are left out (they
+// outlive addressedTo).
+func (h *Handle) List(ctx context.Context, entity string, limit int) ([]expreval.Record, error) {
+	if h.readable == nil {
+		return nil, ErrNotBound
+	}
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return nil, err
+	}
+	if h.addressed(entity) {
+		return nil, ErrNotReadable
+	}
+	n := 0
+	if limit > 0 {
+		n = limit + 1
+	}
+	recs, err := h.b.ListRecords(ctx, rs, n)
+	if err != nil {
+		return nil, err
+	}
+	if limit > 0 && len(recs) > limit {
+		return nil, ErrTooMany
+	}
+	ent := h.app.EntityByID(entity)
+	out := make([]expreval.Record, 0, len(recs))
+	for i := range recs {
+		r := &recs[i]
+		if len(r.Readers) > 0 {
+			continue
+		}
+		h.readable[entity+"\x00"+r.ID] = true
+		for _, f := range ent.Fields {
+			if f.Type != dsl.FieldRef {
+				continue
+			}
+			if ref, _ := r.Data[f.ID].(string); ref != "" {
+				h.readable[f.RefEntity+"\x00"+ref] = true
+			}
+		}
+		out = append(out, ToExpr(r))
+	}
+	return out, nil
+}
+
+// ToExpr converts a stored record for the evaluator.
+func ToExpr(r *store.Record) expreval.Record {
+	out := expreval.Record{ID: r.ID, Data: r.Data, Author: r.Author, AuthorName: r.AuthorName}
+	if !r.CreatedAt.IsZero() {
+		out.CreatedAt = r.CreatedAt.UTC().Format(time.RFC3339)
+	}
+	return out
+}
+
+// ---- notify.Directory -----------------------------------------------------------
+
+// Owner implements notify.Directory: the creator (app_owners) of a shared
+// app, the user of a private one.
+func (h *Handle) Owner(ctx context.Context) (string, error) {
+	if !h.shared {
+		return h.uid, nil
+	}
+	if h.ownerRead {
+		return h.owner, nil
+	}
+	o, err := h.b.AppOwner(ctx, h.appID)
+	if errors.Is(err, store.ErrNotFound) {
+		o, err = "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	h.owner, h.ownerRead = o, true
+	return o, nil
+}
+
+// IsMember implements notify.Directory: one members/{uid} read (#2297). The
+// creator has no document (check Owner first); false for private data.
+func (h *Handle) IsMember(ctx context.Context, uid string) (bool, error) {
+	if !h.shared {
+		return false, nil
+	}
+	return store.IsMember(ctx, h.b, h.appID, uid)
+}
+
+// Members implements notify.Directory: the whole list, for a notification to
+// every member (none for private data).
+func (h *Handle) Members(ctx context.Context) ([]string, error) {
+	if !h.shared {
+		return nil, nil
+	}
+	ms, err := h.b.ListMembers(ctx, h.appID, store.MaxMembers)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, m.UID)
+	}
+	return out, nil
+}
+
+// RecordAuthor implements notify.Directory (readable records only).
+func (h *Handle) RecordAuthor(ctx context.Context, entity, id string) (string, bool, error) {
+	r, err := h.stored(ctx, entity, id)
+	if r == nil || err != nil {
+		return "", false, err
+	}
+	return r.Author, true, nil
+}
+
+// ---- notify.Accounts --------------------------------------------------------------
+
+// Deleted implements notify.Accounts.
+func (h *Handle) Deleted(ctx context.Context, uid string) (bool, error) {
+	return h.b.UserDeleted(ctx, uid)
+}
+
+// Blocks implements notify.Accounts.
+func (h *Handle) Blocks(ctx context.Context, uid string) ([]string, error) {
+	bs, err := h.b.ListBlocks(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(bs))
+	for _, b := range bs {
+		out = append(out, b.UID)
+	}
+	return out, nil
+}
+
+// ---- notify.Consent and devices (#269, #339) ---------------------------------------
+
+// Allows implements notify.Consent: uid's stored consent for this app.
+func (h *Handle) Allows(ctx context.Context, uid string) (bool, error) {
+	return h.b.NotifyAllowed(ctx, uid, h.appID)
+}
+
+// PushDevices are uid's devices the runner can push to: iOS devices whose
+// APNs environment is env (all when env is "") and every Android device (an
+// FCM token is valid in the Firebase project it was issued for, #918). The
+// notifier asks only for recipients that passed the checks (#337: tokens are
+// personal data across apps).
+func (h *Handle) PushDevices(ctx context.Context, uid, env string) ([]store.Device, error) {
+	ds, err := h.b.ListDevices(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	var out []store.Device
+	for _, d := range ds {
+		if d.Platform == store.PlatformAndroid || env == "" || d.Environment == env {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+// DropDeviceToken deletes uid's devices holding token (APNs 410, FCM UNREGISTERED).
+func (h *Handle) DropDeviceToken(ctx context.Context, uid, token string) error {
+	_, err := h.b.DeleteDeviceToken(ctx, uid, token)
+	return err
+}
+
+// ---- writes -----------------------------------------------------------------------
+
+// CreateRecord creates entity/id (idempotent on id) with origin. It goes
+// through no outbox, so it triggers no rule.
+func (h *Handle) CreateRecord(ctx context.Context, entity, id string, data map[string]any, origin store.RecordOrigin) (created bool, err error) {
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return false, err
+	}
+	_, created, err = h.b.CreateRecord(ctx, rs, store.Record{ID: id, Data: data, Origin: &origin})
+	return created, err
+}
+
+// ApplyOnce writes fn(data) to a readable record once per key (see
+// store.RunnerWrites.ApplyRecordOnce). The record is the trigger record or
+// one of its ref targets.
+func (h *Handle) ApplyOnce(ctx context.Context, entity, id, key string, fn func(map[string]any) map[string]any) (bool, error) {
+	rs, err := h.readableSet(ctx, entity, id)
+	if err != nil {
+		return false, err
+	}
+	return h.b.ApplyRecordOnce(ctx, rs, id, h.env, key, fn)
+}
+
+// UpsertRecord creates entity/id with data, or, when it is there, applies
+// fn to it once per key (the scheduled import, #1712). data nil: update
+// only (a missing record is left missing). Unlike ApplyOnce the record need
+// not be readable by the trigger: the caller names only ids it derives from
+// its own key (store.IDFromClientID), inside this handle's app and side.
+func (h *Handle) UpsertRecord(ctx context.Context, entity, id string, data map[string]any, origin store.RecordOrigin, key string, fn func(map[string]any) map[string]any) (created, applied bool, err error) {
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return false, false, err
+	}
+	if data != nil {
+		if _, created, err = h.b.CreateRecord(ctx, rs, store.Record{ID: id, Data: data, Origin: &origin}); err != nil || created {
+			return created, false, err
+		}
+	}
+	applied, err = h.b.ApplyRecordOnce(ctx, rs, id, h.env, key, fn)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, false, nil
+	}
+	return false, applied, err
+}
+
+// ImportedRecord reads entity/id for the scheduled import (#1712), so a
+// row equal to the stored record is not written again. Like UpsertRecord,
+// the caller names only ids it derives from its own key. found=false when
+// the record is not there.
+func (h *Handle) ImportedRecord(ctx context.Context, entity, id string) (data map[string]any, found bool, err error) {
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return nil, false, err
+	}
+	r, err := h.b.GetRecord(ctx, rs, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return r.Data, true, nil
+}
+
+// Marked reports whether the action key already ran.
+func (h *Handle) Marked(ctx context.Context, key string) (bool, error) {
+	return h.b.RunnerMarked(ctx, h.env, key)
+}
+
+// Mark records that the action key ran.
+func (h *Handle) Mark(ctx context.Context, key string) error {
+	return h.b.MarkRunnerDone(ctx, h.env, key)
+}

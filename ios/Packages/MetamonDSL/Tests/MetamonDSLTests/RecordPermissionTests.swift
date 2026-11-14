@@ -46,4 +46,22 @@ final class RecordPermissionTests: XCTestCase {
         XCTAssertTrue(RecordPermission.canDelete(theirs, in: try entity(scope: "public"), uid: nil))
         XCTAssertTrue(RecordPermission.canEdit(theirs, in: nil, uid: "me"))
     }
+
+    /// entity.deleteBy(#272): admins は管理者だけ、authorOrAdmins は作った人か管理者。管理者か分からない時は従来どおり作った人だけ。
+    func testDeleteBy() throws {
+        func shared(_ deleteBy: String) throws -> Entity {
+            try JSONDecoder().decode(Entity.self, from: Data(#"{"id":"s","name":"シフト","scope":"shared","deleteBy":"\#(deleteBy)","unique":["title"],"fields":[{"id":"title","name":"t","type":"string","editableBy":"admins"}]}"#.utf8))
+        }
+        let admins = try shared("admins")
+        XCTAssertEqual(admins.unique, ["title"])
+        XCTAssertTrue(admins.fields[0].isAdminOnly)
+        XCTAssertFalse(RecordPermission.canDelete(mine, in: admins, uid: "me", isAdmin: false))
+        XCTAssertTrue(RecordPermission.canDelete(theirs, in: admins, uid: "me", isAdmin: true))
+        XCTAssertTrue(RecordPermission.canDelete(mine, in: admins, uid: "me"), "分からない時は作った人")
+        XCTAssertFalse(RecordPermission.canDelete(theirs, in: admins, uid: "me"))
+        let either = try shared("authorOrAdmins")
+        XCTAssertTrue(RecordPermission.canDelete(mine, in: either, uid: "me", isAdmin: false))
+        XCTAssertTrue(RecordPermission.canDelete(theirs, in: either, uid: "me", isAdmin: true))
+        XCTAssertFalse(RecordPermission.canDelete(theirs, in: either, uid: "me", isAdmin: nil))
+    }
 }

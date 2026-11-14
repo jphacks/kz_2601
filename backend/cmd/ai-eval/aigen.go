@@ -2,13 +2,17 @@ package main
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // aiButton generate (#417) expect keys: aiGenerate (string: the shape of some
 // generate button, or any) and aiGenerateEntity (bool: one of them reads
-// records). Cases: internal/ai/eval/ai_generate_cases.json (-cases).
+// records), aiTask (string: some aiButton has this task), aiLength (string:
+// some aiButton has this length, unset = short), aiInputPhoto (bool: some
+// aiButton sends a photo field, inputPhoto; false = none does). Cases:
+// internal/ai/eval/ai_generate_cases.json and cloud_ai_cases.json (-cases).
 
 // generateButtons lists the generate aiButtons of the app.
 func generateButtons(a *dsl.App) []dsl.Component {
@@ -54,5 +58,53 @@ func checkAIGenerate(exp map[string]any, a *dsl.App) []string {
 			miss = append(miss, fmt.Sprintf("aiGenerateEntity=%v", got))
 		}
 	}
-	return miss
+	if want, ok := exp["aiTask"].(string); ok {
+		var got []string
+		for _, x := range aiButtons(a) {
+			got = append(got, x.Task)
+		}
+		if !slices.Contains(got, want) {
+			miss = append(miss, fmt.Sprintf("aiTask=%s got %v", want, got))
+		}
+	}
+	if want, ok := exp["aiLength"].(string); ok {
+		var got []string
+		for _, x := range aiButtons(a) {
+			l := x.Length
+			if l == "" {
+				l = "short"
+			}
+			got = append(got, l)
+		}
+		if !slices.Contains(got, want) {
+			miss = append(miss, fmt.Sprintf("aiLength=%s got %v", want, got))
+		}
+	}
+	if want, ok := exp["aiInputPhoto"].(bool); ok {
+		got := false
+		for _, x := range aiButtons(a) {
+			got = got || x.InputPhoto != ""
+		}
+		if got != want {
+			miss = append(miss, fmt.Sprintf("aiInputPhoto=%v got %v", want, got))
+		}
+	}
+	miss = append(miss, checkAIInputFeeds(exp, a)...)
+	miss = append(miss, checkAIOutputs(exp, a)...)
+	return append(miss, checkAISaveTo(exp, a)...)
+}
+
+// aiButtons lists every aiButton of the app (also inside a container).
+func aiButtons(a *dsl.App) []dsl.Component {
+	var out []dsl.Component
+	for _, s := range a.Screens {
+		for _, c := range s.Components {
+			for _, x := range append([]dsl.Component{c}, c.Children...) {
+				if x.Type == dsl.CompAiButton {
+					out = append(out, x)
+				}
+			}
+		}
+	}
+	return out
 }

@@ -57,7 +57,7 @@ public enum RenderTheme {
         public static let surfaceElevated = SemanticPalette.color(SemanticPalette.surfaceElevated)
         /// 1pt の薄い枠線・セパレータ(紺を 12% / ダークは生成りを 10%)
         public static let hairline = SemanticPalette.color((light: SemanticPalette.RGB(51, 82, 103), dark: SemanticPalette.RGB(244, 241, 232)), lightAlpha: 0.12, darkAlpha: 0.10)
-        public static let separator = Color(.separator)
+        public static let separator = Color.platformSeparator
         /// ブランド色の**文字**(リンク・secondary ボタン・値)。面に対し AA(4.5:1)を満たすトーン(#68 SemanticPalette で検算)
         public static let brandText = SemanticPalette.color(SemanticPalette.brand)
         /// semantic(AA を満たす #68 のトーン。文字にも塗りにも使う)
@@ -211,6 +211,8 @@ struct EmptyPlaceholder: View {
     var loading = false
     var state: EmptyState = .empty
     var retry: (() -> Void)? = nil
+    /// 案内(cta)を押した時(M12: 同じ画面の追加ボタンと同じ動き)。nil なら案内はただの文字
+    var onCTA: (() -> Void)? = nil
 
     static var loadingText: String { L("読み込み中…") }
     static var unavailableText: String { L("読み込めませんでした") }
@@ -219,9 +221,12 @@ struct EmptyPlaceholder: View {
     static let unavailableValue = "—"
 
     /// list / table / timeline / chart 共通の組み立て: 状態から文言・アイコンを決める。
-    init(icon: String = "tray", emptyText: String, state: EmptyState, cta: String? = nil, retry: (() -> Void)? = nil) {
+    /// `onCTA` は `retry`(後置クロージャで渡す呼び出しが多い)より後ろに置く。
+    init(icon: String = "tray", emptyText: String, state: EmptyState, cta: String? = nil, retry: (() -> Void)? = nil,
+         onCTA: (() -> Void)? = nil) {
         self.state = state
         self.cta = cta
+        self.onCTA = onCTA
         self.loading = state == .loading
         self.retry = state == .unavailable ? retry : nil
         switch state {
@@ -261,9 +266,20 @@ struct EmptyPlaceholder: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             if let cta, state == .empty {
-                Text(cta)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(RenderTheme.Colors.brandText)
+                if let onCTA {
+                    Button(action: onCTA) {
+                        Label(cta, systemImage: "plus")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(RenderTheme.Colors.brandText)
+                    .accessibilityIdentifier("empty.add")
+                } else {
+                    Text(cta)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(RenderTheme.Colors.brandText)
+                }
             }
             if let retry {
                 Button(action: retry) {

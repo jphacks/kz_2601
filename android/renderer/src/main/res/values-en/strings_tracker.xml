@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="renderer_tracker_auto_stopped">Stopped recording after %1$d min</string>
+    <string name="renderer_tracker_bar_spoken">Recording location, elapsed %1$s</string>
+    <string name="renderer_tracker_bar_stop_label">Stop recording location</string>
+    <string name="renderer_tracker_cancel">Cancel</string>
+    <string name="renderer_tracker_channel">Location recording</string>
+    <string name="renderer_tracker_confirm_message">The points recorded so far will be kept.</string>
+    <string name="renderer_tracker_confirm_title">Stop recording your location?</string>
+    <string name="renderer_tracker_denied">Can\'t record without permission for precise location</string>
+    <string name="renderer_tracker_footnote">Records your location only after you tap start (stops automatically after %1$d min at most)</string>
+    <string name="renderer_tracker_notification_text">Keeps recording your location, even with the app closed, until you tap Stop</string>
+    <string name="renderer_tracker_notification_title">Recording location</string>
+    <string name="renderer_tracker_open_settings">Open Settings</string>
+    <string name="renderer_tracker_other_active">Another recording is in progress</string>
+    <string name="renderer_tracker_progress">%1$d points recorded · stops automatically in %2$d min</string>
+    <string name="renderer_tracker_recording">Recording</string>
+    <string name="renderer_tracker_requesting">Waiting for location permission</string>
+    <string name="renderer_tracker_save_failed">Couldn\'t save the recording</string>
+    <string name="renderer_tracker_start">Start recording</string>
+    <string name="renderer_tracker_stop">Stop recording</string>
+    <string name="renderer_tracker_stop_other">Stop that recording</string>
+    <string name="renderer_tracker_stop_short">Stop</string>
+    <string name="renderer_tracker_unavailable">Stopped recording because location isn\'t available</string>
+    <string name="renderer_tracker_waiting">Waiting for location…</string>
+</resources>

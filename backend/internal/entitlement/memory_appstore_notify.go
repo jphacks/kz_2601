@@ -3,6 +3,7 @@ package entitlement
 import (
 	"context"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -39,7 +40,7 @@ func (m *Memory) Bindings(_ context.Context, after string, limit int) ([]Binding
 	defer m.mu.Unlock()
 	ids := make([]string, 0, len(m.bindings))
 	for otid := range m.bindings {
-		if otid > after {
+		if otid > after && !strings.HasPrefix(otid, playKeyPrefix) { // App Store only (like Firestore)
 			ids = append(ids, otid)
 		}
 	}

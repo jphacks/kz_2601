@@ -67,3 +67,10 @@ func (c *ProChecker) IsPro(ctx context.Context, uid string) bool {
 	c.mu.Unlock()
 	return e.pro
 }
+
+// Forget drops uid's cached answer (a purchase or restore was just stored).
+func (c *ProChecker) Forget(uid string) {
+	c.mu.Lock()
+	delete(c.cache, uid)
+	c.mu.Unlock()
+}

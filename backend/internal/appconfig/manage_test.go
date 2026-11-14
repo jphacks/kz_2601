@@ -153,3 +153,43 @@ func TestReorderApps(t *testing.T) {
 		}
 	})
 }
+
+// link-10: the stat shown on the app list card is a per-app setting on the
+// server (so iPhone and Mac agree), set by PATCH and listed with the app.
+func TestAppGlanceStat(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		uid := "glancer" + sfx
+		a := "GLANCE-A" + sfx
+		e.ownApp(uid, "/v1/apps/"+a, kakeibo(t))
+		before := appItems(e, uid)
+
+		for _, v := range []string{"month_total", "-", ""} {
+			r := e.do(uid, http.MethodPatch, "/v1/apps/"+a, map[string]any{"glanceStat": v}, nil)
+			if r.code != http.StatusOK {
+				t.Fatalf("set %q: %d %s", v, r.code, r.raw)
+			}
+			after := appItems(e, uid)
+			got, _ := after[a]["glanceStat"].(string)
+			if got != v {
+				t.Fatalf("listed glanceStat: want %q, got %q", v, got)
+			}
+			if after[a]["updatedAt"] != before[a]["updatedAt"] {
+				t.Fatalf("glanceStat %q moved updatedAt", v)
+			}
+		}
+		if r := e.do(uid, http.MethodPatch, "/v1/apps/"+a, map[string]any{"glanceStat": "kept"}, nil); r.code != http.StatusOK || r.body["glanceStat"] != "kept" {
+			t.Fatalf("response: %d %s", r.code, r.raw)
+		}
+		for _, bad := range []string{"Upper", "1st", "a b", "--", "abcdefghijabcdefghijabcdefghijabcdefghijx"} {
+			if r := e.do(uid, http.MethodPatch, "/v1/apps/"+a, map[string]any{"glanceStat": bad}, nil); r.code != http.StatusBadRequest {
+				t.Fatalf("bad %q: want 400, got %d", bad, r.code)
+			}
+		}
+		if got := appItems(e, uid)[a]["glanceStat"]; got != "kept" {
+			t.Fatalf("rejected value changed the setting: %v", got)
+		}
+		if r := e.do("other"+sfx, http.MethodPatch, "/v1/apps/"+a, map[string]any{"glanceStat": "x"}, nil); r.code != http.StatusNotFound {
+			t.Fatalf("someone else's app: want 404, got %d", r.code)
+		}
+	})
+}

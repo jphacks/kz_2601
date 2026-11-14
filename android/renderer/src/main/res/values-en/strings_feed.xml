@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_attribution">Source: %1$s (%2$s)</string>
+    <string name="feed_attribution_spoken">Source: %1$s</string>
+    <string name="feed_empty">Nothing to show right now</string>
+    <string name="feed_loading">Loading…</string>
+    <string name="feed_pop_spoken">%1$d percent chance of rain</string>
+    <string name="feed_pressure_drop">Dropping</string>
+    <string name="feed_pressure_drop_spoken">Air pressure will drop sharply</string>
+    <string name="feed_retry">Retry</string>
+    <string name="feed_stale">Couldn\'t get the latest data; showing what was fetched earlier</string>
+    <string name="feed_unavailable">Couldn\'t load</string>
+</resources>

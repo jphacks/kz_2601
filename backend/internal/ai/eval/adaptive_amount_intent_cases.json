@@ -1,0 +1,5 @@
+[
+  {"id": "aa_study_last_week", "kind": "create", "group": "adaptive-amount", "transcript": "勉強の予定を記録して、先週どれだけできたかで今週の目標を自動で調整したい", "expect": {"computed": true, "rowWindow": true}, "note": "adaptive_study.json: 週の computed = agg count logs の filter [date gte addDays(start,-7), date lt start](+ done eq true)、target = clamp(round(base*rate/80), base*0.5, base*1.5)"},
+  {"id": "aa_workout_rate_low", "kind": "create", "group": "adaptive-amount", "transcript": "筋トレのメニューをこなしたか記録したい。先週の達成率が低かったら今週の量を減らして、高かったら増やして", "expect": {"computed": true, "rowWindow": true}, "note": "週の行ごとに先週の達成率(thisWeek / today 基準ではなく行の start 基準)から今週の量を決める"},
+  {"id": "aa_fixed_target", "kind": "create", "group": "adaptive-amount", "transcript": "毎週の勉強時間の目標は 300 分。今週どれだけやったか記録して見たい", "expect": {"rowWindow": false}, "note": "否定: 目標は固定。今週の合計は stat の filter thisWeek で足り、行ごとの先週の computed は足さない"}
+]

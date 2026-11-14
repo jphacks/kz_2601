@@ -1,0 +1,1 @@
+{"new": {"requests": 100, "errors_5xx": "0", "p95_ms": 400}, "old": {"requests": 900, "errors_5xx": 3, "p95_ms": 400}}

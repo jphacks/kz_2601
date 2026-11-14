@@ -45,7 +45,7 @@
         {
           "type": "section", "id": "recent", "area": "A3:F10", "title": "最近の支出",
           "children": [
-            { "type": "list", "entity": "expense", "item": { "title": "memo", "subtitle": "category", "trailing": "amount", "image": "receipt" },
+            { "type": "list", "entity": "expense", "item": { "title": "category", "subtitle": "memo", "trailing": "amount", "image": "receipt" },
               "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ支出がありません", "swipeToDelete": true,
               "onItemTap": { "type": "navigate", "screen": "expense_form", "presentation": "push" } }
           ]

@@ -41,6 +41,10 @@ final class LiveActivityContentTests: XCTestCase {
 
     func testKeysSeparateTimerAndAction() {
         XCTAssertNotEqual(LiveActivityContent.timerKey("a"), LiveActivityContent.appKey("a"))
+        // #38: タイマーのキーは appId で始まる。アプリ名で始まる古いものだけを消す対象にする
+        XCTAssertFalse(LiveActivityContent.isLegacyTimerKey(LiveActivityContent.timerKey("app-1/home/t"), appId: "app-1"))
+        XCTAssertTrue(LiveActivityContent.isLegacyTimerKey(LiveActivityContent.timerKey("ラーメン/home/t"), appId: "app-1"))
+        XCTAssertFalse(LiveActivityContent.isLegacyTimerKey(LiveActivityContent.appKey("app-1"), appId: "app-1"))
     }
 
     // MARK: startActivity

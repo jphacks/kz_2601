@@ -54,6 +54,7 @@ var expectKeys = map[string]expectKind{
 	"meFilter":     expectBool,   // #251 (PR #384)
 	"scopeNot":     expectString, // #254 (PR #405)
 	"summaryHas":   expectStrings,
+	"summaryNot":   expectStrings,
 	"prefillRef":   expectBool, // #256 (PR #387)
 	// checkMarks (#255, PR #398)
 	"mark":       expectBool,
@@ -76,6 +77,9 @@ var expectKeys = map[string]expectKind{
 	// checkLiveActivity (#423)
 	"liveTimer":       expectBool,
 	"activityButtons": expectBool,
+	// checkCalendarAdd: calendar_add.go
+	"addToCalendar": expectBool,
+	"calendarAlert": expectBool,
 	// checkQR (#422)
 	"qrSource": expectString,
 	// checkPhotoAI (#418)
@@ -86,6 +90,12 @@ var expectKeys = map[string]expectKind{
 	// checkAIGenerate (#417): aigen.go
 	"aiGenerate":       expectString, // line|list|fields|any
 	"aiGenerateEntity": expectBool,
+	"aiTask":           expectString, // some aiButton has this task (summarize|classify|...|generate)
+	"aiLength":         expectString, // some aiButton has this length (short|long; short = unset too)
+	"aiInputPhoto":     expectBool,   // some aiButton has inputPhoto (false = none)
+	"aiInputFeeds":     expectBool,   // some generate button reads feeds on its screen (ai_input_feed.go)
+	"aiSaveTo":         expectBool,   // some generate list button saves items as records (ai_save_to.go)
+	"aiOutputs":        expectBool,   // some generate fields button fills form fields per item (ai_outputs.go)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
@@ -100,6 +110,13 @@ var expectKeys = map[string]expectKind{
 	"matchMatched": expectBool,
 	"matchSafe":    expectBool,
 	"matchUI":      expectBool,
+	// checkSingle (#267): single.go
+	"single":  expectBool,
+	"setting": expectBool,
+	// checkAddressed (#271): addressed.go
+	"addressed":       expectBool,
+	"addressedGroup":  expectBool,
+	"addressedUnread": expectBool,
 	// checkRepeat (#266): repeat.go
 	"repeat":         expectString,
 	"repeatOffset":   expectNumber,
@@ -107,8 +124,32 @@ var expectKeys = map[string]expectKind{
 	// checkNotifyWhen (#265): notify_when.go
 	"notifyWhen":   expectBool,
 	"notifyWhenOp": expectString,
+	// checkNotifyNear: notify_near.go
+	"notifyNear":       expectBool,
+	"notifyNearRepeat": expectString,
+	"jitter":           expectBool,
+	// checkAddMinutes: add_minutes.go
+	"addMinutes": expectBool,
+	// checkAlarm: alarm.go
+	"alarm":       expectBool,
+	"alarmRecord": expectBool,
+	// checkServerRules (#343): server_rules.go
+	"serverRules": expectBool,
+	"ruleTrigger": expectString,
+	"ruleAction":  expectString,
+	"ruleTo":      expectString,
+	"ruleSim":     expectBool,
+	"ruleEach":    expectBool,
+	"ruleAgg":     expectBool,
+	"ruleWith":    expectBool,
+	"ruleLookup":  expectString,
+	"ruleSimilar": expectBool,
+	"rulePick":    expectString,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
+	// checkFeed (#348): feed.go
+	"feed":       expectString,
+	"feedRegion": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -196,6 +237,14 @@ func validateExpect(exp map[string]any) []string {
 			if s := v.(string); s != "any" && !dsl.AIShapes[s] {
 				bad = append(bad, "aiGenerate must be line|list|fields|any: "+s)
 			}
+		case "aiTask":
+			if s := v.(string); !dsl.AITasks[s] {
+				bad = append(bad, "aiTask must be an aiButton task: "+s)
+			}
+		case "aiLength":
+			if s := v.(string); !dsl.AILengths[s] {
+				bad = append(bad, "aiLength must be short|long: "+s)
+			}
 		}
 	}
 	if _, ok := exp["keepEntity"]; !ok && (exp["keep"] != nil || exp["growTo"] != nil) {
@@ -234,6 +283,9 @@ func validateCases(cases []Case) []string {
 			bad = append(bad, where+"empty transcript")
 		}
 		for _, b := range validateExpect(c.Expect) {
+			bad = append(bad, where+b)
+		}
+		for _, b := range validatePendingExpect(c.Expect, c.PendingExpect) {
 			bad = append(bad, where+b)
 		}
 		seen[c.ID] = true

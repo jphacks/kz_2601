@@ -68,20 +68,20 @@
                 "rows" : [
                   {
                     "recordId" : "e1",
-                    "subtitle" : "食費",
-                    "title" : "ランチ",
+                    "subtitle" : "ランチ",
+                    "title" : "食費",
                     "trailing" : "¥1,200"
                   },
                   {
                     "recordId" : "e2",
-                    "subtitle" : "交通",
-                    "title" : "バス",
+                    "subtitle" : "バス",
+                    "title" : "交通",
                     "trailing" : "¥320"
                   },
                   {
                     "recordId" : "e3",
-                    "subtitle" : "娯楽",
-                    "title" : "映画",
+                    "subtitle" : "映画",
+                    "title" : "娯楽",
                     "trailing" : "¥5,000"
                   }
                 ]
@@ -1137,26 +1137,26 @@
                   "rows" : [
                     {
                       "recordId" : "new-1",
-                      "subtitle" : "食費",
-                      "title" : "パン",
+                      "subtitle" : "パン",
+                      "title" : "食費",
                       "trailing" : "¥980"
                     },
                     {
                       "recordId" : "e1",
-                      "subtitle" : "食費",
-                      "title" : "ランチ",
+                      "subtitle" : "ランチ",
+                      "title" : "食費",
                       "trailing" : "¥1,200"
                     },
                     {
                       "recordId" : "e2",
-                      "subtitle" : "交通",
-                      "title" : "バス",
+                      "subtitle" : "バス",
+                      "title" : "交通",
                       "trailing" : "¥320"
                     },
                     {
                       "recordId" : "e3",
-                      "subtitle" : "娯楽",
-                      "title" : "映画",
+                      "subtitle" : "映画",
+                      "title" : "娯楽",
                       "trailing" : "¥5,000"
                     }
                   ]
@@ -1453,20 +1453,20 @@
                   "rows" : [
                     {
                       "recordId" : "e1",
-                      "subtitle" : "食費",
-                      "title" : "ランチ",
+                      "subtitle" : "ランチ",
+                      "title" : "食費",
                       "trailing" : "¥1,200"
                     },
                     {
                       "recordId" : "e2",
-                      "subtitle" : "交通",
-                      "title" : "バス",
+                      "subtitle" : "バス",
+                      "title" : "交通",
                       "trailing" : "¥320"
                     },
                     {
                       "recordId" : "e3",
-                      "subtitle" : "娯楽",
-                      "title" : "映画",
+                      "subtitle" : "映画",
+                      "title" : "娯楽",
                       "trailing" : "¥5,000"
                     }
                   ]

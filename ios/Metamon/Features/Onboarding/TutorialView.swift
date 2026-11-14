@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 初回のチュートリアル(#274): 3 枚のカード。スキップでき、設定の「使い方を見る」から何度でも見られる。
+/// 初回のチュートリアル(#274・H1 で 1 枚)。スキップでき、設定の「使い方を見る」から何度でも見られる。
 struct TutorialView: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.colorScheme) private var scheme
@@ -35,8 +35,10 @@ struct TutorialView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: page)
 
-                pageDots
-                    .padding(.bottom, Theme.Spacing.md)
+                if cards.count > 1 { // 1 枚(H1)の時は点を出さない
+                    pageDots
+                        .padding(.bottom, Theme.Spacing.md)
+                }
 
                 Button {
                     if isLast { rt.finishTutorial() } else { withAnimation { page += 1 } }
@@ -47,6 +49,7 @@ struct TutorialView: View {
                 .controlSize(.large)
                 .tint(Theme.Colors.brandA)
                 .padding(.horizontal, Theme.Spacing.lg)
+                .readableWidth() // 横向きでボタンが画面の端から端まで伸びないように(#625)
                 .padding(.bottom, Theme.Spacing.lg)
                 .accessibilityIdentifier(isLast ? "tutorial.start" : "tutorial.next")
             }
@@ -69,12 +72,15 @@ struct TutorialView: View {
 
 private struct TutorialCardView: View {
     let card: FirstRunTutorial.Card
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .title) private var titleSize: CGFloat = 26
+    private var compactHeight: Bool { LandscapeLayout.isCompactHeight(verticalSizeClass) }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.lg) {
                 ZStack(alignment: .bottomTrailing) {
-                    CraneMascot(pose: card.pose, size: 132, sway: 6)
+                    CraneMascot(pose: card.pose, size: LandscapeLayout.tutorialMascotSize(compactHeight: compactHeight), sway: 6)
                     Image(systemName: card.symbol)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
@@ -83,11 +89,11 @@ private struct TutorialCardView: View {
                         .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 2))
                         .offset(x: 12, y: 6)
                 }
-                .padding(.top, Theme.Spacing.xl)
+                .padding(.top, compactHeight ? Theme.Spacing.md : Theme.Spacing.xl)
                 .accessibilityHidden(true)
 
                 Text(card.title)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(.system(size: titleSize, weight: .bold, design: .rounded))
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text(card.body)
@@ -102,7 +108,7 @@ private struct TutorialCardView: View {
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)
-            .frame(maxWidth: .infinity)
+            .readableWidth() // 横向きで本文の行が長くなりすぎないように(#625)
         }
         .scrollBounceBehavior(.basedOnSize)
         .accessibilityIdentifier("tutorial.card.\(card.id)")
@@ -131,6 +137,12 @@ struct FirstEditHintCard: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(Theme.Colors.brandText)
                 .fixedSize(horizontal: false, vertical: true)
+            // 動かない時も話しかけて直せる(テスターが気づかなかった)。直し方の例と同じく 1 回だけ
+            Label(FixRequest.hint, systemImage: "wrench.and.screwdriver")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("editHint.fixRequest")
             HStack {
                 Button("とじる") { withAnimation { rt.showFirstEditHint = false } }
                     .foregroundStyle(.secondary)

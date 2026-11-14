@@ -12,6 +12,7 @@
 5. [iOS の実装](#ios-の実装)
 6. [網羅](#網羅)
 7. [Android で合わせる時の注意](#android-で合わせる時の注意)
+8. [デスクトップで合わせる時の注意](#デスクトップで合わせる時の注意)
 
 ## 置き場
 
@@ -58,6 +59,7 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 | `{"tapRow": {"component": "<list id>", "index": 0}}` | 一覧の行を押す(`onItemTap` に行の recordId を渡す)。`component` 省略時は最初の `onItemTap` を持つ部品 |
 | `{"input": {"field": "<field id>", "value": <JSON>}}` | 今のフォームの値を変える |
 | `{"search": {"field": "<searchBar.field>", "text": "…"}}` | 検索欄に入力する |
+| `{"importCsv": {"component": "<fileImport id>", "text": "…"}}` | `fileImport` に CSV の中身を渡す(ファイルを選ぶ操作は含めない)。`component` 省略時は画面の最初の `fileImport`。`text` は 1 つの文字列、または 1 行 1 要素の配列(読みやすさのため) |
 | `{"back": true}` | 戻る(スタックを 1 つ戻す・最下層のモーダルは閉じる) |
 
 確認ダイアログ(`confirmMessage`)は「はい」で進める。
@@ -106,7 +108,7 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 
 | type | 解決した値 |
 |---|---|
-| 入力(textField など 18 種) | `value`(ドラフトの値・JSON のまま)・`label`(toggle / datePicker / colorPicker / stepper / timePicker は field の名前で補う)・picker は `options` と `style` |
+| 入力(textField など 20 種) | `value`(ドラフトの値・JSON のまま)・`label`(toggle / datePicker / colorPicker / stepper / timePicker は field の名前で補う)・picker は `options` と `style` |
 | computed / ref / refs の field を指す入力 | `input`(`computed` / `ref` / `refs`)・computed は書式後の `value`・ref は `options` |
 | `stat` | `value`(書式後の文字: `¥1,520`・`2 件`・`—`)・`unavailable` |
 | `list` | `rows: [{recordId, title, subtitle?, trailing?, checked?}]`(filter → sort → 検索の後)・空なら `emptyText` |
@@ -116,12 +118,14 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 | `progressBar` | `ratio`(1 を超えてもよい)・`percent` |
 | `gauge` | `value`・`unit` |
 | `settlement` | `title`・`transfers: [{from, to, amount}]` |
+| `bracket` | `rounds: [{title, matches: [{a, b, winner, bye?}]}]`(a / b は `{recordId, title}` か `null`・winner は `"a"` / `"b"` / `null`・1 回戦の不戦勝は `bye: true`)・`champion`(`{recordId, title}` か `null`)。組み合わせと勝ち上がりの規則は `../README.md` の bracket の補足 |
 | `flashcards` | `cards: [{recordId, front, back, learned?}]`(開いた直後の山札: filter → 登録順。toggle を比べる filter は値の無いカードを「まだ」として扱う)・`progress`(`1 / 3`。空なら `0 / 0`) |
 | `link` | `text`・`opens`(URL として開けるか) |
 | `disclosure` | `title`・`expanded` |
 | `grid` | `columns`(2〜4 に丸めた列数) |
 | `searchBar` | `query` |
 | `image` | `hasImage` |
+| `aiChat` | `textField`・`roleField`・`saveTo`(`{entity}`)・`inputEntity`・`turns: [{recordId, role, text}]`(自分の記録だけ・作成時刻の古い順・本文が空の記録は飛ばす・`roleField` が無ければ自分 → AI の交互。役は `user` / `assistant`)。返事は AI 次第なので入れない(`example-ai-counselor`・`edge-ai-chat`) |
 
 DSL に書いた値で `props` に入れるもの: `title text label message placeholder url field entity aggregate format groupBy bucket kind mode metric period sensor task output address unit min max step target seconds limit expanded show`。`style`・`icon`・`color`・`size`・`height` などの見た目のキーは入れない。
 
@@ -134,6 +138,7 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 | `{"rejected": {"missing": ["金額"]}}` | 必須が空で保存しなかった(項目の名前) |
 | `{"rejected": "noForm" / "unsavedParent"}` | フォームが無い / 親が未保存で子を作れない |
 | `{"deleted": {entity, recordId}}` | 削除した |
+| `{"imported": {entity, matched, unused, failures, overLimit}}` | CSV を読んで列を当てた(`importCsv` の後)。`matched` は `[{column, field}]`(当てた列 → field の**名前**・列の順)、`unused` はどの field にも当たらない列の見出し、`failures` は読めなかった行 `[{line, field, kind, cell}]`(`line` は見出しを 1 行目とする行番号・`kind` は `invalid` / `required` / `tooLong`)、`overLimit` は上限(1 回 500 件・entity の合計 2000 件)で入れない行の数。確認ダイアログの文言は比べない(件数はここで比べる)。続けて足した記録が `saved` で 1 件ずつ出る |
 | `{"request": <action>}` | OS の機能(URL・通知・書き出し・ライブアクティビティ・音声入力)を頼んだ。結果は比べない |
 
 ## 期待値の更新(iOS だけ)
@@ -175,15 +180,15 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 
 `ConformanceTests.testCoverageListIsUpToDate` が「全 case に出てくる部品の type + `coverage.json` の `notYetCovered` = スキーマの全 type」を確かめる(足りない・余計なら赤)。
 
-今: **68 / 68 の type が case に出てくる**(`notYetCovered` は空)。そのうち値まで解決して比べるもの:
+今: **75 / 77 の type が case に出てくる**(`notYetCovered` は `callButton`・`placeSearch`。placeSearch の検索は `PlaceSearchTests` で確かめる。aiChat は会話の並びまで木に出し、送る会話は `AIChatTests` で確かめる)。そのうち値まで解決して比べるもの:
 
 | 区分 | type |
 |---|---|
 | Container(7) | vstack hstack section card disclosure carousel grid(子の順・ローカルグリッドの位置・見出し・列数・開閉) |
-| 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image、入力 18 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField videoField audioRecorder locationPicker locationButton qrScanner) |
-| state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer |
+| 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image aiChat、入力 20 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField drawingField videoField audioRecorder transcribeField locationPicker locationButton qrScanner) |
+| state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer speakButton・feed(行は appconfig の `/v1/feeds` から取るので木に入れない・`edge-feed`)・fileImport(木には `state` と DSL の値だけ。CSV の列の当て方と足す記録は `importCsv` の操作と `imported` / `saved` の effects で比べる・`flow-file-import`) |
 
-アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。
+アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。CSV の取り込み(`fileImport`)は `importCsv` で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。
 
 ## Android で合わせる時の注意
 
@@ -193,3 +198,21 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 - 時刻は `device.now` と `timeZone` で固定する。期間の filter(`thisWeek` は月曜始まり)も同じ時刻で評価する。
 - 一覧の行の並びは filter → sort → 検索(title / subtitle の部分一致・大小無視)の順。
 - `unknown` / `unavailable` の部品も node として残す(穴として位置を持つ)。
+
+## デスクトップで合わせる時の注意
+
+デスクトップ版(`desktop/`・Windows・Linux)は Android のソースを取り込んでいる。作りは [`docs/desktop/architecture.md`](../../desktop/architecture.md) にある。
+
+- 回すもの: `desktop/` で `./gradlew :desktop:test`。比べるのは `desktop/app/src/test/kotlin/jp/kz2601/metamon/desktop/DesktopConformanceTest.kt`。`docs/dsl/conformance/cases` を読み、全 case の DSL が読めること・画面の id と見出しと `layout`・部品の並びと `cell`・`state`・`props`・操作ごとの `top` と `effects` を expected.json と比べる。
+- 期待値は iOS が書く。デスクトップは expected.json を書き換えない(上の「期待値の更新(iOS だけ)」と同じ)。
+- 違ってよい所は `desktop/app/src/test/kotlin/jp/kz2601/metamon/desktop/ConformanceAllowlist.kt` に理由つきで書く。
+  - `unavailableTypes`: expected は `rendered` だがデスクトップでは描けない type。キーが type、値が理由(例: 位置情報・ヘルスケアがパソコンに無い)。
+  - `propsNotCompared`: まだ比べない props。type → キー → 理由。DSL に書いた値を写すだけのものは `echo(...)` でまとめて書く。
+- 許可リストに無い違いはテストが落ちる。どの case にも出てこない項目も落ちる(古い項目を残さない)。
+- 直す時の流れ:
+  1. 描けるようにした type・比べるようにした props を、許可リストから外す。
+  2. `:desktop:test` が通ることを確かめる。
+  3. 比べる props を増やす時は、`DesktopConformanceTest.kt` の `comparedProps` に type とキーを足す。
+- 違いが出たら、まずデスクトップ側の解決の規則(書式・並べ替え・丸め)を iOS に合わせる。iOS が間違っていると思ったら Issue にして、iOS を直して期待値を更新してもらう(Android の節と同じ)。許可リストに足して逃げない。
+- case.json の `locale` が `en*` の時は、英語の UI で比べる。時刻とタイムゾーンも `device` の値で固定する。
+- CI: `desktop-ci` が回る。`docs/dsl/conformance/**` の変更でも回る(条件は `docs/desktop/architecture.md` の「CI が回る条件」)。

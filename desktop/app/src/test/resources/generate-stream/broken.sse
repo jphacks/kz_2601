@@ -1,0 +1,15 @@
+event: app
+data: {"name":"家計簿","tabs":[],"attempt":0}
+
+event: component
+data: {"attempt":0,"screen":"home","component":{"index":0,"type":"text","label":"今月の支出"}}
+
+event: component
+data: {"attempt":0,"screen":"home","component":{"index":1,"type":"text","lab
+
+event: component
+data: {"attempt":0,"screen":"home","component":{"index":1,"type":"hologram","label":"未知の部品"}}
+
+event: error
+data: {"error":{"code":"unavailable","message":"busy","status":503}}
+

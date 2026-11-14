@@ -1,0 +1,263 @@
+{
+  "description": "Patterns the prompt rules teach (third JPHACKS batch): stage from a streak (nested if on a computed), 1-vote winner (latest filtered by agg max over a computed count), timer seconds today in minutes, level and remaining by floor/mod of a count, len of imported text, majority status from two counts.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "habit",
+        "name": "習慣",
+        "fields": [
+          {"id": "name", "name": "習慣", "type": "string"},
+          {"id": "done_on", "name": "やった日", "type": "date"},
+          {"id": "streak", "name": "続けた日数", "type": "integer", "computed": {"op": "streak", "args": [{"ref": "done_on"}]}},
+          {
+            "id": "stage",
+            "name": "育ち具合",
+            "type": "string",
+            "computed": {
+              "if": {"op": "gte", "args": [{"ref": "streak"}, 21]},
+              "then": "収穫できる",
+              "else": {
+                "if": {"op": "gte", "args": [{"ref": "streak"}, 7]},
+                "then": "つぼみ",
+                "else": {"if": {"op": "gte", "args": [{"ref": "streak"}, 1]}, "then": "芽", "else": "種"}
+              }
+            }
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "shop",
+        "name": "お店",
+        "fields": [
+          {"id": "name", "name": "お店", "type": "string"},
+          {
+            "id": "votes",
+            "name": "票",
+            "type": "integer",
+            "computed": {"entity": "vote", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "shop"}}
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "vote",
+        "name": "票",
+        "fields": [{"id": "shop", "name": "お店", "type": "ref", "refEntity": "shop"}],
+        "titleField": "shop"
+      },
+      {
+        "id": "session",
+        "name": "集中",
+        "fields": [{"id": "seconds", "name": "秒", "type": "integer"}, {"id": "date", "name": "日付", "type": "date"}],
+        "titleField": "date"
+      },
+      {"id": "meal", "name": "自炊", "fields": [{"id": "name", "name": "料理", "type": "string"}], "titleField": "name"},
+      {
+        "id": "doc",
+        "name": "文書",
+        "fields": [
+          {"id": "title", "name": "題名", "type": "string"},
+          {"id": "body", "name": "本文", "type": "text"},
+          {"id": "chars", "name": "文字数", "type": "integer", "computed": {"op": "len", "args": [{"ref": "body"}]}}
+        ],
+        "titleField": "title"
+      },
+      {
+        "id": "facility",
+        "name": "設備",
+        "fields": [
+          {"id": "name", "name": "設備", "type": "string"},
+          {
+            "id": "yes",
+            "name": "ある",
+            "type": "integer",
+            "computed": {
+              "entity": "check",
+              "agg": "count",
+              "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "facility"}, {"value": "ある", "op": "eq", "field": "answer"}]
+            }
+          },
+          {
+            "id": "no",
+            "name": "ない",
+            "type": "integer",
+            "computed": {
+              "entity": "check",
+              "agg": "count",
+              "filter": [{"value": {"ref": "id"}, "op": "eq", "field": "facility"}, {"value": "ない", "op": "eq", "field": "answer"}]
+            }
+          },
+          {
+            "id": "status",
+            "name": "判定",
+            "type": "string",
+            "computed": {
+              "if": {"op": "gt", "args": [{"ref": "yes"}, {"ref": "no"}]},
+              "then": "ある",
+              "else": {"if": {"op": "gt", "args": [{"ref": "no"}, {"ref": "yes"}]}, "then": "ない", "else": "未確認"}
+            }
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "check",
+        "name": "確認",
+        "fields": [
+          {"id": "facility", "name": "設備", "type": "ref", "refEntity": "facility"},
+          {"id": "answer", "name": "あった?", "type": "enum", "options": ["ある", "ない"]}
+        ],
+        "titleField": "answer"
+      }
+    ],
+    "records": {
+      "check": [
+        {"id": "c1", "data": {"answer": "ある", "facility": "f1"}},
+        {"id": "c2", "data": {"answer": "ある", "facility": "f1"}},
+        {"id": "c3", "data": {"answer": "ない", "facility": "f1"}},
+        {"id": "c4", "data": {"answer": "ない", "facility": "f2"}}
+      ],
+      "facility": [
+        {"id": "f1", "data": {"name": "エレベーター"}},
+        {"id": "f2", "data": {"name": "トイレ"}},
+        {"id": "f3", "data": {"name": "授乳室"}}
+      ],
+      "habit": [
+        {
+          "id": "h1",
+          "data": {
+            "name": "水やり",
+            "done_on": "2026-10-28",
+            "done_on__dates": ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"]
+          }
+        },
+        {"id": "h2", "data": {"name": "読書"}}
+      ],
+      "meal": [
+        {"id": "m1", "data": {"name": "a"}},
+        {"id": "m2", "data": {"name": "b"}},
+        {"id": "m3", "data": {"name": "c"}},
+        {"id": "m4", "data": {"name": "d"}},
+        {"id": "m5", "data": {"name": "e"}},
+        {"id": "m6", "data": {"name": "f"}},
+        {"id": "m7", "data": {"name": "g"}}
+      ],
+      "session": [
+        {"id": "p1", "data": {"date": "2026-10-28", "seconds": 1500}},
+        {"id": "p2", "data": {"date": "2026-10-28", "seconds": 1430}},
+        {"id": "p3", "data": {"date": "2026-10-27", "seconds": 1500}}
+      ],
+      "shop": [{"id": "s1", "data": {"name": "ラーメン"}}, {"id": "s2", "data": {"name": "カレー"}}, {"id": "s3", "data": {"name": "そば"}}],
+      "vote": [{"id": "v1", "data": {"shop": "s2"}}, {"id": "v2", "data": {"shop": "s2"}}, {"id": "v3", "data": {"shop": "s1"}}]
+    }
+  },
+  "cases": [
+    {
+      "name": "rules3/stage-seven-days",
+      "expr": {"ref": "stage"},
+      "row": {
+        "entity": "habit",
+        "record": {
+          "id": "h1",
+          "data": {
+            "name": "水やり",
+            "done_on": "2026-10-28",
+            "done_on__dates": ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"]
+          }
+        }
+      },
+      "expected": {"type": "string", "value": "つぼみ", "text": "つぼみ"}
+    },
+    {
+      "name": "rules3/stage-never",
+      "expr": {"ref": "stage"},
+      "row": {"entity": "habit", "record": {"id": "h2", "data": {"name": "読書"}}},
+      "expected": {"type": "string", "value": "種", "text": "種"}
+    },
+    {
+      "name": "rules3/vote-winner",
+      "expr": {
+        "entity": "shop",
+        "agg": "latest",
+        "field": "name",
+        "filter": [
+          {"value": {"entity": "shop", "agg": "max", "field": "votes"}, "op": "eq", "field": "votes"},
+          {"value": 0, "op": "gt", "field": "votes"}
+        ]
+      },
+      "expected": {"type": "string", "value": "カレー", "text": "カレー"}
+    },
+    {
+      "name": "rules3/vote-winner-no-votes",
+      "expr": {
+        "entity": "shop",
+        "agg": "latest",
+        "field": "name",
+        "filter": [
+          {"value": {"entity": "shop", "agg": "max", "field": "votes"}, "op": "eq", "field": "votes"},
+          {"value": 0, "op": "gt", "field": "votes"}
+        ]
+      },
+      "records": {"shop": [{"id": "s1", "data": {"name": "ラーメン"}}], "vote": []},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "rules3/focus-minutes-today",
+      "expr": {
+        "op": "round",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "entity": "session",
+                "agg": "sum",
+                "field": "seconds",
+                "filter": {"value": null, "op": "today", "field": "date"}
+              },
+              60
+            ]
+          }
+        ]
+      },
+      "expected": {"type": "number", "value": 49, "text": "49"}
+    },
+    {
+      "name": "rules3/level",
+      "expr": {"op": "add", "args": [{"op": "floor", "args": [{"op": "div", "args": [{"entity": "meal", "agg": "count"}, 5]}]}, 1]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "rules3/level-remaining",
+      "expr": {"op": "sub", "args": [5, {"op": "mod", "args": [{"entity": "meal", "agg": "count"}, 5]}]},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "rules3/chars-japanese-newline",
+      "expr": {"ref": "chars"},
+      "row": {"entity": "doc", "record": {"id": "d1", "data": {"body": "日本語の文。\nabc", "title": "t"}}},
+      "expected": {"type": "number", "value": 10, "text": "10"}
+    },
+    {
+      "name": "rules3/status-yes",
+      "expr": {"ref": "status"},
+      "row": {"entity": "facility", "record": {"id": "f1", "data": {"name": "エレベーター"}}},
+      "expected": {"type": "string", "value": "ある", "text": "ある"}
+    },
+    {
+      "name": "rules3/status-no",
+      "expr": {"ref": "status"},
+      "row": {"entity": "facility", "record": {"id": "f2", "data": {"name": "トイレ"}}},
+      "expected": {"type": "string", "value": "ない", "text": "ない"}
+    },
+    {
+      "name": "rules3/status-unknown",
+      "expr": {"ref": "status"},
+      "row": {"entity": "facility", "record": {"id": "f3", "data": {"name": "授乳室"}}},
+      "expected": {"type": "string", "value": "未確認", "text": "未確認"}
+    }
+  ]
+}

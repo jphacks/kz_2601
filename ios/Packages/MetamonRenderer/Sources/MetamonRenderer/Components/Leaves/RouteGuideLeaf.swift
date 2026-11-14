@@ -215,7 +215,7 @@ struct RouteGuideLeaf: View {
             }
             .buttonStyle(RenderButtonStyle(kind: .secondary))
             .frame(maxWidth: 64)
-            .accessibilityLabel(voiceOn ? L("音声案内をオフにする") : L("音声案内をオンにする"))
+            .iconButtonLabel(voiceOn ? L("音声案内をオフにする") : L("音声案内をオンにする"), hoverHighlight: false)
             .accessibilityIdentifier("routeGuide.voice")
             if session.phase == .idle {
                 Button {
@@ -247,10 +247,10 @@ struct RouteGuideLeaf: View {
                 Label(L("経路を探しています…"), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
             case .denied:
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L("位置情報がオフのため案内できません。設定で「このAppの使用中のみ許可」を選んでください"))
+                    Text(LocationPermissionCopy.cannotGuide)
                         .foregroundStyle(RenderTheme.Colors.negative)
                     Button(L("設定を開く")) {
-                        if let url = URL(string: "app-settings:") { openURL(url) }
+                        if let url = LocationPermissionCopy.settingsURL { openURL(url) }
                     }
                     .font(.caption.weight(.semibold))
                 }
@@ -258,8 +258,11 @@ struct RouteGuideLeaf: View {
                 Text(message).foregroundStyle(RenderTheme.Colors.negative)
             case .guiding, .arrived:
                 if let cue = session.lastCue, voiceOn {
+                    // スピーカーの印は飾り: 要素を 1 つにまとめ、読み上げと識別子を文だけに付ける
                     Label(cue, systemImage: "speaker.wave.2")
                         .lineLimit(2)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(cue)
                         .accessibilityIdentifier("routeGuide.cue")
                 }
             case .idle:

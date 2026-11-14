@@ -75,6 +75,7 @@ func render(ctx context.Context, st store.FeedbackReader, args []string, out *st
 	switch args[0] {
 	case "list":
 		fs := flag.NewFlagSet("list", flag.ContinueOnError)
+		fs.SetOutput(io.Discard) // the parse error is returned; do not also print flag usage
 		since := fs.Duration("since", 7*24*time.Hour, "only feedback newer than this (0 = all)")
 		status := fs.String("status", "", "only this status (received / triaged / done)")
 		limit := fs.Int("limit", 50, "max rows (<= 500)")
@@ -104,6 +105,7 @@ func render(ctx context.Context, st store.FeedbackReader, args []string, out *st
 		return nil
 	case "show":
 		fs := flag.NewFlagSet("show", flag.ContinueOnError)
+		fs.SetOutput(io.Discard) // the parse error is returned; do not also print flag usage
 		dir := fs.String("out", "", "save screenshot.jpg / dsl.json into this directory (created if missing)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
@@ -116,7 +118,7 @@ func render(ctx context.Context, st store.FeedbackReader, args []string, out *st
 			return err
 		}
 		fmt.Fprintf(out, "id:        %s\ncreatedAt: %s\nstatus:    %s\nkind:      %s\nuid:       %s\nconsent:   %s\n",
-			fb.ID, fb.CreatedAt.In(jst).Format(time.RFC3339), fb.Status, fb.Kind, fb.UID, fb.ConsentVersion)
+			fb.ID, fb.CreatedAt.In(jst).Format(time.RFC3339), fb.Status, fb.Kind, fb.UID, quote(fb.ConsentVersion, 64))
 		if d := fb.Device; d != nil {
 			fmt.Fprintf(out, "device:    app %s (%s) / %s / %s / %s\n", quote(d.AppVersion, 64), quote(d.Build, 64), quote(d.OS, 64), quote(d.Model, 64), quote(d.Locale, 64))
 		}

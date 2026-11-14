@@ -55,7 +55,8 @@ func navRaw(tabs, homeExtra, screens string) string {
 }
 
 func isNavWarning(w string) bool {
-	return strings.Contains(w, "not reachable from the initial screen") || strings.Contains(w, "no way back") || strings.Contains(w, "not one of app.tabs")
+	return strings.Contains(w, "not reachable from the initial screen") || strings.Contains(w, "no way back") || strings.Contains(w, "not one of app.tabs") ||
+		strings.Contains(w, "shown as a tab/home screen") // root_form.go
 }
 
 func navWarnings(t *testing.T, raw string) []string {
@@ -167,7 +168,8 @@ func TestNavErrorsHint(t *testing.T) {
 func TestNavInitialNotATab(t *testing.T) {
 	raw := navRaw(`,"tabs":[{"screen":"stats","title":"集計"},{"screen":"form","title":"追加"}]`, "", "")
 	w := navWarnings(t, raw)
-	if len(w) != 1 || !strings.Contains(w[0], `initialScreen "home" is not one of app.tabs`) {
+	// the form tab also saves in place (root_form.go)
+	if len(w) != 2 || !strings.Contains(w[0], `initialScreen "home" is not one of app.tabs`) || !strings.Contains(w[1], `screen "form" is a form`) {
 		t.Fatalf("got %v", w)
 	}
 }

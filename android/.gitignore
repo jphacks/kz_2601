@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+captures/
+*.apk
+*.aab
+.externalNativeBuild/
+.cxx/
+# Firebase の設定はコミットしない(#356)。scripts/sync-google-services.sh で手元に置く
+app/google-services.json
+app/src/*/google-services.json

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- aiChat(#874・iOS の AiChatLeaf / AiChatSuggestCard / AiChatVoiceInput)。名前順。 -->
+<resources>
+    <string name="ai_chat_ai">AI</string>
+    <string name="ai_chat_creator_needs_pro">今は AI と話せません。アプリを作った人に知らせてください</string>
+    <string name="ai_chat_empty">話しかけてみましょう</string>
+    <string name="ai_chat_error_too_long">会話が長すぎて AI に送れませんでした。短くしてからお試しください</string>
+    <string name="ai_chat_input_note">参考に「%1$s」の自分の記録も AI に渡します</string>
+    <string name="ai_chat_me">自分</string>
+    <string name="ai_chat_mic">話して入力</string>
+    <string name="ai_chat_mic_busy">今は話して入力を使えません</string>
+    <string name="ai_chat_mic_failed">うまく聞き取れませんでした。もう一度お試しください</string>
+    <string name="ai_chat_mic_prepare">音声モデルを用意する</string>
+    <string name="ai_chat_mic_stop">聞いています… タップで終わる</string>
+    <string name="ai_chat_mic_transcribing">文字にしています…</string>
+    <string name="ai_chat_needs_pro">AI と話すには Tailor It Pro が必要です</string>
+    <string name="ai_chat_offline">この版では AI と話せません</string>
+    <string name="ai_chat_placeholder">メッセージ</string>
+    <string name="ai_chat_reply_save_failed">AI の返事を保存できませんでした</string>
+    <string name="ai_chat_save_failed">会話を保存できませんでした</string>
+    <string name="ai_chat_send">送信</string>
+    <string name="ai_chat_speak">読み上げる</string>
+    <string name="ai_chat_speak_stop">止める</string>
+    <string name="ai_chat_suggest_add">追加</string>
+    <string name="ai_chat_suggest_failed">記録できませんでした</string>
+    <string name="ai_chat_suggest_fix">直す</string>
+    <string name="ai_chat_suggest_full">これ以上記録を足せません</string>
+    <string name="ai_chat_suggest_saved">記録しました</string>
+    <string name="ai_chat_suggest_title">この内容で記録しますか?</string>
+    <string name="ai_chat_thinking">AI が考えています…</string>
+</resources>

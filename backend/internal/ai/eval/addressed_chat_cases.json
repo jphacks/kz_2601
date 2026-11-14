@@ -1,0 +1,4 @@
+[
+  {"id": "adc_can_dm", "group": "addressed", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#271 できる? → できる(送った人と宛先の人だけが読める)",
+   "steps": [{"say": "選んだ人にだけ見えるメッセージって作れる?", "textAny": ["できます", "できる"], "textNot": ["できません", "addressedTo", "entity"]}]}
+]

@@ -1,0 +1,22 @@
+{
+  "reviews": [
+    {
+      "reviewId": "gp:AOqpTOE-english-1",
+      "authorName": "John Smith",
+      "comments": [
+        {
+          "userComment": {
+            "text": "  The voice edit is great, but the app crashes when I rotate the screen.  ",
+            "lastModified": {"seconds": "1762732800"},
+            "starRating": 3,
+            "reviewerLanguage": "en",
+            "device": "husky",
+            "androidOsVersion": 34,
+            "appVersionCode": 11,
+            "appVersionName": "1.1.2"
+          }
+        }
+      ]
+    }
+  ]
+}

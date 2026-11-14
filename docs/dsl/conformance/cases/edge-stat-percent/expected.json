@@ -1,0 +1,53 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "half",
+          "props" : {
+            "format" : "percent",
+            "label" : "半分",
+            "unavailable" : false,
+            "value" : "50%"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "over",
+          "props" : {
+            "format" : "percent",
+            "label" : "超過",
+            "unavailable" : false,
+            "value" : "142%"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "達成率",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

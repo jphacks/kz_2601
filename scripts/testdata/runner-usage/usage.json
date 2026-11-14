@@ -1,0 +1,10 @@
+[
+  {"timestamp":"2026-10-31T14:59:59.5Z","jsonPayload":{"app_id":"app-a","creator_uid_hash":"cccc000000000001","trigger":"record_created","outcome":"ok","reads":0,"writes":1,"notify_recipients":2,"est_cost_usd":0.0000192}},
+  {"timestamp":"2026-10-31T15:00:00.123456Z","jsonPayload":{"app_id":"app-a","creator_uid_hash":"cccc000000000001","trigger":"record_created","outcome":"ok","reads":10,"writes":2,"notify_recipients":3,"est_cost_usd":0.0000258}},
+  {"timestamp":"2026-11-01T01:00:00Z","jsonPayload":{"app_id":"app-a","creator_uid_hash":"cccc000000000001","trigger":"record_updated","outcome":"error","reads":0,"writes":0,"notify_recipients":0,"est_cost_usd":0.000016}},
+  {"timestamp":"2026-11-01T02:00:00Z","jsonPayload":{"app_id":"app-a","creator_uid_hash":"cccc000000000001","trigger":"record_created","outcome":"ok","limit":"app_writes","reads":0,"writes":1,"writes_dropped":4,"notify_recipients":0,"est_cost_usd":0.000018}},
+  {"timestamp":"2026-11-01T03:00:00Z","jsonPayload":{"app_id":"app-a","creator_uid_hash":"cccc000000000001","trigger":"record_created","outcome":"skipped_quota","limit":"app_exec","reads":0,"writes":0,"notify_recipients":0,"est_cost_usd":0}},
+  {"timestamp":"2026-11-01T04:00:00Z","jsonPayload":{"app_id":"app-b","creator_uid_hash":"cccc000000000001","trigger":"schedule","outcome":"ok","reads":100,"writes":0,"notify_recipients":10,"recipients_dropped":1,"est_cost_usd":0.000062}},
+  {"timestamp":"2026-11-01T05:00:00Z","jsonPayload":{"app_id":"app-c","creator_uid_hash":"cccc000000000002","trigger":"record_created","outcome":"skipped_plan","limit":"needs_pro","reads":0,"writes":0,"notify_recipients":0,"est_cost_usd":0}},
+  {"timestamp":"2026-11-01T15:00:00Z","jsonPayload":{"app_id":"app-c","creator_uid_hash":"cccc000000000002","trigger":"schedule","outcome":"ok","reads":0,"writes":5,"notify_recipients":0,"est_cost_usd":0.000026}}
+]

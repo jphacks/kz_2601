@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import MetamonServices
+import MetamonRenderer
 
 /// 画面マップ(#116)の表示状態と「この画面について話す」の文脈。変身一覧・設定・音声シートの間で共有する。
 @MainActor
@@ -31,11 +32,6 @@ final class ScreenMapUI {
     }
 }
 
-struct ScreenContext: Equatable {
-    var id: String
-    var title: String
-}
-
 extension AppRuntime {
     /// 画面マップで選んだ画面を文脈にして edit を送る。API の契約は変えず、transcript の先頭に「画面「B」(id: b)で: 」を付ける。
     /// 「元に戻して」等の意図は付ける前の文で判定する(文脈付きでも undo / 切替はそのまま効く)。
@@ -47,11 +43,6 @@ extension AppRuntime {
         }
         await generate(ScreenMapCopy.contextPrefix(screen) + text)
     }
-}
-
-enum ScreenMapCopy {
-    static func contextPrefix(_ s: ScreenContext) -> String { L10n.tr("画面「\(s.title)」(id: \(s.id))で: ") }
-    static var title: String { L10n.tr("画面マップ") }
 }
 
 extension View {
@@ -123,7 +114,7 @@ struct ScreenContextChip: View {
             HStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: "point.3.connected.trianglepath.dotted")
                     .foregroundStyle(Theme.brandGradient)
-                Text(L10n.tr("画面「\(screen.title)」について話す"))
+                Text(ScreenMapCopy.chipText(screen))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 Button { ui.context = nil } label: {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="renderer_sensor_alert">Threshold exceeded</string>
+    <string name="renderer_sensor_level">Level</string>
+    <string name="renderer_sensor_log_finished">Stopped after saving %1$d (limit reached)</string>
+    <string name="renderer_sensor_logging">Recording %1$d/%2$d · every %3$d s (while this screen is open)</string>
+    <string name="renderer_sensor_save">Save current value</string>
+    <string name="renderer_sensor_save_failed">Couldn\'t save</string>
+    <string name="renderer_sensor_saved">Saved %1$d</string>
+    <string name="renderer_sensor_start">Start recording</string>
+    <string name="renderer_sensor_stop">Stop recording</string>
+    <string name="renderer_sensor_tilted">Tilted</string>
+    <string name="renderer_sensor_unavailable">This sensor isn\'t available on this device</string>
+</resources>

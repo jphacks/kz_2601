@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_completed_changed">Changes applied</string>
+    <string name="a11y_completed_created">“%1$s” is ready</string>
+    <string name="a11y_error_card">%1$s. %2$s</string>
+</resources>

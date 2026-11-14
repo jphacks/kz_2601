@@ -73,6 +73,18 @@ func wantLint(t *testing.T, got []string, substr string) {
 	t.Errorf("want a warning containing %q, got:\n%s", substr, strings.Join(got, "\n"))
 }
 
+func TestLintDateDefault(t *testing.T) {
+	for _, bad := range []string{`"today"`, `"明日"`, `0`} {
+		got := lintWith(t, `,{"id":"due","name":"期限","type":"date","defaultValue":`+bad+`}`, "")
+		wantLint(t, got, `field "due": defaultValue`)
+	}
+	for _, ok := range []string{`"now"`, `"2026-04-01"`, `"2026-04-01T09:00:00+09:00"`} {
+		if got := lintWith(t, `,{"id":"due","name":"期限","type":"datetime","defaultValue":`+ok+`}`, ""); len(got) > 0 {
+			t.Errorf("%s: %v", ok, got)
+		}
+	}
+}
+
 func TestLintBaseClean(t *testing.T) {
 	if w := lintWith(t, "", ""); len(w) > 0 {
 		t.Fatalf("base should be clean: %v", w)
@@ -121,7 +133,7 @@ func TestLintEntityReach(t *testing.T) {
 // a form but no list; once a ref or a list-like component uses it, it does.
 func TestLintSettingEntityNeedsNoList(t *testing.T) {
 	raw := strings.Replace(strings.Replace(lintBase, "%s", "", 1), "%s",
-		`{"type":"stat","label":"今月の残り","value":{"op":"sub","args":[{"agg":"max","entity":"budget","field":"amount"},{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}}]}},
+		`{"type":"stat","label":"今月の残り","value":{"op":"sub","args":[{"agg":"latest","entity":"budget","field":"amount"},{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}}]}},
 		 {"type":"button","label":"予算","action":{"type":"navigate","screen":"budget_form","presentation":"sheet"}},`, 1)
 	var doc map[string]any
 	_ = json.Unmarshal([]byte(raw), &doc)
@@ -202,5 +214,18 @@ func TestLintPeriodLabel(t *testing.T) {
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"今月の予算の残り","value":{"op":"sub","args":[30000,{"agg":"sum","entity":"log","field":"amount"}]}},`), `has no filter`)
 	if len(ok) > 0 {
 		t.Errorf("unexpected: %v", ok)
+	}
+}
+
+// format percent means "value is a 0..1 ratio" (schema). An aggregate result
+// is not a ratio, so lint asks for value instead; value + percent stays clean.
+func TestLintStatPercentNeedsValue(t *testing.T) {
+	got := lintWith(t, "", `{"type":"stat","label":"件数","aggregate":"count","entity":"log","format":"percent"},`)
+	if len(got) != 1 || !strings.Contains(got[0], "is not a 0..1 ratio. Compute the ratio in value") {
+		t.Fatalf("want one percent warning, got %v", got)
+	}
+	got = lintWith(t, "", `{"type":"stat","label":"達成率","format":"percent","value":{"op":"div","args":[{"agg":"sum","entity":"log","field":"amount"},10000]}},`)
+	if len(got) > 0 {
+		t.Fatalf("unexpected: %v", got)
 	}
 }

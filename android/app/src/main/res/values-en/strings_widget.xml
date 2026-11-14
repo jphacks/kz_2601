@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_count">Count</string>
+    <string name="widget_description">Shows totals from your app (like this month\'s spending) on the Home Screen.</string>
+    <string name="widget_last_7_days">Last 7 days</string>
+    <string name="widget_name">Tailor It Numbers</string>
+    <string name="widget_no_app">Make an app in Tailor It and its numbers show up here</string>
+    <string name="widget_no_app_review">Set up a tracker in Tailor It to see numbers here</string>
+    <string name="widget_no_records">No records yet</string>
+    <string name="widget_no_stat">“%1$s” has no stat component</string>
+    <string name="widget_recent">Recent</string>
+</resources>

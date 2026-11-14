@@ -3,6 +3,10 @@ import MetamonDSL
 @testable import MetamonServices
 
 final class MockServicesTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     func testInMemoryAppConfigCRUD() async throws {
         let client = InMemoryAppConfigClient(seed: MockSeed.demoRecords())
         var rows = try await client.list(appId: "a", entity: "expense")

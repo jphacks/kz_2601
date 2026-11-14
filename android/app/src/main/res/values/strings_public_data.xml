@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 生成直後の「個人の情報も公開されます」の確認(#253・#899・iOS の PublicDataPromptHost) -->
+<resources>
+    <string name="public_data_keep">公開のままにする</string>
+    <string name="public_data_message">%1$sは、アプリを開いた人なら誰でも見られます。</string>
+    <string name="public_data_private">自分だけにする</string>
+    <string name="public_data_remove">この欄を消す</string>
+    <string name="public_data_title">個人の情報も公開されます</string>
+</resources>

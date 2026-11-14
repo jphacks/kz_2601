@@ -57,6 +57,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 - **pass** = 生成が成功し、`expect` の外れが 0 本のケース。`expect` の無いケースは `no expect` に数え、割合には入れない。
 - M0 の判定には `total` の pass% と、共有系のグループ(`m0-social` `m0-booking` `m0-work` `m0-edit`)の pass% を使う。
 - 洗い出しの「○ 53%・共有系 35%」は人が DSL を読んだ判定で、この pass% とは別物。期待値には「M4 に回す機能は正直に断る(`substitution: true`)」も含むので、○ でなくても pass になるケースがある。最初の実 API の実行で基準値を取り、以後はそこから下がらないことを見る。
+- 基準を下回ったら終了コード 1 にする `-min-pass` / `-thresholds` と、PR コメント用の表を出す `-report md` は [ci-gate.md](ci-gate.md)。
 
 ## 4. 生成ケースの期待値
 
@@ -66,7 +67,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 |---|---|---|
 | d_friends_vague | `shared: true` | 友達と使う = 共有。public / shared のどちらでもよい(D-06 で shared になっても通る) |
 | d_sns_post | `photo: true, scope: public`(前から) | — |
-| d_sns_follow | `substitution: true, shared: true` | フォローのタイムラインは M4(D-22) |
+| d_sns_follow | `shared: true, followFilter: true, followButton: true, followEntity: false` | フォローのタイムラインは #270(D-22)で作れるようになった。フォローは appconfig が持ち、DSL は `{"myFollows": true}` の filter と follow / unfollow のボタンで使う |
 | d_group_chat | `substitution: true, shared: true` | 他人の書き込みで届くプッシュは M4(D-21) |
 | d_circle_attend | `scope: shared`(前から) | 洗い出しでは public だった。D-06 の目標どおり残す |
 | d_ranking | `scope: public`(前から) | — |
@@ -74,7 +75,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 | d_habit | `calc: true` | 連続日数(streak) |
 | d_sleep | `computed: true` | hoursBetween |
 | d_medicine | `notification: any`(前から) | — |
-| d_period | `calc: true` | 次の予定日の計算 |
+| d_period | `calc: true`・`single: true`・`setting: true` | 次の予定日の計算。周期は single の設定(#267) |
 | d_vocab | `has: [flashcards], lacks: [disclosure], flashcardsUnlearned: true, substitution: false` | めくるカード `flashcards`(#264)。覚えたものは filter で出題から外す |
 | d_pet | `photo: true, shared: true` | 家族で共有・写真 |
 | d_baby | `computed: true` | 前回からの経過時間 |
@@ -113,7 +114,7 @@ PR #378 / #379 が同じ行か隣の行を変えるため、ここで書くと g
 - 全ステップに `textNot: [public, private, shared, entity, scope, disclosure, computed]`(D-10)。返答の本文に DSL の英語の名前が出たら外れ。
   - `op` は入れていない(部分一致なので英単語の一部にも当たる)。#379 の `ai.LeakedTerms` は単語の境目で見るので、チップや案のタイトルも含めてそちらで拾う。
 - `dc_friends_vague`: `expect: question`(ふわっとした依頼は聞き返す)。
-- M4 に回す 4 本(`dc_sns_can` `dc_chat_push_can` `dc_reserve_conflict` `dc_role_can`): `textAny: [できません, できない, 出せません]`(正直に断る)。
+- M4 に回す 3 本(`dc_chat_push_can` `dc_reserve_conflict` `dc_role_can`): `textAny: [できません, できない, 出せません]`(正直に断る)。`dc_sns_can` は #270 でフォローができるようになったので `textNot` に「できません」「できない」を入れた(断らない)。
 - `dc_family_only_can`・`dc_random_can`・`dc_flashcard_can` は D-06 / D-15 / D-16 で答えが変わるので、断り方の期待は付けていない。
 
 ## 6. PR #378 / #379 との関係

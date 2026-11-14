@@ -54,6 +54,16 @@ func uids(items []any) string {
 	return strings.Join(out, ",")
 }
 
+// adult records each uid's 18+ declaration.
+func (m matchEnv) adult(uids ...string) {
+	m.t.Helper()
+	for _, u := range uids {
+		if r := m.do(u, http.MethodPut, "/v1/me/age-confirmation", `{"ageConfirmed":true}`, nil); r.code != http.StatusOK {
+			m.t.Fatalf("%s confirms age: %d %s", u, r.code, r.raw)
+		}
+	}
+}
+
 func (m matchEnv) send(from, toProfile, fromProfile string) resp {
 	m.t.Helper()
 	return m.do(from, http.MethodPost, m.app+"/interests", `{"recordId":"`+toProfile+`","fromRecordId":"`+fromProfile+`","ageConfirmed":true}`, nil)
@@ -65,6 +75,7 @@ func TestMatching(t *testing.T) { ownerStores(t, testMatching) }
 func testMatching(t *testing.T, e *env, sfx string) {
 	m := matchEnv{env: e, app: "/v1/apps/MATCH-1" + sfx}
 	e.ownApp("owner", m.app, matchingDSL(t))
+	m.adult("alice", "bob", "carol")
 	pa := m.post("alice", "profile", "hobby", "囲碁")
 	pb := m.post("bob", "profile", "hobby", "将棋")
 	pc := m.post("carol", "profile", "hobby", "チェス")
@@ -80,9 +91,6 @@ func testMatching(t *testing.T, e *env, sfx string) {
 	}
 
 	// guards
-	if r := m.do("alice", http.MethodPost, m.app+"/interests", `{"recordId":"`+pb+`","fromRecordId":"`+pa+`"}`, nil); r.code != http.StatusBadRequest || r.reason() != reasonAgeUnconfirmed {
-		t.Fatalf("no age confirmation: %d %s", r.code, r.raw)
-	}
 	if r := m.send("alice", pb, pc); r.code != http.StatusBadRequest {
 		t.Fatalf("someone else's profile as fromRecordId: %d %s", r.code, r.raw)
 	}
@@ -198,6 +206,7 @@ func TestMatchingDailyCap(t *testing.T) {
 	e := newEnv(t)
 	m := matchEnv{env: e, app: "/v1/apps/MATCH-CAP"}
 	e.ownApp("owner", m.app, matchingDSL(t))
+	m.adult("alice", "bob")
 	pa := m.post("alice", "profile", "hobby", "囲碁")
 	pb := m.post("bob", "profile", "hobby", "将棋")
 	for i := range InterestsPerDay {
@@ -224,5 +233,69 @@ func TestMatchingUsesPublishedDSL(t *testing.T) {
 	}
 	if got := uids(m.items("mallory", "/entities/contact/records")); got != "" {
 		t.Fatalf("mallory reads contacts of %q", got)
+	}
+}
+
+// The 18+ declaration is kept by the server; without it the matching
+// endpoints answer nothing about other people.
+func TestMatchingAgeDeclaration(t *testing.T) { ownerStores(t, testMatchingAgeDeclaration) }
+
+func testMatchingAgeDeclaration(t *testing.T, e *env, sfx string) {
+	m := matchEnv{env: e, app: "/v1/apps/MATCH-AGE" + sfx}
+	e.ownApp("owner", m.app, matchingDSL(t))
+	m.adult("alice", "bob")
+	pa := m.post("alice", "profile", "hobby", "囲碁")
+	pb := m.post("bob", "profile", "hobby", "将棋")
+	m.post("alice", "contact", "how", "alice@example.com")
+	dave, erin := "dave"+sfx, "erin"+sfx
+
+	if r := m.do(dave, http.MethodGet, "/v1/me/age-confirmation", nil, nil); r.code != http.StatusOK || r.body["ageConfirmed"] != false {
+		t.Fatalf("not declared yet: %d %s", r.code, r.raw)
+	}
+	unconfirmed := func(what string, r resp) {
+		t.Helper()
+		if r.code != http.StatusBadRequest || r.reason() != reasonAgeUnconfirmed {
+			t.Fatalf("%s without the declaration: %d %s", what, r.code, r.raw)
+		}
+	}
+	unconfirmed("profile", m.do(dave, http.MethodPost, m.app+"/entities/profile/records", `{"data":{"hobby":"碁"}}`, nil))
+	unconfirmed("incoming", m.do(dave, http.MethodGet, m.app+"/interests", nil, nil))
+	unconfirmed("outgoing", m.do(dave, http.MethodGet, m.app+"/interests?box=outgoing", nil, nil))
+	unconfirmed("matches", m.do(dave, http.MethodGet, m.app+"/matches", nil, nil))
+	unconfirmed("send", m.do(dave, http.MethodPost, m.app+"/interests", `{"recordId":"`+pa+`","fromRecordId":"`+pb+`"}`, nil))
+	unconfirmed("accept", m.do(dave, http.MethodPost, m.app+"/interests/alice/accept", `{}`, nil))
+	unconfirmed("declare false", m.do(dave, http.MethodPut, "/v1/me/age-confirmation", `{"ageConfirmed":false}`, nil))
+	if got := uids(m.items(dave, "/entities/profile/records")); got != "" {
+		t.Fatalf("undeclared sees profiles of %q", got)
+	}
+	if r := m.do(dave, http.MethodGet, m.app+"/entities/profile/records/"+pa, nil, nil); r.code != http.StatusNotFound {
+		t.Fatalf("undeclared reads a profile by id: %d %s", r.code, r.raw)
+	}
+	// only the profile entity needs it for a post
+	if r := m.do(dave, http.MethodPost, m.app+"/entities/contact/records", `{"data":{"how":"dave@example.com"}}`, nil); r.code != http.StatusCreated {
+		t.Fatalf("contact is not the profile: %d %s", r.code, r.raw)
+	}
+
+	// declared once, kept
+	m.adult(dave)
+	if r := m.do(dave, http.MethodGet, "/v1/me/age-confirmation", nil, nil); r.body["ageConfirmed"] != true {
+		t.Fatalf("declared: %s", r.raw)
+	}
+	pd := m.post(dave, "profile", "hobby", "碁")
+	if got := uids(m.items(dave, "/entities/profile/records")); !strings.Contains(got, "alice") || !strings.Contains(got, "bob") {
+		t.Fatalf("declared sees %q", got)
+	}
+	// a send with ageConfirmed:true records it as well
+	if r := m.send(erin, pd, pd); r.code != http.StatusBadRequest {
+		t.Fatalf("erin has no profile: %d %s", r.code, r.raw)
+	}
+	if r := m.do(erin, http.MethodGet, "/v1/me/age-confirmation", nil, nil); r.body["ageConfirmed"] != true {
+		t.Fatalf("a send with ageConfirmed records it: %s", r.raw)
+	}
+	if r := m.do(dave, http.MethodPost, m.app+"/interests", `{"recordId":"`+pa+`","fromRecordId":"`+pd+`"}`, nil); r.code != http.StatusOK {
+		t.Fatalf("send after declaring, no flag: %d %s", r.code, r.raw)
+	}
+	if got := uids(m.items("alice", "/interests")); got != dave {
+		t.Fatalf("alice incoming %q", got)
 	}
 }

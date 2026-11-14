@@ -97,6 +97,22 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 			res.Blocks += n
 			return err
 		}},
+		{"devices", func() error {
+			n, err := f.DeleteDevices(ctx, uid)
+			res.Devices += n
+			if err != nil {
+				return err
+			}
+			n, err = f.DeleteNotifyConsents(ctx, uid)
+			res.NotifyConsents += n
+			return err
+		}},
+		{"ext connections", func() error {
+			// users/{uid}/connections/* (#1493): sealed OAuth tokens and revoked markers
+			n, err := f.deleteQuery(ctx, f.userRef(uid).Collection("connections").Query, nil)
+			res.ExtConnections += n
+			return err
+		}},
 		{"match quota", func() error {
 			_, err := f.c.Collection(matchQuotaCollection).Doc(uid).Delete(ctx)
 			return err
@@ -131,6 +147,9 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 // for it. uid's apps_public mirror is erased too unless others take part.
 func (f *Firestore) purgeAccountApp(ctx context.Context, uid string, app *firestore.DocumentRef, res *AccountPurgeResult) error {
 	appID := app.ID
+	if err := f.purgeFollows(ctx, appID, uid, res); err != nil { // #270
+		return fmt.Errorf("follows: %w", err)
+	}
 	if err := f.purgeMatching(ctx, appID, uid, res); err != nil {
 		return fmt.Errorf("matching: %w", err)
 	}
@@ -327,7 +346,7 @@ func (f *Firestore) MarkAccountPurged(ctx context.Context, uid string) error {
 		case AccountPurged:
 			return nil
 		case AccountDeleted:
-			return tx.Set(ref, map[string]any{"status": AccountPurged, "purgedAt": time.Now().UTC()})
+			return tx.Set(ref, map[string]any{"status": AccountPurged, "purgedAt": Now()})
 		default:
 			return ErrNotDeleted
 		}

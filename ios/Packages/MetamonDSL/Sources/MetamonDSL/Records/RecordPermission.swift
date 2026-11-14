@@ -9,8 +9,16 @@ public enum RecordPermission {
         isMine(record, in: entity, uid: uid) || (entity?.membersCanEdit ?? false)
     }
 
-    public static func canDelete(_ record: Record, in entity: Entity?, uid: String?) -> Bool {
-        isMine(record, in: entity, uid: uid)
+    /// `entity.deleteBy`(#272): "admins" は管理者だけ、"authorOrAdmins" は作った人か管理者。
+    /// `isAdmin` が分からない(nil・参加者を読む前・審査用の版)時は従来どおり作った人だけに出し、サーバーが最後に判定する。
+    public static func canDelete(_ record: Record, in entity: Entity?, uid: String?, isAdmin: Bool? = nil) -> Bool {
+        let mine = isMine(record, in: entity, uid: uid)
+        guard let entity, entity.isShared else { return mine }
+        switch entity.deleteBy {
+        case "admins": return isAdmin ?? mine
+        case "authorOrAdmins": return mine || isAdmin == true
+        default: return mine
+        }
     }
 
     private static func isMine(_ record: Record, in entity: Entity?, uid: String?) -> Bool {

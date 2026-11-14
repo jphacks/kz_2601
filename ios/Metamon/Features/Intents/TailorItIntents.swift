@@ -42,6 +42,8 @@ struct AddRecordIntent: AppIntent {
     static var description = IntentDescription("Tailor It で作ったアプリに、アプリを開かずに記録を 1 件追加します。例: 家計簿に「ランチ 800円」。")
     #endif
     static var openAppWhenRun = false
+    /// ロック中は端末のロック解除を求める(#1995)。記録先の名前や記録をロック画面から読み書きさせない
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
     #if APP_STORE_REVIEW
     @Parameter(title: "記録先", requestValueDialog: "どの記録帳に記録しますか?")
@@ -65,25 +67,45 @@ struct AddRecordIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let runtime = IntentHost.shared.runtime else { throw TailorIntentError.notReady }
-        guard let doc = await IntentHost.shared.document(appId: target.appId),
+        let host = IntentHost.shared // iOS は IntentHost.swift、Mac は MetamonMac/App/Intents/MacIntentHost.swift(#1034)
+        guard host.canWriteRecords else { throw TailorIntentError.notReady }
+        guard let doc = await host.document(appId: target.appId),
               let entity = doc.dsl.entity(target.entityId) else { throw TailorIntentError.targetNotFound(target.title) }
 
+        // ref 項目(カテゴリ台帳など)は参照先のレコードをローカル DB から読み、見出しで当てる
+        var refRecords: [String: [Record]] = [:]
+        for refEntity in Set(entity.fields.filter { $0.type == .ref }.compactMap(\.refEntity)) {
+            refRecords[refEntity] = await host.cachedRecords(appId: target.appId, entity: refEntity)
+        }
+        let refChoices = QuickRecord.refChoices(for: entity, in: doc.dsl, records: refRecords)
+
         var number = amount
-        var draft = QuickRecord.build(entity: entity, text: content, number: number)
+        var draft = QuickRecord.build(entity: entity, text: content, number: number, refChoices: refChoices)
         // 数値項目(金額など)だけが足りなければ Siri で聞き返す
         if let numberField = QuickRecord.numberField(of: entity), draft.missing.contains(numberField.name) {
             number = try await $amount.requestValue(IntentDialog("\(numberField.name)はいくつですか?"))
-            draft = QuickRecord.build(entity: entity, text: content, number: number)
+            draft = QuickRecord.build(entity: entity, text: content, number: number, refChoices: refChoices)
         }
         guard draft.missing.isEmpty else { throw TailorIntentError.missingFields(draft.missing) }
 
-        let sent = await runtime.addRecordFromIntent(appId: target.appId, entity: entity.id, data: draft.data)
+        // #233 今のアプリでなくても暗号化する
+        let sent = try await host.addRecord(appId: target.appId, entity: entity.id, data: draft.data,
+                                            encryptedFields: doc.dsl.encryptedFields)
         let what = draft.summary.isEmpty ? content : draft.summary
-        let tail = sent ? "" : "(未送信: 接続が戻ったら自動で送ります)"
-        let message = "\(target.appName)に「\(what)」を追加しました\(tail)"
-        print("[Metamon] intent: \(message)")
-        return .result(dialog: IntentDialog(stringLiteral: message))
+        let message = Self.addedMessage(appName: target.appName, what: what, refs: draft.refs, sent: sent)
+        print("[Metamon] intent: \(String(localized: message))")
+        return .result(dialog: IntentDialog(message))
+    }
+
+    /// 返事の文言。Siri の言語で引けるよう書式キーにする(アプリ名・内容・項目名はデータなので訳さない)。
+    static func addedMessage(appName: String, what: String, refs: [String], sent: Bool) -> LocalizedStringResource {
+        let refs = refs.joined(separator: String(localized: "・")) // どのカテゴリに入れたか
+        switch (refs.isEmpty, sent) {
+        case (true, true): return "\(appName)に「\(what)」を追加しました"
+        case (false, true): return "\(appName)に「\(what)」(\(refs))を追加しました"
+        case (true, false): return "\(appName)に「\(what)」を追加しました(未送信: 接続が戻ったら自動で送ります)"
+        case (false, false): return "\(appName)に「\(what)」(\(refs))を追加しました(未送信: 接続が戻ったら自動で送ります)"
+        }
     }
 }
 
@@ -108,6 +130,11 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
     case notReady
     case targetNotFound(String)
     case missingFields([String])
+    /// 数字を読む(#1994): アプリか stat が消えた / 記録が端末に無い / 数で取れない
+    case statNotFound
+    case statNotLoaded(String)
+    case statNotNumber(String)
+    case statLocked(String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -117,7 +144,15 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
         #else
         case .targetNotFound(let name): "「\(name)」が見つかりませんでした。Tailor It でアプリを確認してください"
         #endif
-        case .missingFields(let names): "「\(names.joined(separator: "・"))」が必要です。Tailor It を開いて追加してください"
+        case .missingFields(let names): "「\(names.joined(separator: String(localized: "・")))」が必要です。Tailor It を開いて追加してください"
+        #if APP_STORE_REVIEW
+        case .statNotFound: "その数字が見つかりませんでした。Tailor It で記録帳を確認して、選び直してください"
+        #else
+        case .statNotFound: "その数字が見つかりませんでした。Tailor It でアプリを確認して、選び直してください"
+        #endif
+        case .statNotLoaded(let name): "まだ読み込んでいません。Tailor It で\(name)を一度開いてください"
+        case .statNotNumber(let label): "「\(label)」は数値で読めません。「数字を読む」を使ってください"
+        case .statLocked(let label): "「\(label)」はロック中です。Tailor It を開いて確認してください"
         }
     }
 }
@@ -162,6 +197,17 @@ struct TailorItShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "アプリを開く",
             systemImageName: "square.grid.2x2"
+        )
+        #endif
+        #if os(iOS) // 数字を読む(#1994)は iOS だけ。Mac は #1034 の後で足す
+        AppShortcut(
+            intent: GetStatValueIntent(),
+            phrases: [
+                "\(.applicationName)で数字を読む",
+                "\(.applicationName)の数字を読む",
+            ],
+            shortTitle: "数字を読む",
+            systemImageName: "number"
         )
         #endif
         AppShortcut(

@@ -19,7 +19,8 @@ import (
 // not use what that binary cannot render. No restriction = the prompts,
 // schemas and outputs stay exactly as before (byte-identical prompt cache).
 
-// Known disabledFeatures values; unknown ones are ignored.
+// Known disabledFeatures values; unknown ones are ignored. FeatureNearbyPassby
+// (nearby_rules.go) is one too, through disabledClientFeatures.
 const (
 	FeatureFieldHealth   = "fieldHealth"   // Field.health (HealthKit write)
 	FeatureCameraCapture = "cameraCapture" // photoField / videoField source camera|both
@@ -40,6 +41,12 @@ const FeatureRecordRetention = "recordRetention"
 // as a plain repeat once (a 09:00 reminder), so it is never generated for them.
 const FeatureNotificationWhen = "notification.when"
 
+// FeatureSingleEntity (#267) is a supportedFeatures value: the iOS build edits
+// the one record of an Entity.single and evaluates {"setting": ...}. Older
+// builds add a record each time the settings form is saved and cannot read a
+// computed that uses setting.
+const FeatureSingleEntity = "singleEntity"
+
 // Restriction is the per-request set of unusable parts. The zero value means
 // no restriction.
 type Restriction struct {
@@ -53,7 +60,17 @@ type Restriction struct {
 	noWhen bool
 	// noMatching (#507): the client has no matching UI (Entity.match)
 	noMatching bool
-	key        string // "" = no restriction; memo key otherwise
+	// noSingle (#267): the client has no Entity.single / {"setting": ...}
+	noSingle bool
+	// noRoles (#272): the client has no member picker / visibleTo (data_roles_rules.go)
+	noRoles bool
+	// noAddressed (#271): the client has no members picker (messages_addressed_rules.go)
+	noAddressed bool
+	// noNear: the client has no Notification.near / jitterMinutes (notify_near_rules.go)
+	noNear bool
+	// off: the clientFeatures (client_features.go) that are not available
+	off map[string]bool
+	key string // "" = no restriction; memo key otherwise
 }
 
 // knownComponentTypes are the container and leaf types of the canonical schema.
@@ -108,8 +125,11 @@ func NewRestriction(allowed, disabled []string) Restriction {
 		case FeatureSharedData:
 			r.noShared = true
 			r.noMatching = true // match needs a shared entity
+			r.noRoles = true    // roles are about other people's records
+			r.noAddressed = true
 		}
 	}
+	r.off = disabledFeaturesOff(disabled) // #1955
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
@@ -128,6 +148,24 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	}
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureMatching) {
 		r.noMatching = true
+	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureSingleEntity) {
+		r.noSingle = true
+	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureDataRoles) {
+		r.noRoles = true
+	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureAddressed) {
+		r.noAddressed = true
+	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureNotificationNear) {
+		r.noNear = true
+	}
+	for k := range clientFeaturesOff(allowed, supported) {
+		if r.off == nil {
+			r.off = map[string]bool{}
+		}
+		r.off[k] = true
 	}
 	r.withholdMatchingUI()
 	r.setKey()
@@ -148,11 +186,14 @@ func (r *Restriction) withholdMatchingUI() {
 
 func (r *Restriction) setKey() {
 	r.key = ""
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching {
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed || r.noNear || len(r.off) > 0 {
 		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen) +
-			fmt.Sprintf("|m=%t", r.noMatching)
+			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t|n=%t|f=%s", r.noMatching, r.noSingle, r.noRoles, r.noAddressed, r.noNear, r.offKey())
 	}
 }
+
+// NoSingle reports whether Entity.single / {"setting": ...} is unavailable (#267).
+func (r Restriction) NoSingle() bool { return r.noSingle }
 
 // NoMatching reports whether Entity.match is unavailable (#507).
 func (r Restriction) NoMatching() bool { return r.noMatching }
@@ -162,6 +203,9 @@ func (r Restriction) NoRetention() bool { return r.noRetention }
 
 // NoWhen reports whether Notification.when is unavailable (#265).
 func (r Restriction) NoWhen() bool { return r.noWhen }
+
+// NoNear reports whether Notification.near / jitterMinutes are unavailable.
+func (r Restriction) NoNear() bool { return r.noNear }
 
 // Active reports whether anything is restricted.
 func (r Restriction) Active() bool { return r.key != "" }
@@ -216,7 +260,7 @@ func (r Restriction) assets() *restrictedAssets {
 	// An allowlist that leaves no leaf cannot build a catalog: keep the full
 	// one (the note and enforceRestriction still apply).
 	if c, err := BuildCatalog(raw); err == nil {
-		a.catalog = c
+		a.catalog = fixGoalRecipe(c) // title_goal_rules.go
 	}
 	if i, err := BuildCapabilityIndex(raw); err == nil {
 		a.index = i
@@ -302,6 +346,12 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 			delete(props, "when")
 		}
 	}
+	if r.noNear {
+		restrictNearSchema(defs)
+	}
+	for _, f := range r.offFeatures() {
+		f.schema(defs)
+	}
 	if r.noMatching {
 		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
 			props, _ := entity["properties"].(map[string]any)
@@ -311,6 +361,15 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 			props, _ := item["properties"].(map[string]any)
 			delete(props, "interest")
 		}
+	}
+	if r.noSingle {
+		restrictSingle(defs)
+	}
+	if r.noRoles {
+		restrictDataRoles(defs, r.noShared)
+	}
+	if r.noAddressed {
+		restrictAddressed(defs)
 	}
 	if r.disallowed[string(dsl.CompWebView)] {
 		// openUrlButton's description points to webView for embedding (#452 G3)
@@ -410,6 +469,8 @@ const noShareChatRule = "- 共有の範囲: このアプリの版では、記録
 // share-scope blocks, the chat share rule and the scope / poster / edit lines.
 func dropSharingRules(s string) string {
 	s = strings.Replace(s, "\n\n"+marksRules+"\n"+marksCatalog, "", 1)
+	s = strings.Replace(s, "\n\n"+followRules, "", 1) // #270
+	s = strings.Replace(s, "\n\n"+followChatRule, "", 1)
 	s = strings.Replace(s, shareRules, "", 1)
 	s = strings.Replace(s, shareChatRule, noShareChatRule, 1)
 	lines := strings.Split(s, "\n")
@@ -459,9 +520,29 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 		s = strings.Replace(s, condNotifyCanLine, condNotifyCannotLine, 1)
 		s = strings.Replace(s, notifyWhenChatRule, noNotifyWhenChatRule, 1)
 	}
+	if r.noNear {
+		s = dropNearRules(s)
+	}
+	for _, f := range r.offFeatures() {
+		s = dropFeatureRules(s, f)
+	}
 	if r.noMatching {
 		s = strings.Replace(s, "\n\n"+matchingRules, "", 1)
 		s = strings.Replace(s, matchingChatRule, noMatchingChatRule, 1)
+	}
+	if r.noSingle {
+		s = strings.Replace(s, "\n\n"+singleRules, "", 1)
+		s = strings.Replace(s, settingsSingleLine, settingsLatestLine, 1)
+		s = strings.Replace(s, notifySettingBudget, notifyLatestBudget, 1)
+		s = strings.Replace(s, goalRateSetting, goalRateLatest, 1)
+		s = strings.Replace(s, singleChatRule, noSingleChatRule, 1)
+		s = strings.Replace(s, titleGoalSingleLine, titleGoalLatestLine, 1)
+	}
+	if r.noRoles {
+		s = dropDataRolesRules(s, r.noShared)
+	}
+	if r.noAddressed {
+		s = dropAddressedRules(s)
 	}
 
 	// Rule lines that route an utterance to a disallowed part
@@ -518,8 +599,23 @@ func restrictionNote(r Restriction) string {
 	if r.noWhen {
 		b.WriteString("- 条件で知らせる通知(app.notifications の when)は使わない(この版では条件を確かめられない)。在庫が減ったら・予算を超えたら等と頼まれたら、不足の一覧などで代替し「条件で知らせる通知はこの版ではできないため、○○で代替しました。」と申告する。\n")
 	}
+	if r.noNear {
+		b.WriteString(noNearNote)
+	}
+	for _, f := range r.offFeatures() {
+		b.WriteString(f.note)
+	}
 	if r.noMatching && !r.noShared {
 		b.WriteString("- entity の match は使わない(この版ではお互いに承認してつながる仕組みが無い)。仲間探しを頼まれたら「この版ではお互いに承認してつながる仕組みは使えません。最新版に更新すると使えます」と伝え、みんなで見るプロフィールの一覧(連絡先・写真・位置は載せない)で近い形を作る。\n")
+	}
+	if r.noSingle {
+		b.WriteString("- entity の single と式 {\"setting\":...} は使わない(この版では設定の 1 件を編集する画面が無い)。周期・目標・予算のような値は記録の entity に入れ、最新の値を {\"agg\":\"latest\",...} で読む。\n")
+	}
+	if r.noRoles {
+		b.WriteString(dataRolesNote(r.noShared))
+	}
+	if r.noAddressed && !r.noShared {
+		b.WriteString(addressedNote)
 	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
@@ -596,6 +692,21 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 		for _, id := range whenNotifications(raw) {
 			if !prev[id] {
 				out = append(out, fmt.Sprintf("app.notifications %q: when (condition notification) is not available in this app build: remove the notification and substitute (e.g. a shortage list)", id))
+			}
+		}
+	}
+	if r.noNear {
+		out = append(out, nearViolations(raw, base)...)
+	}
+	out = append(out, featureViolations(raw, base, r)...)
+	if r.noSingle {
+		prev := map[string]bool{}
+		for _, id := range singleEntities(base) {
+			prev[id] = true
+		}
+		for _, id := range singleEntities(raw) {
+			if !prev[id] {
+				out = append(out, fmt.Sprintf(`entity %q: single (one record of settings) is not available in this app build: omit it, keep the values as records and read the newest with {"agg":"latest","entity":%q,"field":...} instead of {"setting":...}`, id, id))
 			}
 		}
 	}
@@ -698,6 +809,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 		return raw, nil, false
 	}
 	removed := map[string]int{}
+	feedsBefore := screenFeedIDs(root)
 	var health, camera, private, retention, when, matching int
 	var fixComps func([]any) []any
 	fixComps = func(cs []any) []any {
@@ -822,7 +934,32 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			}
 		}
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 {
+	single := 0
+	if r.noSingle {
+		single = unsingle(root)
+	}
+	roles := 0
+	if r.noRoles {
+		roles = unrole(root, r.noShared)
+	}
+	addressed := 0
+	if r.noAddressed || r.noRoles {
+		addressed = unaddress(root, r.noAddressed)
+	}
+	near := 0
+	if r.noNear {
+		near = unnear(root)
+	}
+	var featureNotes []string
+	for _, f := range r.offFeatures() {
+		if n := f.strip(root); n > 0 {
+			featureNotes = append(featureNotes, fmt.Sprintf("dropped %s on %d place(s)", f.key, n))
+		}
+	}
+	if n := pruneInputFeeds(root, removedFeedIDs(feedsBefore, root)); n > 0 { // a removed feed leaves no dangling inputFeeds id
+		featureNotes = append(featureNotes, fmt.Sprintf("dropped inputFeeds of removed feeds on %d button(s)", n))
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 && near == 0 && len(featureNotes) == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -846,6 +983,19 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	if matching > 0 {
 		notes = append(notes, fmt.Sprintf("dropped match / item.interest on %d place(s)", matching))
 	}
+	if single > 0 {
+		notes = append(notes, fmt.Sprintf("single -> latest records on %d entity(ies)", single))
+	}
+	if roles > 0 {
+		notes = append(notes, fmt.Sprintf("dropped member / visibleTo / admin rules on %d place(s)", roles))
+	}
+	if addressed > 0 {
+		notes = append(notes, fmt.Sprintf("dropped addressedTo / members on %d place(s)", addressed))
+	}
+	if near > 0 {
+		notes = append(notes, fmt.Sprintf("dropped near notification / jitterMinutes on %d place(s)", near))
+	}
+	notes = append(notes, featureNotes...)
 	b, err := json.Marshal(root)
 	if err != nil {
 		return raw, nil, false

@@ -86,7 +86,7 @@ else
       echo "warning: LIMIT($LIMIT 行)に達した。数字が少なく出ている。LIMIT を上げてやり直す" >&2
     fi
   }
-  read_logs "$F_USAGE" "timestamp,jsonPayload.operation,jsonPayload.outcome,jsonPayload.uid_hash,jsonPayload.est_cost_usd" "$TMP/usage.json"
+  read_logs "$F_USAGE" "timestamp,jsonPayload.operation,jsonPayload.outcome,jsonPayload.uid_hash,jsonPayload.est_cost_usd,jsonPayload.clientPlatform" "$TMP/usage.json"
   read_logs "$F_GENERATE" "timestamp,jsonPayload.mode,jsonPayload.outcome,jsonPayload.est_cost_usd" "$TMP/gen.json"
   SRC="${AI_SERVICE}(${PROJECT_ID})"
 fi
@@ -98,7 +98,8 @@ def jst_day: .timestamp | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdat
 def pct(p): sort as $s | if ($s|length)==0 then null else $s[((($s|length)*p)|ceil|if .<1 then 1 else . end)-1] end;
 def usd: if . == null then "—" else (. * 10000 | round / 10000 | tostring) end;
 def rows: map({day: jst_day, op: (.jsonPayload.operation // "unknown"), outcome: .jsonPayload.outcome,
-  uid: .jsonPayload.uid_hash, cost: .jsonPayload.est_cost_usd, mode: .jsonPayload.mode});
+  uid: .jsonPayload.uid_hash, cost: .jsonPayload.est_cost_usd, mode: .jsonPayload.mode,
+  os: ((.jsonPayload.clientPlatform // "") | ascii_downcase | if . == "" then "unknown" else . end)});
 '
 
 printf '# AI 費用 %s(見る日 %s・日本時間)\n\n' "$SRC" "$DAY"
@@ -132,6 +133,15 @@ jq -r --arg d "$DAY" "$JQ_LIB"'
   | map({op: .[0].op, calls: length, cost: (map(.cost // 0) | add)}) | sort_by(-.cost)
   | "\n## 処理ごと(\($d))\n\n| 処理 | 呼び出し | USD |\n|---|---|---|\n"
     + (map("| \(.op) | \(.calls) | \(.cost | usd) |") | join("\n"))
+' "$TMP/usage.json"
+
+# 2b) OS ごと(見る日)。clientPlatform(#2132 の語彙)が無い行は unknown
+jq -r --arg d "$DAY" "$JQ_LIB"'
+  rows | map(select(.day == $d)) | group_by(.os)
+  | map({os: .[0].os, calls: length, users: (map(.uid // empty) | unique | length), cost: (map(.cost // 0) | add)})
+  | sort_by(-.cost, .os)
+  | "\n## OS ごと(\($d))\n\n| OS | 呼び出し | ユーザー | USD |\n|---|---|---|---|\n"
+    + (map("| \(.os) | \(.calls) | \(.users) | \(.cost | usd) |") | join("\n"))
 ' "$TMP/usage.json"
 
 # 3) 日ごと

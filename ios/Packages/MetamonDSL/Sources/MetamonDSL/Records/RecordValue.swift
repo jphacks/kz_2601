@@ -23,8 +23,8 @@ public enum RecordValue {
             return Field(id: id, name: mark.label, type: .integer)
         }
         return switch id {
-        case author where entity.isShared: Field(id: author, name: "投稿者", type: .string)
-        case createdAt: Field(id: createdAt, name: "投稿日時", type: .datetime)
+        case author where entity.isShared: Field(id: author, name: L("投稿者"), type: .string)
+        case createdAt: Field(id: createdAt, name: L("投稿日時"), type: .datetime)
         default: nil
         }
     }

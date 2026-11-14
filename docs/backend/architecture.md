@@ -10,13 +10,23 @@
 - [シェアリンクと「探す」(#49 #50)](features/sharing.md)
 - [生成前の対話(#74)](features/chat.md)
 - [リリース申請(#76)](features/release.md)
-- [有料機能の判定と Pro の権利(#77 #314)](features/pro.md)
+- [有料機能の判定・Pro の権利・サーバーでの強制(#77 #314 #316)](features/pro.md)
 - [ホットリロードの変化通知・SSE(#82)](features/events.md)
 - [計算ロジック Expr(#100)](features/expr.md)
 - [アカウント削除(#119)](features/account-deletion.md)
 - [shared の参加者(#254)](features/members.md)
+- [プッシュ通知の端末と受け取りの同意(#269)](features/notifications.md)
+- [フォローとタイムライン(#270)](features/follows.md)
 - [フィードバック(#319)](features/feedback.md)
+- [自己改善ループ(#364)](features/feedback-loop.md)
+- [自己改善ループ: 承認された Issue からエージェントの PR を作る(#370)](features/feedback-loop-agent-pr.md)
+- [自己改善ループ: 振り分けと人の判断の一致を測る(#376)](features/feedback-loop-triage-agreement.md)
+- [自動の動きの見える化(#347)](features/automations.md)
+- [外部の公開データの読み取り(#348)](features/external-feeds.md)
+- [外の API(runner の口・数え方・OAuth のトークン・#1493)](features/external-apis.md)
+- [ISBN から本の情報を入れる(lookupBook)](features/book-lookup.md)
 - [決まった形の文章(#417)](features/text.md)
+- [通話(#447・LiveKit Cloud)](features/calls.md)
 - [仲間探しのアプリ(#507)](features/matching.md)
 
 ## 1. サービス構成とリクエストフロー
@@ -215,7 +225,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 
 ### 6.1 Claude 呼び出し
 
-> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,defaults.go,stream.go,generate.go,chat.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`、発話 16 本の品質/速度 eval は `docs/backend/ai-eval/`(ランナー `backend/cmd/ai-eval`・ケース `backend/internal/ai/eval/cases.json`、対話フェーズは `-chat` + `chat_cases.json`)。
+> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,defaults.go,stream.go,generate.go,chat.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`、発話 16 本の品質/速度 eval は `docs/backend/ai-eval/`(ランナー `backend/cmd/ai-eval`・ケース `backend/internal/ai/eval/cases.json`、対話フェーズは `-chat` + `chat_cases.json`)。回し方・フラグは [`ai-eval/README.md`](ai-eval/README.md)。
 
 | 項目 | 値(実装済み) |
 |---|---|
@@ -225,10 +235,12 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 | 出力 | **既定は「スキーマをプロンプトに載せて JSON のみを出させ、Go で厳密検証」**。`output_config.format`(構造化出力)は `CLAUDE_STRUCTURED_OUTPUT=1` のときだけ送る(下記「構造化出力の制約」参照)。応答テキストは `extractJSON`(コードフェンス/前置き除去)→ 初回 `dsl.Parse`、編集 `dsl.ApplyPatch` |
 | max_tokens | 16000。DSL 64KB 上限内 |
 | 出力の短縮(#61) | プロンプトで **1 行の compact JSON**(改行・インデント無し)と **既定値の省略** を指示し、Go 側 `internal/ai/defaults.go` `fillDefaults` / `fillPatchDefaults` が `dsl.Parse` の前に補完する(schemaVersion 1・voiceEntry floating・navigate.presentation = フォームへ sheet / 行タップ push・filter.value null・sort.direction desc・list.swipeToDelete true・stat/chart.aggregate sum・date の defaultValue now)。few-shot も同じ省略形で埋め込む(`abbreviateExample`、round-trip テスト付き)。`pkg/dsl` の検証は不変・iOS には明示値が届く。**実測(2026-10-24・create 5 本 × 2): 出力 1,300 → 964 tokens(−26%)、p50 6.5 → 6.0s、品質 10/10 維持**(`docs/backend/ai-eval/2026-10-24-latency.md`) |
-| ストリーミング(#61) | `POST /v1/generate?stream=1` は SSE。`client.go` が `stream: true` を読み(`Completion.OnText`)、`stream.go` `keyWatcher` が出力先頭の `app` ブロック(edit は `summary`)の完了を検出 → `event: app` / `event: summary`(名前・タブ名・仮の読み上げ文「家計簿アプリを作っています。ホームと集計の2タブです。」)→ 検証・保存後に `event: result`(JSON モードと同じ応答)か `event: error`。create のキー順 app → initialScreen → entities → screens、edit は `{"summary":…,"patch":[…]}` をプロンプトで固定。**first event p50 2.4s(完了 6.0s)、edit は 0.9〜1.0s(完了 1.3s)**。JSON モード(`stream` 無し)は従来どおり |
+| ストリーミング(#61) | `POST /v1/generate?stream=1` は SSE。`client.go` が `stream: true` を読み(`Completion.OnText`)、`stream.go` `keyWatcher` が出力先頭の `app` ブロック(edit は `summary`)の完了を検出 → `event: app` / `event: summary`(名前・タブ名・仮の読み上げ文「家計簿アプリを作っています。ホームと集計の2タブです。」)→ create は最初に見える画面(初期タブ・タブ無しなら initialScreen)の部品が 1 つ閉じるたびに `event: component`(`component_stream.go`・#636。仮置き用。作り直す時は `event: restart`)→ 検証・保存後に `event: result`(JSON モードと同じ応答)か `event: error`。create のキー順 app → initialScreen → entities → screens、edit は `{"summary":…,"patch":[…]}` をプロンプトで固定。**first event p50 2.4s(完了 6.0s)、edit は 0.9〜1.0s(完了 1.3s)**。JSON モード(`stream` 無し)は従来どおり |
 | 拒否 | `stop_reason == "refusal"` → 400 `refused`。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を常時送付 |
-| キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ ≈8.6K tokens)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。実測: 2 回目以降 `cache_read_input_tokens=8588` |
+| キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ・機能ごとの規則)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。大きさ(2026-11-08 の develop で計測): `systemPrompt` 234,874 バイト ≒ **約 94K tokens**(開いている PR を全部入れると約 112K)、`editRules` 6,420 バイト ≒ 約 2.6K。測り方は「バイト数 ÷ 2.5」(1 トークン ≒ 2.5 バイト。714039ad・34b0ef97 の eval の `cache_read_input_tokens` とその時のプロンプトのバイト数で合わせた値)。初期の実測 `cache_read_input_tokens=8588`(≈8.6K)から 10 倍以上に増えた。キャッシュが切れた 1 回の書き込みは `claude-sonnet-5-5` の 2.50 USD / 100 万で **約 0.24〜0.28 USD**。edit は system を 2 ブロック(`systemPrompt` と `"\n"+editRules`、どちらも `cache_control`)で送り、1 ブロック目を create と同じバイト列にして create のキャッシュを使う(`Completion.SystemSuffix`・`system_blocks.go`)。制限つきの版では制限の注記が 1 ブロック目の末尾に付く。めったに使わない作り方(`onDemandRules` で登録した JPHACKS 作品の 28 項目・約 21 KB)は 1 ブロック目から外し、要る項目だけをキャッシュしない最後のブロック(`Completion.SystemTail`)で送る(`on_demand_rules.go`。1 ブロック目は全リクエストで同じバイト列のまま)。要る項目 = きっかけの言葉(発話と、編集では今のアプリ)に当たったもの ∪ 振り分けの呼び出し(`recipe_selector.go`・`claude-haiku-5-5`・28 項目の 1 行の索引をキャッシュ・アプリが分かった時点で始めて最大 1.5 秒待つ。時間切れ・失敗は言葉だけ)が選んだもの。どちらが選んだかと待った時間は `meta.recipeSources` / `recipeSelector` / `recipeSelectorMs`。`AI_ON_DEMAND_RULES=0` で前と同じく全部送る |
+| プロンプトサイズの上限 | `backend/internal/ai/prompt_size_test.go` `TestPromptSizeBudget` が system prompt を 300,000 bytes、編集時(+ editRules)を 310,000 bytes、`serverRulesPrompt` を 40,000 bytes で止める(約 2.5 bytes/token)。上限は目標ではなく見張り。超えたら見出し(`## `)ごとの大きい順 15 件を出す。上げるのは費用が増えると承知した上での判断 |
 | 費用ログ(#298) | HTTP の試行ごとに slog JSON の `ai.usage` を 1 行(処理・モデル・トークン 4 種・試行番号・成否・uid のハッシュ・見積もり費用)。`ai.generate` にも 1 生成ぶんのトークンと費用の合計(`cost_tally.go`)。本文と生の uid は出さない。形・料金表・`scripts/ai-cost.sh`(すぐ見る集計)・BigQuery 集計・アラート手順は [../infra/ai-cost.md](../infra/ai-cost.md) |
+| 端末の OS(#2132) | アクセスログ(`request`)と App Check のログの `clientPlatform` は、ヘッダ `X-Client-Platform` を決まった語彙 `ios` / `android` / `macos` / `windows` / `linux` / `other` にそろえた値(ヘッダ無し・未知の値も `other`)。語彙と寄せ方は [../dsl/README.md §5.2](../dsl/README.md#52-ios-が毎回送るもの)・`httpx.NormalizePlatform` |
 | 生成のログ(#322) | `POST /v1/generate` 1 回ごとに slog JSON の `ai.generate` を 1 行(mode・outcome・validation_passed・first_generation・duration_ms・uid のハッシュ)。本文・DSL・appId・生の uid は出さない。β の品質ゲートの成功率と初回の p95 に使う([../release/beta-quality-gate.md](../release/beta-quality-gate.md)) |
 | 再生成ループ | 検証 NG(`dsl.ValidationError.Problems`: 重なり・範囲外・参照不整合・スキーマ違反)は **Problems を user に添付して最大 2 回再生成**(計 3 回)。それでも NG → **`area` を全部落として再検証**(省略=上から積むフォールバック)→ それも NG なら **400 `generation_failed`**(`details.problems`/`details.attempts`)。編集は Patch 3 回 NG → `area` 落とし → **フル生成 1 回に降格**(`meta.downgradedToFull`)→ 400 |
 | summary | 編集 = PatchDocument の `summary`(モデル生成・読み上げ用 1 文 40 字程度「。」止め、満たされていれば `test` 1 つの patch +「すでに〜になっています。」)。初回 = `app.name`/tabs/追加ボタンの `area`/notifications から **読み上げ用の自然文**をテンプレ生成(例「家計簿アプリを作りました。ホームと集計の2タブで、右下のボタンから支出を追加できます。毎朝8時に通知が届きます。」)。**locale=en** は英語テンプレ `summarizeEN`(「I made an Expense Tracker app. Use the button at the bottom right to add expenses. You'll get a reminder every evening at 8.」) |
@@ -331,7 +343,7 @@ Cloud Run: ai は `min-instances=1`(コールドスタート回避・デモ中�
 ### ローカル
 
 ```sh
-# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.24
+# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.26(版は backend/go.mod の go 行を見る)
 cd backend
 make emulator        # Firestore :8089(CI と同じ gcloud のエミュレータ・demo-kz2601)
 make test-emulator   # エミュレータ試験を CI と同じ判定で回す
@@ -383,6 +395,8 @@ jobs:
 | `deploy-cloudrun.yml` | staging デプロイ後に同じものを **非ブロッキング**(`continue-on-error`)で実行し job summary に表を貼る |
 | `-only kakeibo\|training\|walk` / `SMOKE_ONLY=` | 1 本だけ |
 
+流れ・環境変数・片付け(stg-cleanup)・失敗した時の見方は [docs/infra/smoke.md](../infra/smoke.md)。
+
 ### 環境変数
 
 | 変数 | appconfig | ai | 既定 / 備考 |
@@ -409,22 +423,32 @@ jobs:
 
 `ls backend/cmd backend/internal` の全エントリ(用途は各パッケージの doc コメントから)。
 
+新しい `cmd`(運用コマンド・Cloud Run Job)を足す時の決まりは [adding-a-command.md](adding-a-command.md)。
+
 ```
 backend/
   Dockerfile                 # 1 イメージに全サービス。既定は /app/appconfig、ai は --command=/app/ai
   Makefile                   # build / test / schema-check / dev。運用コマンドは mk/<feature>.mk
   go.mod                     # module github.com/jphacks/kz_2601/backend
-  mk/                        # feedback.mk / moderate.mk / purge.mk
+  mk/                        # appstore.mk / feedback-loop.mk / feedback.mk / moderate.mk / purge.mk / runner.mk / stg-cleanup.mk
   cmd/
     ai/                      # ai サービス: 文字(iOS が端末内で文字起こし済み)-> Claude -> DSL(全体 or JSON Patch)-> appconfig
     ai-audit/                # ai-eval の結果を機能面で採点(押しても動かないボタン・辿れない画面など)。API を呼ばない
     ai-eval/                 # internal/ai/eval/cases.json を実 Claude で流し、ケースごとの指標と DSL を JSON に出す
+    ai-session-report/       # 人ごとの操作をセッションに切り、AI が外したらしい所(言い直し・すぐの undo・やめた等)を順位づけ。人が手で回す(docs/ops/ai-session-report.md)
     appconfig/               # appconfig サービス: 配線のみ(env -> store -> handlers -> http.Server)
+    appstore-reconcile/      # App Store Server API で Pro の購読を読み直し、通知(v2)で届かなかった変化を保存(#315)。Cloud Run Job(docs/infra/app-store-notifications.md)
+    coin-initial-backfill/   # 記録が始まる前に初回のコインを受けたアカウントへ coin_initial_grants を書く(#1429)。1 回だけ人が回す(docs/infra/coin-initial-backfill.md)
+    dslgen/                  # docs/dsl/dsl.schema.json から Android(Kotlin)の DSL の型を生成(#351・make dsl-gen)
     feedback/                # アプリ内フィードバックを運営が読む(#319)。読み取りだけ
+    feedback-loop/           # 自己改善ループ(#364): 取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・停止スイッチ
+    matching-age-backfill/   # 18 歳以上の申告(#507)より前に出た仲間探しのプロフィールに ownerAgeConfirmed を付ける。1 回だけ人が回す(docs/infra/matching-age-backfill.md)
     moderate/                # 通報の確認と運営による非公開化(#321)。手順は docs/infra/moderation.md
     product-metrics/         # 指標のログ(#297)から週ごとの Markdown 表を出す。ログのエクスポートだけを読む
     purge/                   # 退会から一定期間たったアカウントと古いフィードバックを消す Cloud Run Job(#458・#319)
+    runner/                  # サーバーのルール(#341)。appconfig が貯めた outbox を POST /internal/tick で流す(docs/infra/runner.md)
     smoke/                   # デモの発話を実 API で流して表を出す(make smoke-local / smoke-stg)
+    stg-cleanup/             # stg のテストのデータ(smoke のアプリ・回数制限のカウンタ・指定した uid)を消す(#293)。既定は dry run(docs/infra/stg-cleanup.md)
   internal/                  # サービス実装(外部 import 不可)
     ai/                      # 文字 -> DSL の変更。pkg/dsl で検証し、問題があれば上限つきで再生成
     appcheck/                # Firebase App Check のトークン検証(#318・APP_CHECK_MODE)
@@ -432,11 +456,23 @@ backend/
     appconfigclient/         # ai が今の DSL を読み書きする薄いクライアント(HTTP で Bearer 転送 / Memory)
     appstore/                # StoreKit 2 の署名付き取引(JWS)を Apple に問い合わせずに検証(#314)
     auth/                    # Firebase ID トークン検証 middleware・UID(ctx)・dev 用 verifier
+    books/                   # DSL の lookupBook で ISBN から本の情報を引く(openBD・キャッシュつき)。docs/backend/features/book-lookup.md
+    budget/                  # その日の環境の AI の費用がしきい値を超えたら、無料プランの AI の処理をその日止める(#317・AI_FREE_DAILY_BUDGET_USD)
+    calls/                   # shared のアプリの音声・ビデオ通話(#447)。LiveKit のトークン発行と分の課金だけ。docs/backend/features/calls.md
+    coins/                   # コインの財布と台帳(#630)。LLM の呼び出しを Reserve / Commit / Release で払う
     entitlement/             # Pro の権利のサーバー側の記録(#314)
+    extapi/                  # runner から外の API を呼ぶ口(#1493)。決まった provider と操作だけ。docs/backend/features/external-apis.md
     fsenv/                   # 接続する Firestore の DB を決め、stg が本番の DB を使うと止める(#290)
+    googleplay/              # Google Play の購読(Android の Pro)を Google Play Developer API で読む・acknowledge する
+    gtfsstatic/              # 静的な GTFS-JP の zip からバスの停留所・路線・時刻を読む(#1692)。読むだけ
     httpx/                   # JSON 書き出し・エラー封筒・RequestID・recover・アクセスログ middleware
+    loop/                    # 自己改善ループ(#364)。pii(伏せ字)・ingest・triage(LLM・道具なし)・draft(出口の検査)・github・fixed
     metrics/                 # プロダクトの指標のイベントを構造化ログに出す(#297)
+    moderation/textfilter/   # 他の人が見る文字(共有の記録・参加者の名前・公開の一覧)で明らかに不適切な語を断る(#321)。docs/infra/moderation.md
+    paid/                    # 有料機能のリスト(paid_features.json)と DSL での判定。ai / appconfig が 402 で止める(#316)
+    plan/                    # プランごとに使える量の表(#317・無料 / Pro)。docs/backend/rate-limit.md
     ratelimit/               # 1 人(と全体)が 1 日に起こせる Claude の処理量の上限(#280)
+    runner/                  # サーバーのルール(#341)。outbox から取り、直前に確かめ、評価・数え・1 回だけ書き・通知する
     store/                   # users/{uid}/apps/{appId} 以下の永続化(Firestore / Memory)
   pkg/
     dsl/                     # 全サービス共有の DSL: 型・schema.json(embed)・Parse / Validate

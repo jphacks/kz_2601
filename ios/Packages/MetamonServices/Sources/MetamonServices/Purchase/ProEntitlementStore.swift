@@ -110,7 +110,10 @@ public final class ProEntitlementStore {
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
                 guard let self else { return }
-                if case .verified(let transaction) = update { await transaction.finish() }
+                // コインのパック(消耗型・#630)は `CoinStore` がサーバーに足してから終わらせる。ここで終わらせない
+                if case .verified(let transaction) = update, self.productIDs.contains(transaction.productID) {
+                    await transaction.finish()
+                }
                 await self.refreshEntitlements()
             }
         }

@@ -1,0 +1,17 @@
+{"time":"2026-11-05T10:00:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r1","clientPlatform":"ios","uid_hash":"aa"}
+{"time":"2026-11-05T10:00:00Z","event":"ai.generate","mode":"create","outcome":"validated","requestId":"r1","uid_hash":"aa"}
+{"time":"2026-11-05T10:01:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r2","clientPlatform":"ios","uid_hash":"aa"}
+{"time":"2026-11-05T10:01:00Z","event":"ai.generate","mode":"edit","outcome":"failed","error_code":"generation_failed","requestId":"r2","uid_hash":"aa"}
+{"time":"2026-11-05T10:02:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r3","clientPlatform":"windows","uid_hash":"aa"}
+{"time":"2026-11-05T10:02:00Z","event":"ai.generate","mode":"create","outcome":"failed","requestId":"r3","uid_hash":"aa"}
+{"time":"2026-11-05T10:03:00Z","event":"ai.generate","mode":"create","outcome":"regenerated","requestId":"r4","clientPlatform":"Windows","uid_hash":"aa"}
+{"time":"2026-11-05T10:04:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r5","clientPlatform":"linux","uid_hash":"aa"}
+{"time":"2026-11-05T10:04:00Z","event":"ai.generate","mode":"edit","outcome":"refused","requestId":"r5","uid_hash":"aa"}
+{"time":"2026-11-05T10:05:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r6","clientPlatform":"PlayStation","uid_hash":"aa"}
+{"time":"2026-11-05T10:05:00Z","event":"ai.generate","mode":"edit","outcome":"validated","requestId":"r6","uid_hash":"aa"}
+{"time":"2026-11-05T10:06:00Z","event":"ai.generate","mode":"edit","outcome":"validated","uid_hash":"aa"}
+{"time":"2026-11-05T10:07:00Z","event":"ai.generate","mode":"edit","outcome":"failed","requestId":"r7","uid_hash":"aa"}
+{"time":"2026-11-05T10:08:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r8","clientPlatform":"ios","uid_hash":"aa"}
+{"time":"2026-11-05T10:08:00Z","event":"ai.generate","mode":"edit","outcome":"restored","requestId":"r8","uid_hash":"aa"}
+{"time":"2026-11-09T10:00:00Z","event":"http.request","path":"/v1/generate","status":200,"requestId":"r9","clientPlatform":"android","uid_hash":"aa"}
+{"time":"2026-11-09T10:00:00Z","event":"ai.generate","mode":"edit","outcome":"failed","requestId":"r9","uid_hash":"aa"}

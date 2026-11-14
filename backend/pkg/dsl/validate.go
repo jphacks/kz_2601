@@ -58,6 +58,7 @@ var compiled = func() *jsonschema.Schema {
 // with the full list at once.
 type ValidationError struct {
 	Problems []string
+	codes    []string // per problem; "" or missing = ProblemCode (see Codes)
 }
 
 func (e *ValidationError) Error() string {
@@ -68,7 +69,7 @@ func (e *ValidationError) Error() string {
 // the typed App. This is the single entry point appconfig and ai must use.
 func Parse(raw []byte) (*App, error) {
 	if len(raw) > MaxDSLBytes {
-		return nil, &ValidationError{Problems: []string{fmt.Sprintf("document exceeds %d bytes", MaxDSLBytes)}}
+		return nil, problem(CodeTooLarge, fmt.Sprintf("document exceeds %d bytes", MaxDSLBytes))
 	}
 	if err := ValidateSchema(raw); err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func Parse(raw []byte) (*App, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&app); err != nil {
-		return nil, &ValidationError{Problems: []string{"decode: " + err.Error()}}
+		return nil, problem(CodeDecode, "decode: "+err.Error())
 	}
 	if err := app.Validate(); err != nil {
 		return nil, err
@@ -89,25 +90,26 @@ func Parse(raw []byte) (*App, error) {
 func ValidateSchema(raw []byte) error {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
-		return &ValidationError{Problems: []string{"invalid JSON: " + err.Error()}}
+		return problem(CodeInvalidJSON, "invalid JSON: "+err.Error())
 	}
 	if err := compiled.Validate(doc); err != nil {
 		var ve *jsonschema.ValidationError
 		if errors.As(err, &ve) {
-			return &ValidationError{Problems: flatten(ve)}
+			return flatten(ve)
 		}
 		return &ValidationError{Problems: []string{err.Error()}}
 	}
 	return nil
 }
 
-func flatten(ve *jsonschema.ValidationError) []string {
-	var out []string
+func flatten(ve *jsonschema.ValidationError) *ValidationError {
+	var out, codes []string
 	var walk func(v *jsonschema.ValidationError)
 	walk = func(v *jsonschema.ValidationError) {
 		if len(v.Causes) == 0 {
 			loc := "/" + strings.Join(v.InstanceLocation, "/")
 			out = append(out, loc+": "+v.ErrorKind.LocalizedString(errPrinter))
+			codes = append(codes, schemaCode(v))
 			return
 		}
 		causes := v.Causes
@@ -121,8 +123,9 @@ func flatten(ve *jsonschema.ValidationError) []string {
 	walk(ve)
 	if len(out) > 20 {
 		out = append(out[:20], fmt.Sprintf("...and %d more", len(out)-20))
+		codes = append(codes[:20], CodeMore)
 	}
-	return out
+	return &ValidationError{Problems: out, codes: codes}
 }
 
 // matchingTypeCauses drops anyOf branches that failed on the node's own
@@ -265,7 +268,13 @@ func (a *App) Validate() error {
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
+	checkEncryptedFields(a, entities, add) // encrypted.go
 	checkMatching(a, add)
+	checkSingleEntities(a, entities, add)
+	checkBookLookups(a, entities, add) // book_lookup.go
+	checkDataRules(a, add)
+	checkAddressed(a, add)
+	checkServerRules(a, entities, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -277,6 +286,7 @@ func (a *App) Validate() error {
 		checkNotification(fmt.Sprintf("app.notifications[%d]", i), n, add)
 		checkRecordNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 		checkWhenNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
+		checkNearNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 	}
 
 	screens := map[string]bool{}
@@ -342,15 +352,21 @@ func (a *App) Validate() error {
 				if act.Notification.When != nil {
 					add("%s: notification when (condition) belongs in app.notifications, not scheduleNotification", where)
 				}
+				checkNearAction(where, act.Notification, add)
 			}
 		case ActionCancelNotif:
 			if act.NotificationID == "" {
 				add("%s: cancelNotification needs notificationId", where)
 			}
+		case ActionFollow, ActionUnfollow:
+			checkFollowAction(where, act, entities, add) // #270: follow.go
 		case ActionExport:
 			checkExportAction(where, act, entities, add)
 		case ActionStartActivity:
 			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
+		case ActionAddCalendar:
+			checkCalendarAction(where, act, entities, add) // calendar_event.go
+		case ActionLookupBook: // placement and fields: checkBookLookups (book_lookup.go)
 		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)
@@ -406,11 +422,13 @@ func (a *App) Validate() error {
 				checkComponentFilterValue(where, c.Filter, entities, add)
 				checkComponentPeriodFilter(where, c, entities, add)
 			}
+			checkPhotoIllustrate(where, c, add) // photo_illustrate.go
+			if c.Type != CompOpenURLButton && (c.App != "" || c.To != "") {
+				add("%s: app / to are only for openUrlButton", where)
+			}
 			switch c.Type {
 			case CompText:
-				if c.Text == "" {
-					add("%s: text is empty", where)
-				}
+				checkText(where, c, formEntity, add) // text_highlight.go
 			case CompButton:
 				if c.Label == "" || c.Action == nil {
 					add("%s: button needs label and action", where)
@@ -423,10 +441,12 @@ func (a *App) Validate() error {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
 				} else if f.Computed != nil && c.Type != CompImage && c.Type != CompVideoPlayer {
 					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
-				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs {
-					add("%s: picker field %q must be enum, ref or refs", where, c.Field)
+				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs && f.Type != FieldMember && f.Type != FieldMembers {
+					add("%s: picker field %q must be enum, ref, refs, member or members", where, c.Field)
 				} else if c.Type != CompPicker && (f.Type == FieldRef || f.Type == FieldRefs) {
 					add("%s: field %q is type %s; use a picker to choose the %s record", where, c.Field, f.Type, f.RefEntity)
+				} else if c.Type != CompPicker && (f.Type == FieldMember || f.Type == FieldMembers) {
+					add("%s: field %q is type %s; use a picker to choose the participant", where, c.Field, f.Type)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {
@@ -514,7 +534,7 @@ func (a *App) Validate() error {
 					add("%s: shareButton needs text", where)
 				}
 				if !ShareTargets[c.ShareTo] {
-					add("%s: shareButton shareTo %q must be one of any|line|slack|discord", where, c.ShareTo)
+					add("%s: shareButton shareTo %q must be one of any|line|slack|discord|x|mail", where, c.ShareTo)
 				}
 				if c.Field != "" {
 					if formEntity == nil {
@@ -524,11 +544,7 @@ func (a *App) Validate() error {
 					}
 				}
 			case CompOpenURLButton:
-				if c.Label == "" || c.URL == "" {
-					add("%s: openUrlButton needs label and url", where)
-				} else if !isOpenableURL(c.URL) {
-					add("%s: openUrlButton url %q must be https or one of the schemes %s", where, c.URL, strings.Join(OpenURLSchemes, ", "))
-				}
+				checkOpenURLButton(where, c, formEntity, add) // open_app.go
 			case CompWebView:
 				if !strings.HasPrefix(c.URL, "https://") {
 					add("%s: webView url %q must be an https URL", where, c.URL)
@@ -561,12 +577,15 @@ func (a *App) Validate() error {
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
 					add("%s: qrScanner field %q must be string or text", where, c.Field)
 				}
+				checkLocationButtonAddress(where, c, formEntity, add) // place_search.go
 			case CompQrCode: // #422
 				checkQRCode(where, c, formEntity, entities, add)
 			case CompLocationPicker: // #212
 				checkLocationPicker(where, c, formEntity, add)
 			case CompRouteGuide: // #411
 				checkRouteGuide(where, c, formEntity, entities, add)
+			case CompPlaceSearch:
+				checkPlaceSearch(where, c, formEntity, add) // place_search.go
 			case CompTimerDisplay:
 				switch c.Mode {
 				case "stopwatch":
@@ -637,8 +656,16 @@ func (a *App) Validate() error {
 			case CompRandomPicker:
 				checkRandomPicker(where, c, entities, add)
 				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompFileImport:
+				checkFileImport(where, c, entities, add) // file_import.go
 			case CompAudioRecorder:
 				checkAudioRecorder(where, c, formEntity, add)
+			case CompTranscribeField: // speech.go
+				checkTranscribeField(where, c, formEntity, add)
+			case CompSpeakButton: // speech.go
+				checkSpeakButton(where, c, formEntity, entities, add)
+			case CompDrawingField:
+				checkDrawingField(where, c, formEntity, add)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
@@ -649,6 +676,8 @@ func (a *App) Validate() error {
 				checkLocationTracker(where, c, entities, add)
 			case CompChatThread:
 				checkChatThread(where, c, entities, add)
+			case CompAiChat:
+				checkAIChat(where, c, entities, add) // ai_chat.go
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
 			case CompDashcam:
@@ -667,6 +696,12 @@ func (a *App) Validate() error {
 				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompFlashcards:
 				checkFlashcards(where, c, entities, add) // flashcards.go
+			case CompBracket:
+				checkBracket(where, c, entities, add) // bracket.go
+			case CompFeed:
+				checkFeed(where, c, add) // feed.go
+			case CompCallButton:
+				checkCallButton(where, c, a, add) // call_button.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -678,6 +713,7 @@ func (a *App) Validate() error {
 	checkRecordNav(a, entities, add) // #256
 	checkDashcamCount(a, add)        // #410
 	checkMusicPlayerCount(a, add)
+	checkAIInputFeeds(a, add) // ai_input_feed.go
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}
@@ -790,7 +826,7 @@ func isHTTPURL(s string) bool {
 }
 
 // ShareTargets are the shareButton.shareTo presets ("" = any, the OS share sheet).
-var ShareTargets = map[string]bool{"": true, "any": true, "line": true, "slack": true, "discord": true}
+var ShareTargets = map[string]bool{"": true, "any": true, "line": true, "slack": true, "discord": true, "x": true, "mail": true}
 
 // OpenURLSchemes is the allowlist of non-https schemes an openUrlButton may
 // launch (other apps / system handlers). Keep in sync with the iOS
@@ -855,9 +891,7 @@ func checkProgressBar(where string, c *Component, entities map[string]*Entity, a
 	if _, ok := checkAggregateRef(where, c, entities, add); !ok {
 		return
 	}
-	if c.Target == nil || *c.Target <= 0 {
-		add("%s: progressBar entity mode needs target > 0", where)
-	}
+	checkProgressTarget(where, c.Target, entities, add)
 }
 
 func checkGauge(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {

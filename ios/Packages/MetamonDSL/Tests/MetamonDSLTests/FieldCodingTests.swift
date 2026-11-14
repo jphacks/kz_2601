@@ -40,6 +40,17 @@ final class FieldCodingTests: XCTestCase {
         XCTAssertEqual(FieldCoding.display(.null, field: d, locale: ja, now: now), "")
     }
 
+    /// 端末の暦が和暦・仏暦でも、日本語の固定書式は西暦で出す(和暦だと「0007/10/24」になっていた)。
+    func testDisplayDateJaIgnoresNonGregorianCalendar() throws {
+        let now = try XCTUnwrap(FieldCoding.dateFormatter.date(from: "2026-06-01"))
+        let d = try field("date")
+        for id in ["ja_JP@calendar=japanese", "ja_JP@calendar=buddhist"] {
+            let locale = Locale(identifier: id)
+            XCTAssertEqual(FieldCoding.display(.string("2025-10-24"), field: d, locale: locale, now: now), "2025/10/24(金)", id)
+            XCTAssertEqual(FieldCoding.display(.string("2026-10-24"), field: d, locale: locale, now: now), "10/24(土)", id)
+        }
+    }
+
     func testDisplayDatetimeHasWeekdayAndTime() throws {
         let now = try XCTUnwrap(FieldCoding.dateFormatter.date(from: "2026-06-01"))
         let dt = try field("datetime")

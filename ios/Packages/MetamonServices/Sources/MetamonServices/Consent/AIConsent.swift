@@ -7,8 +7,10 @@ import MetamonDSL
 @MainActor
 @Observable
 public final class AIConsentStore {
-    /// 説明文(AIConsentView・プライバシーポリシー)の版。送る中身・送り先を変えたら上げる。
-    nonisolated public static let currentVersion = 1
+    /// 説明文(AIConsentView・プライバシーポリシー)の版。送る中身・送り先を変えたら上げる(ポリシー 6 章)。
+    /// 1: 初版(#246)。2: 「AI で書く」の範囲(要約・分類・書き直し・抜き出し・提案)と 4KB・端末内 AI なら送らない(ポリシー 2026-11 改定)。
+    /// 3: 長い答えは最大 16KB・いつもオンライン / aiChat 直近 20 発言・16KB / 写真のボタン 1 枚(JPEG・1024px)/ 共有は自分の記録だけ(ポリシー 2026-11-08 改定)。
+    nonisolated public static let currentVersion = 3
 
     nonisolated static let versionKey = "metamon.aiConsent.version"
     nonisolated static let dateKey = "metamon.aiConsent.date"
@@ -41,15 +43,41 @@ public final class AIConsentStore {
         grantedAt = nil
     }
 
+    /// 保存先を直接消した後(アカウント削除の端末データ削除)に、画面の状態を保存先に合わせ直す。
+    /// 合わせないと画面は「同意済み」のまま送信の砦(`ConsentGatedAIClient`)だけが止め、同意の画面も出なくなる。
+    public func reload() {
+        isGranted = Self.isGranted(in: defaults)
+        grantedAt = isGranted ? defaults.object(forKey: Self.dateKey) as? Date : nil
+    }
+
     /// 初回起動の説明を一度出したか(「あとで」を選んだ人に毎回は出さない。生成しようとした時はまた出る)。
     public var hasBeenPrompted: Bool { defaults.bool(forKey: Self.promptedKey) }
-    public func markPrompted() { defaults.set(true, forKey: Self.promptedKey) }
+    public func markPrompted() {
+        defaults.set(true, forKey: Self.promptedKey)
+        defaults.set(Self.currentVersion, forKey: Self.promptedVersionKey)
+    }
     nonisolated static let promptedKey = "metamon.aiConsent.prompted"
+    /// 最後に説明を出した版。古い版に同意した人へ、新しい版の説明を起動時に 1 回だけ出すため。
+    nonisolated static let promptedVersionKey = "metamon.aiConsent.promptedVersion"
+
+    /// 古い版の説明に同意したままの人(送る中身を変えたので、もう一度同意が要る)。取り消した人は含めない。
+    public var needsReconsent: Bool {
+        !isGranted && defaults.integer(forKey: Self.versionKey) > 0
+    }
+
+    /// 起動時に同意の画面を出すか。初回(まだ出していない)と、版が上がって出し直す時(その版で 1 回だけ)。
+    /// 「あとで」の人には毎回は出さない(生成しようとした時に出る)。
+    public var shouldPromptOnLaunch: Bool {
+        guard !isGranted else { return false }
+        if !hasBeenPrompted { return true }
+        return needsReconsent && defaults.integer(forKey: Self.promptedVersionKey) < Self.currentVersion
+    }
 
     /// UI テスト用: 保存した同意・既読を消して初回の状態に戻す。
     public func resetForTesting() {
         revoke()
         defaults.removeObject(forKey: Self.promptedKey)
+        defaults.removeObject(forKey: Self.promptedVersionKey)
     }
 
     /// どのスレッドからでも読める判定(`ConsentGatedAIClient` 用)。
@@ -85,6 +113,12 @@ public struct ConsentGatedAIClient: AIClient {
     public func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult {
         guard isGranted() else { throw AIConsentError.notGranted }
         return try await base.morph(transcript: transcript, appId: appId, currentVersion: currentVersion, locale: locale)
+    }
+
+    public func morph(transcript: String, appId: String, currentVersion: Int, locale: String?,
+                      progress: @escaping @Sendable (GenerateProgress) -> Void) async throws -> MorphResult {
+        guard isGranted() else { throw AIConsentError.notGranted }
+        return try await base.morph(transcript: transcript, appId: appId, currentVersion: currentVersion, locale: locale, progress: progress)
     }
 
     public func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {

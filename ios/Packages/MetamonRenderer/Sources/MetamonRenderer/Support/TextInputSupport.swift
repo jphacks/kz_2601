@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// テキスト入力の共通ルール(#196・LINE のトーク入力が手本)。
@@ -21,9 +25,11 @@ public enum TextInputRules {
     /// textField の複数行の行数(最小〜最大)。最大を超えたら欄の中でスクロール。
     static let multilineLines: ClosedRange<Int> = 3 ... 8
 
-    /// textEditor の行数。`minLines`(既定 4)から伸び、最低でも 10 行まで。
+    /// textEditor の行数。`minLines`(既定 4・最大 30)から伸び、最低でも 10 行まで。
+    /// 巨大な minLines(Int.max だと +6 で落ちる・数万行ぶんの高さを確保して固まる)は 30 行に丸める。
+    static let maxEditorMinLines = 30
     static func editorLines(minLines: Int?) -> ClosedRange<Int> {
-        let low = Swift.max(minLines ?? 4, 1)
+        let low = Swift.min(Swift.max(minLines ?? 4, 1), maxEditorMinLines)
         return low ... Swift.max(low + 6, 10)
     }
 }
@@ -32,6 +38,10 @@ extension KeyboardState {
     /// 画面上で今の入力欄の次(上 → 下、左 → 右)にある入力欄へフォーカスを移す。無ければキーボードを閉じる。
     /// leaf はそれぞれ自分の @FocusState しか持たないので、UIKit の responder で横断する。
     public static func focusNext() {
+        #if os(macOS)
+        // Mac: キーボードの Tab と同じ順(キービューの並び)で次へ
+        NSApp?.keyWindow?.selectNextKeyView(nil)
+        #else
         guard let window = UIApplication.shared.connectedScenes
             .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return dismiss() }
         let located: [(view: UIView, frame: CGRect)] = textInputs(in: window).map { view in
@@ -46,6 +56,7 @@ extension KeyboardState {
         // SwiftUI が return の後にフォーカスを外すことがあるので、次のループでも確かめる
         next.becomeFirstResponder()
         DispatchQueue.main.async { if !next.isFirstResponder { next.becomeFirstResponder() } }
+        #endif
     }
 
     /// 上 → 下、同じ行(4pt 以内)なら左 → 右。
@@ -55,16 +66,22 @@ extension KeyboardState {
         return a.minX < b.minX
     }
 
+    #if os(iOS)
     private static func textInputs(in view: UIView) -> [UIView] {
         if view.isHidden || view.alpha < 0.01 || !view.isUserInteractionEnabled { return [] }
         if let field = view as? UITextField { return field.isEnabled ? [field] : [] }
         if let text = view as? UITextView { return text.isEditable ? [text] : [] }
         return view.subviews.flatMap(textInputs(in:))
     }
+    #endif
 
     /// 日本語の変換中(未確定の文字)を確定させる。送信ボタンで未確定の文字が消えたり二重に残ったりしないよう、読む前に呼ぶ。
     public static func commitMarkedText() {
+        #if os(macOS)
+        focusedTextView()?.commitMarkedTextNow()
+        #else
         UIApplication.shared.sendAction(#selector(UITextInput.unmarkText), to: nil, from: nil, for: nil)
+        #endif
     }
 }
 
@@ -72,6 +89,12 @@ extension View {
     /// 1 行の入力欄: return =「次へ」(最後の欄なら閉じる)。
     func singleLineSubmit() -> some View {
         submitLabel(.next)
-            .onSubmit { KeyboardState.focusNext() }
+            .onSubmit {
+                #if os(macOS)
+                // 日本語の変換中の Return は確定だけ。次の欄へ進まない(#942)
+                guard IMEReturnGuard.allowsReturn(KeyboardState.focusedTextView()) else { return }
+                #endif
+                KeyboardState.focusNext()
+            }
     }
 }

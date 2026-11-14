@@ -49,7 +49,7 @@ func (d *feedbackDoc) toFeedback(id string, withBodies bool) *Feedback {
 // CreateFeedback implements Store. The daily count and the create run in one
 // transaction so parallel sends cannot exceed perDay.
 func (f *Firestore) CreateFeedback(ctx context.Context, fb Feedback, perDay int) (*Feedback, error) {
-	now := time.Now().UTC()
+	now := Now()
 	fb.ID, fb.Status, fb.Day, fb.CreatedAt = NewID("fb_"), FeedbackReceived, FeedbackDay(now), now
 	d := feedbackDoc{UID: fb.UID, Kind: fb.Kind, Message: fb.Message, Untrusted: true, ConsentVersion: fb.ConsentVersion,
 		Status: fb.Status, Attachments: fb.Attachments(), AppID: fb.AppID, DSLVersion: int64(fb.DSLVersion),
@@ -85,7 +85,7 @@ func (f *Firestore) ListFeedback(ctx context.Context, q FeedbackQuery) ([]Feedba
 		fq = fq.Where("createdAt", ">=", q.Since)
 	}
 	// without the bodies: a screenshot can be ~0.5 MB per document
-	fq = fq.Select("uid", "kind", "message", "consentVersion", "status", "appId", "dslVersion", "device", "day", "createdAt")
+	fq = fq.Select("uid", "kind", "message", "consentVersion", "status", "attachments", "appId", "dslVersion", "device", "day", "createdAt")
 	it := fq.Documents(ctx)
 	defer it.Stop()
 	out := []Feedback{}
@@ -102,7 +102,9 @@ func (f *Firestore) ListFeedback(ctx context.Context, q FeedbackQuery) ([]Feedba
 			return nil, err
 		}
 		if q.Status == "" || d.Status == q.Status {
-			out = append(out, *d.toFeedback(snap.Ref.ID, false))
+			fb := d.toFeedback(snap.Ref.ID, false)
+			fb.Listed = append([]string{}, d.Attachments...)
+			out = append(out, *fb)
 		}
 	}
 	return out, nil

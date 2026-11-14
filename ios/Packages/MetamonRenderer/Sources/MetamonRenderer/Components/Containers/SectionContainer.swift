@@ -14,6 +14,7 @@ struct SectionContainer: View {
                     .kerning(0.3)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, RenderTheme.Spacing.xs + 2)
+                    .macAccessibilityHeading()
             }
             if c.children.allSatisfy(\.rendersOwnSurface) {
                 // list / table など自前の面を持つ子だけなら見出し + そのまま(カードの中にカードを作らない)。

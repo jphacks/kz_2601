@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ヘルスコネクトの「権限の理由」の画面(#870)。Health Connect と OS の設定から開かれる。英語は values-en。 -->
+<resources>
+    <string name="health_rationale_close">閉じる</string>
+    <string name="health_rationale_title">ヘルスコネクトのデータの使い方</string>
+    <string name="health_rationale_read">歩数と体重は、あなたが作ったアプリの画面に出すためだけに読みます。読んだ値は端末の中で表示するだけで、サーバーには送りません。</string>
+    <string name="health_rationale_write">体重を記録するアプリでは、保存した体重をヘルスコネクトにも書き込みます。書き込むのはあなたが保存した時だけです。</string>
+    <string name="health_rationale_note">許可はいつでもヘルスコネクトの設定で外せます。外しても、アプリの記録は残ります。</string>
+</resources>

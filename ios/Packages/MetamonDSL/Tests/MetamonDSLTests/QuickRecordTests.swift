@@ -73,4 +73,78 @@ final class QuickRecordTests: XCTestCase {
         XCTAssertEqual(QuickRecord.build(entity: entity, text: "ベンチ 60").data["weight"], 60) // 単位なしは先頭の数値
         XCTAssertEqual(QuickRecord.build(entity: entity, text: "スクワット 20回").data["sets"], 3)
     }
+
+    // MARK: - ref(カテゴリ台帳など、ユーザーが編集する参照先)
+
+    /// 支出(memo / amount / category=ref→categories / payment=enum)と、カテゴリ台帳。
+    private func refDSL(categoryDefault: String? = nil) throws -> AppDSL {
+        let def = categoryDefault.map { #","defaultValue":"\#($0)""# } ?? ""
+        let json = """
+        {"schemaVersion":1,"app":{"name":"t"},"initialScreen":"home","entities":[
+         {"id":"expense","name":"支出","titleField":"memo","fields":[
+          {"id":"memo","name":"メモ","type":"string"},
+          {"id":"amount","name":"金額","type":"currency","required":true},
+          {"id":"category","name":"カテゴリ","type":"ref","refEntity":"categories"\(def)},
+          {"id":"payment","name":"支払い","type":"enum","options":["現金","カード"]}]},
+         {"id":"categories","name":"カテゴリ","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"}]}],
+         "screens":[{"id":"home","title":"t","components":[]}]}
+        """
+        return try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+    }
+
+    private let categories: [Record] = [
+        Record(id: "c1", data: ["name": "食費"]),
+        Record(id: "c2", data: ["name": "食費(外食)"]),
+        Record(id: "c3", data: ["name": "交通費"]),
+    ]
+
+    private func refBuild(_ text: String, categoryDefault: String? = nil, records: [Record]? = nil) throws -> QuickRecord.Draft {
+        let dsl = try refDSL(categoryDefault: categoryDefault)
+        let entity = try XCTUnwrap(dsl.entity("expense"))
+        let choices = QuickRecord.refChoices(for: entity, in: dsl, records: ["categories": records ?? categories])
+        return QuickRecord.build(entity: entity, text: text, refChoices: choices)
+    }
+
+    /// 1 文字の見出しは語の一部に当たりやすい(「電車」に「車」・「1200円」に「1」)ので、空白で区切った語と一致する時だけ当てる。
+    func testRefShortTitleNeedsWholeWord() throws {
+        let short = categories + [Record(id: "c4", data: ["name": "車"]), Record(id: "c5", data: ["name": "1"])]
+        XCTAssertNil(try refBuild("電車 300円", records: short).data["category"])
+        XCTAssertNil(try refBuild("ランチ 1200円", records: short).data["category"])
+        XCTAssertEqual(try refBuild("車 ガソリン 3000円", records: short).data["category"], "c4")
+        XCTAssertEqual(try refBuild("食費 電車 300円", records: short).data["category"], "c1") // 2 文字以上は従来どおり部分一致
+    }
+
+    /// Siri の返事で、どのカテゴリに入れたか分かるようにする(メモに同じ語が残るので要約だけでは当たったか分からない)。
+    func testRefMatchIsReported() throws {
+        XCTAssertEqual(try refBuild("食費 コンビニ 480円").refs, ["カテゴリ: 食費"])
+        XCTAssertEqual(try refBuild("コンビニ 480円").refs, [])
+        XCTAssertEqual(try refBuild("コンビニ 480円", categoryDefault: "c3").refs, []) // 既定値は当てたものではない
+    }
+
+    func testRefMatchedByRecordTitle() throws {
+        let draft = try refBuild("食費 コンビニ 480円")
+        XCTAssertEqual(draft.data["category"], "c1") // 見出しでなく id を入れる
+        XCTAssertEqual(draft.data["amount"], 480)
+        XCTAssertEqual(draft.data["memo"], "食費 コンビニ") // enum と同じく残りの文言はそのまま
+        XCTAssertEqual(draft.missing, [])
+    }
+
+    func testRefLongestTitleWins() throws {
+        XCTAssertEqual(try refBuild("食費(外食) ラーメン 900円").data["category"], "c2")
+    }
+
+    func testRefNoMatchLeavesEmptyOrDefault() throws {
+        XCTAssertNil(try refBuild("コンビニ 480円").data["category"])
+        XCTAssertEqual(try refBuild("コンビニ 480円", categoryDefault: "c3").data["category"], "c3")
+        // 候補を渡さない(従来の呼び出し)も空のまま
+        let entity = try XCTUnwrap(try refDSL().entity("expense"))
+        XCTAssertNil(QuickRecord.build(entity: entity, text: "食費 480円").data["category"])
+    }
+
+    func testEnumAndRefBothMatched() throws {
+        let draft = try refBuild("交通費 カード 300円")
+        XCTAssertEqual(draft.data["category"], "c3")
+        XCTAssertEqual(draft.data["payment"], "カード")
+        XCTAssertEqual(draft.data["amount"], 300)
+    }
 }

@@ -1,0 +1,4 @@
+[
+  {"id": "sgc_can_setting", "group": "single", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#267 周期・目標を設定の画面で変えられる",
+   "steps": [{"say": "生理の周期を自分で設定して、次の予定日を出すことってできる?", "textAny": ["できます", "できる"], "textNot": ["できません", "single", "setting"]}]}
+]

@@ -1,4 +1,3 @@
-#if os(iOS)
 import Foundation
 import MusicKit
 import MetamonDSL
@@ -7,6 +6,7 @@ import MetamonDSL
 /// - 許可: `NSAppleMusicUsageDescription`。カタログの再生は Apple Music の契約が要る(`MusicSubscription`)
 /// - App ID に MusicKit(App Services)が要る。無いとカタログの取得が失敗する(docs/ios/architecture.md)
 /// - イヤホンのボタン・ロック画面・コントロールセンターは OS が `ApplicationMusicPlayer` を直接操作する
+/// - Mac(#960)も同じ実体。`ApplicationMusicPlayer` は macOS 14 から(`SystemMusicPlayer` は Mac に無い)
 @MainActor
 public final class AppleMusicPlayback: MusicPlayback {
     private var player: ApplicationMusicPlayer { .shared }
@@ -92,4 +92,3 @@ public final class AppleMusicPlayback: MusicPlayback {
                          artworkURL: e.artwork?.url(width: 200, height: 200)?.absoluteString)
     }
 }
-#endif

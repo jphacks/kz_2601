@@ -43,6 +43,7 @@ private final class FakeShareClient: SharingClient, MembershipClient, @unchecked
     func members(appId: String) async throws -> SharedMemberList { SharedMemberList(items: [], role: .member) }
     func removeMember(appId: String, uid: String) async throws {}
     func leave(appId: String) async throws {}
+    func setAdmin(appId: String, uid: String, admin: Bool) async throws {}
 }
 
 /// 参加者 API を持たない古いシェアの実装(プレビュー無しで import する経路)。
@@ -57,7 +58,7 @@ private final class PlainShareClient: SharingClient, @unchecked Sendable {
     func searchPublicApps(query: String, sort: String) async throws -> [PublicAppListing] { [] }
 }
 
-/// #558: 共有リンクの取り込み(importShared)→ 課金画面(#414)→ 参加の確認(pendingJoin)→ 参加(joinShared)と、公開アプリのインストール(installPublic)の分かれ道。
+/// #558: 共有リンクの取り込み(importShared)→ 課金画面(#414)→ 参加の確認(pendingJoin)→ 参加(joinShared)/ 追加の確認(pendingImport)→ 追加(confirmImport)と、公開アプリのインストール(installPublic)の分かれ道。
 @MainActor
 final class ShareJoinFlowTests: XCTestCase {
     private let token = "tok_family"
@@ -82,6 +83,7 @@ final class ShareJoinFlowTests: XCTestCase {
 
     private func resetSharingUI() {
         SharingUI.shared.pendingJoin = nil
+        SharingUI.shared.pendingImport = nil
         SharingUI.shared.showDiscover = false
         SharingUI.shared.issued = [:]
         SharingUI.shared.shareTarget = nil
@@ -91,7 +93,6 @@ final class ShareJoinFlowTests: XCTestCase {
     private func added(_ name: String) -> String { L10n.tr("シェアされた「\(name)」を追加しました") }
     private func installed(_ name: String) -> String { L10n.tr("「\(name)」をインストールしました") }
     private func joinedBanner(_ name: String) -> String { L10n.tr("「\(name)」に参加しました") }
-    private func declined(_ name: String) -> String { L10n.tr("「\(name)」には参加しませんでした。参加には Tailor It Pro が必要です") }
 
     private func makeRuntime(_ sharing: (any SharingClient)?, enforced: Bool = true, pro: Bool = false) async throws -> AppRuntime {
         var services = BuildConfig.make(environment: .mock)
@@ -104,62 +105,18 @@ final class ShareJoinFlowTests: XCTestCase {
         return rt
     }
 
-    private func waitForPaywall(_ rt: AppRuntime, timeout: Duration = .seconds(5)) async throws -> PaywallRequest {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            if let request = rt.proGate.paywall { return request }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        XCTFail("課金画面が出ない")
-        throw Timeout()
-    }
-
-    private struct Timeout: Error {}
-
-    private func buy(_ rt: AppRuntime) async throws {
-        let outcome = try await rt.proGate.store.purchaseOffer()
-        XCTAssertEqual(outcome, .purchased)
-        rt.proGate.finishPaywall() // 購入後に課金画面が自動で閉じる
-    }
-
     // MARK: - importShared: 記録を共有するアプリ(プレビューあり)
 
-    /// 自分のでない共有アプリ → 課金画面(参加の理由・閉じた時の一言)→ 購入 → 参加の確認。この時点では import しない
-    func testSharedPreviewPaywallPurchaseOpensJoinConfirmation() async throws {
+    /// 自分のでない共有アプリ → 課金画面を出さずに参加の確認(参加者は無料・H5)。この時点では import しない
+    func testSharedPreviewParticipantJoinsWithoutPaywall() async throws {
         let fake = FakeShareClient()
         fake.preview = .success(familyPreview)
         let rt = try await makeRuntime(fake)
-        let run = Task { await rt.importShared(token: token) }
-
-        let request = try await waitForPaywall(rt)
-        XCTAssertEqual(request.reason, .join(appName: "家族の買い物"))
-        XCTAssertEqual(request.placement, .root)
-        XCTAssertEqual(request.closeNote, L10n.tr("閉じると参加しません。"))
-        XCTAssertNil(SharingUI.shared.pendingJoin, "課金画面の間は参加の確認を出さない")
-
-        try await buy(rt)
-        await run.value
+        await rt.importShared(token: token)
+        XCTAssertNil(rt.proGate.paywall, "参加者に課金画面を出さない")
         XCTAssertEqual(SharingUI.shared.pendingJoin, PendingJoin(token: token, preview: familyPreview))
         XCTAssertTrue(fake.importCalls.isEmpty && fake.joinCalls.isEmpty, "参加の確認の前に import しない")
-        XCTAssertNil(rt.proGate.paywall)
         XCTAssertNil(rt.toast)
-    }
-
-    /// 課金画面を閉じる → 参加の確認を出さず、import もしない。理由をトーストで知らせる
-    func testSharedPreviewPaywallDismissDoesNotJoin() async throws {
-        let fake = FakeShareClient()
-        fake.preview = .success(familyPreview)
-        let rt = try await makeRuntime(fake)
-        let appId = rt.document.appId
-        let run = Task { await rt.importShared(token: token) }
-
-        _ = try await waitForPaywall(rt)
-        rt.proGate.finishPaywall()
-        await run.value
-        XCTAssertNil(SharingUI.shared.pendingJoin)
-        XCTAssertTrue(fake.importCalls.isEmpty && fake.joinCalls.isEmpty)
-        XCTAssertEqual(rt.toast, declined("家族の買い物"))
-        XCTAssertEqual(rt.document.appId, appId, "変身しない")
     }
 
     /// Pro ならそのまま参加の確認(課金画面は出さない)
@@ -183,90 +140,119 @@ final class ShareJoinFlowTests: XCTestCase {
         XCTAssertEqual(SharingUI.shared.pendingJoin?.preview, familyPreview)
     }
 
-    // MARK: - importShared: そのまま取り込む
+    // MARK: - importShared: 追加の確認 → 取り込む
 
-    /// 記録を共有しないアプリ → プレビューの後そのまま import して変身(課金画面・参加の確認なし)
-    func testPrivateAppIsImportedDirectly() async throws {
+    /// 記録を共有しないアプリ → 取り込む前に追加の確認(この時点では import しない・課金画面なし)
+    func testPrivateAppAsksBeforeImport() async throws {
+        let fake = FakeShareClient()
+        let preview = ShareLinkPreview(token: token, name: "家計簿", sharedData: false)
+        fake.preview = .success(preview)
+        let rt = try await makeRuntime(fake)
+        let appId = rt.document.appId
+        await rt.importShared(token: token)
+
+        XCTAssertEqual(fake.previewCalls, [token])
+        XCTAssertEqual(SharingUI.shared.pendingImport, PendingImport(token: token, preview: preview))
+        XCTAssertNil(SharingUI.shared.pendingJoin)
+        XCTAssertTrue(fake.importCalls.isEmpty && fake.joinCalls.isEmpty, "追加の確認の前に import しない")
+        XCTAssertNil(rt.proGate.paywall)
+        XCTAssertEqual(rt.document.appId, appId)
+        XCTAssertNil(rt.toast)
+    }
+
+    /// 追加の確認 → 追加する、の通し: import してシートを閉じて変身
+    func testPrivateAppConfirmImportsAndSwitches() async throws {
         let fake = FakeShareClient()
         fake.preview = .success(ShareLinkPreview(token: token, name: "家計簿", sharedData: false))
         let rt = try await makeRuntime(fake)
         await rt.importShared(token: token)
 
-        XCTAssertEqual(fake.previewCalls, [token])
+        let pending = try XCTUnwrap(SharingUI.shared.pendingImport)
+        let error = await rt.confirmImport(pending)
+        XCTAssertNil(error)
         XCTAssertEqual(fake.importCalls, [token])
         XCTAssertTrue(fake.joinCalls.isEmpty)
-        XCTAssertNil(SharingUI.shared.pendingJoin)
+        XCTAssertNil(SharingUI.shared.pendingImport, "シートを閉じる")
         XCTAssertNil(rt.proGate.paywall)
         XCTAssertEqual(rt.document.appId, "copied-app")
         XCTAssertEqual(rt.summaryBanner?.text, added("家計簿"))
     }
 
-    /// プレビューが取れない(古いサーバー・通信の失敗)→ 従来どおり import
-    func testPreviewFailureFallsBackToImport() async throws {
+    /// 追加しない(シートを閉じる)→ import しない・変身しない
+    func testDeclineDoesNotImport() async throws {
+        let fake = FakeShareClient()
+        fake.preview = .success(ShareLinkPreview(token: token, name: "家計簿", sharedData: false))
+        let rt = try await makeRuntime(fake)
+        let appId = rt.document.appId
+        await rt.importShared(token: token)
+        XCTAssertNotNil(SharingUI.shared.pendingImport)
+
+        SharingUI.shared.pendingImport = nil
+        XCTAssertTrue(fake.importCalls.isEmpty)
+        XCTAssertEqual(rt.document.appId, appId)
+        XCTAssertNil(rt.summaryBanner)
+    }
+
+    /// プレビューが取れない(古いサーバー・通信の失敗)→ 名前なしで追加の確認 → 追加すると import
+    func testPreviewFailureStillAsksBeforeImport() async throws {
         let fake = FakeShareClient()
         fake.preview = .failure(URLError(.timedOut))
         let rt = try await makeRuntime(fake)
         await rt.importShared(token: token)
-        XCTAssertEqual(fake.importCalls, [token])
+        XCTAssertEqual(SharingUI.shared.pendingImport, PendingImport(token: token, preview: nil))
+        XCTAssertTrue(fake.importCalls.isEmpty)
         XCTAssertNil(SharingUI.shared.pendingJoin)
+
+        let error = await rt.confirmImport(try XCTUnwrap(SharingUI.shared.pendingImport))
+        XCTAssertNil(error)
+        XCTAssertEqual(fake.importCalls, [token])
         XCTAssertEqual(rt.document.appId, "copied-app")
     }
 
-    /// 参加者 API の無いシェアの実装はプレビューを見ずに import
-    func testClientWithoutMembershipImportsDirectly() async throws {
+    /// 参加者 API の無いシェアの実装もプレビューなしで追加の確認を出す
+    func testClientWithoutMembershipAsksBeforeImport() async throws {
         let rt = try await makeRuntime(PlainShareClient())
         await rt.importShared(token: token)
         XCTAssertNil(SharingUI.shared.pendingJoin)
+        XCTAssertEqual(SharingUI.shared.pendingImport, PendingImport(token: token, preview: nil))
+
+        let error = await rt.confirmImport(try XCTUnwrap(SharingUI.shared.pendingImport))
+        XCTAssertNil(error)
         XCTAssertEqual(rt.document.appId, "plain-app")
         XCTAssertEqual(rt.summaryBanner?.text, added("日記"))
     }
 
-    /// プレビューが取れずに import した結果が共有アプリ(joined)→ 変身の前に課金画面 → 閉じると変身しない
-    func testImportedJoinedAppWithoutPreviewGoesThroughPaywall() async throws {
+    /// プレビューが取れずに追加した結果が共有アプリ(joined)→ 課金画面を出さずに変身し、みんなの投稿が見えることを添える(H5)
+    func testImportedJoinedAppWithoutPreviewSwitchesWithoutPaywall() async throws {
         let fake = FakeShareClient()
         fake.imported = .success(InstalledApp(appId: "board-app", name: "掲示板", joined: true))
         let rt = try await makeRuntime(fake)
-        let appId = rt.document.appId
-        let run = Task { await rt.importShared(token: token) }
-
-        let request = try await waitForPaywall(rt)
-        XCTAssertEqual(request.reason, .join(appName: "掲示板"))
-        rt.proGate.finishPaywall()
-        await run.value
-        XCTAssertEqual(rt.document.appId, appId, "買わなければ開かない")
-        XCTAssertEqual(rt.toast, declined("掲示板"))
-        XCTAssertNil(rt.summaryBanner)
-    }
-
-    /// 同じ経路で購入 → 変身し、みんなの投稿が見えることを添える
-    func testImportedJoinedAppPurchaseSwitches() async throws {
-        let fake = FakeShareClient()
-        fake.imported = .success(InstalledApp(appId: "board-app", name: "掲示板", joined: true))
-        let rt = try await makeRuntime(fake)
-        let run = Task { await rt.importShared(token: token) }
-        _ = try await waitForPaywall(rt)
-        try await buy(rt)
-        await run.value
+        await rt.importShared(token: token)
+        _ = await rt.confirmImport(try XCTUnwrap(SharingUI.shared.pendingImport))
+        XCTAssertNil(rt.proGate.paywall, "参加者に課金画面を出さない")
         XCTAssertEqual(rt.document.appId, "board-app")
         XCTAssertEqual(rt.summaryBanner?.text, added("掲示板") + L10n.tr("。みんなの投稿も見られます"))
+        XCTAssertNil(rt.toast)
     }
 
-    /// 自分が出した共有アプリのリンクを自分で開く(preview.mine)。`PaidGate.joinNeedsPaywall` の方針どおり自分のアプリは無料のはず
+    /// 自分が出した共有アプリのリンクを自分で開く(preview.mine)。参加の確認・課金画面は出さず、追加の確認だけ
     func testOwnSharedAppLinkNeverShowsPaywall() async throws {
         let fake = FakeShareClient()
         fake.preview = .success(ShareLinkPreview(token: token, name: "家族の買い物", mine: true, sharedData: true))
         // backend installCopy: 共有 entity を持つアプリは元 appId を返し joined:true(既に持っていても)
         fake.imported = .success(InstalledApp(appId: "family-app", name: "家族の買い物", joined: true))
         let rt = try await makeRuntime(fake)
-        let run = Task { await rt.importShared(token: token) }
+        await rt.importShared(token: token)
+        XCTAssertNil(SharingUI.shared.pendingJoin, "自分のアプリは参加の確認を出さない")
+        let pending = try XCTUnwrap(SharingUI.shared.pendingImport)
+        let run = Task { await rt.confirmImport(pending) }
 
         let deadline = ContinuousClock.now + .seconds(2)
         while rt.proGate.paywall == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
         // #561: adopt() は InstalledApp.joined を見るが、自分のアプリ(preview.mine)は無料
         XCTAssertNil(rt.proGate.paywall, "自分のアプリを開くのに課金画面を出さない")
         rt.proGate.finishPaywall()
-        await run.value
-        XCTAssertNil(SharingUI.shared.pendingJoin, "自分のアプリは参加の確認を出さない")
+        _ = await run.value
         XCTAssertTrue(fake.joinCalls.isEmpty)
         XCTAssertEqual(fake.importCalls, [token])
         XCTAssertEqual(rt.document.appId, "family-app")
@@ -279,13 +265,15 @@ final class ShareJoinFlowTests: XCTestCase {
         fake.preview = .failure(URLError(.timedOut))
         fake.imported = .success(InstalledApp(appId: "family-app", name: "家族の買い物", joined: true, mine: true))
         let rt = try await makeRuntime(fake)
-        let run = Task { await rt.importShared(token: token) }
+        await rt.importShared(token: token)
+        let pending = try XCTUnwrap(SharingUI.shared.pendingImport)
+        let run = Task { await rt.confirmImport(pending) }
 
         let deadline = ContinuousClock.now + .seconds(2)
         while rt.proGate.paywall == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
         XCTAssertNil(rt.proGate.paywall, "プレビューが無くても自分のアプリに課金画面を出さない")
         rt.proGate.finishPaywall()
-        await run.value
+        _ = await run.value
         XCTAssertEqual(fake.importCalls, [token])
         XCTAssertNil(SharingUI.shared.pendingJoin)
         XCTAssertEqual(rt.document.appId, "family-app")
@@ -294,6 +282,7 @@ final class ShareJoinFlowTests: XCTestCase {
 
     // MARK: - importShared: 失敗
 
+    /// 追加に失敗 → シートは開いたまま、画面に出す文言を返す(変身しない)
     func testImportFailureShowsRevokedMessage() async throws {
         let fake = FakeShareClient()
         fake.preview = .success(ShareLinkPreview(token: token, name: "家計簿"))
@@ -301,8 +290,12 @@ final class ShareJoinFlowTests: XCTestCase {
         let rt = try await makeRuntime(fake)
         let appId = rt.document.appId
         await rt.importShared(token: token)
-        XCTAssertEqual(rt.toast, L10n.tr("このシェアリンクは取り消されたか、存在しません"))
+        let pending = try XCTUnwrap(SharingUI.shared.pendingImport)
+        let error = await rt.confirmImport(pending)
+        XCTAssertEqual(error, L10n.tr("このシェアリンクは取り消されたか、存在しません"))
+        XCTAssertEqual(SharingUI.shared.pendingImport, pending, "シートは開いたまま")
         XCTAssertEqual(rt.document.appId, appId)
+        XCTAssertNil(rt.summaryBanner)
     }
 
     func testImportWithoutServerShowsToast() async throws {
@@ -310,6 +303,18 @@ final class ShareJoinFlowTests: XCTestCase {
         await rt.importShared(token: token)
         XCTAssertEqual(rt.toast, L10n.tr("シェアリンクはサーバー接続時のみ開けます"))
         XCTAssertNil(SharingUI.shared.pendingJoin)
+        XCTAssertNil(SharingUI.shared.pendingImport)
+    }
+
+    /// 追加の確認の文言に英訳がある
+    func testAddConfirmCopyHasEnglish() throws {
+        let path = try XCTUnwrap(Bundle(for: AppRuntime.self).path(forResource: "en", ofType: "lproj"))
+        let en = try XCTUnwrap(Bundle(path: path))
+        for key in ["「%@」を追加しますか?", "シェアされたアプリを追加しますか?", "追加すると、このアプリに切り替わります", "追加する", "追加しない"] {
+            let value = en.localizedString(forKey: key, value: "__missing__", table: nil)
+            XCTAssertNotEqual(value, "__missing__", "英語が無い: \(key)")
+            XCTAssertNotEqual(value, key, "英語が日本語のまま: \(key)")
+        }
     }
 
     func testOpenShareURL() async throws {
@@ -321,6 +326,17 @@ final class ShareJoinFlowTests: XCTestCase {
         XCTAssertTrue(fake.previewCalls.isEmpty)
 
         let handled = await rt.openShareURL(URL(string: "tailorit://import/\(token)")!)
+        XCTAssertTrue(handled)
+        XCTAssertEqual(fake.previewCalls, [token])
+        XCTAssertEqual(SharingUI.shared.pendingJoin?.token, token)
+    }
+
+    /// #331: Universal Links `https://tailor-it.app/s/<token>` も URL スキームと同じ参加の確認に進む
+    func testOpenUniversalLinkRoutesToSameJoinFlow() async throws {
+        let fake = FakeShareClient()
+        fake.preview = .success(familyPreview)
+        let rt = try await makeRuntime(fake, pro: true)
+        let handled = await rt.openShareURL(URL(string: "https://tailor-it.app/s/\(token)")!)
         XCTAssertTrue(handled)
         XCTAssertEqual(fake.previewCalls, [token])
         XCTAssertEqual(SharingUI.shared.pendingJoin?.token, token)
@@ -388,20 +404,17 @@ final class ShareJoinFlowTests: XCTestCase {
         XCTAssertEqual(SharedDisplayName.last, "たろう")
     }
 
-    /// 課金画面で購入 → 参加の確認 → 参加、の通し
-    func testPaywallThenJoinEndToEnd() async throws {
+    /// 参加の確認 → 参加、の通し(課金画面は一度も出ない・H5)
+    func testJoinEndToEndWithoutPaywall() async throws {
         let fake = FakeShareClient()
         fake.preview = .success(familyPreview)
         let rt = try await makeRuntime(fake)
-        let run = Task { await rt.importShared(token: token) }
-        _ = try await waitForPaywall(rt)
-        try await buy(rt)
-        await run.value
+        await rt.importShared(token: token)
 
         let join = try XCTUnwrap(SharingUI.shared.pendingJoin)
         let error = await rt.joinShared(join, displayName: "父")
         XCTAssertNil(error)
-        XCTAssertNil(rt.proGate.paywall, "購入済みなので参加の後に聞き直さない")
+        XCTAssertNil(rt.proGate.paywall, "参加者に課金画面を出さない")
         XCTAssertNil(SharingUI.shared.pendingJoin)
         XCTAssertEqual(rt.document.appId, "family-app")
     }
@@ -426,7 +439,8 @@ final class ShareJoinFlowTests: XCTestCase {
         let rt = try await makeRuntime(fake)
         let appId = rt.document.appId
         await rt.installPublic(PublicAppListing(id: "catalog-walk", name: "散歩"))
-        XCTAssertEqual(rt.toast, L10n.tr("インストールできませんでした: \(failure.localizedDescription)"))
+        XCTAssertEqual(rt.toast, L10n.tr("\(L10n.tr("インストールできませんでした"))。\(ErrorCopy.offlineInterruptedBody)"))
+        XCTAssertFalse(rt.toast?.contains(failure.localizedDescription) ?? true, "OS のエラー文は出さない(H9)")
         XCTAssertEqual(rt.document.appId, appId)
         XCTAssertNil(rt.summaryBanner)
     }
@@ -439,34 +453,16 @@ final class ShareJoinFlowTests: XCTestCase {
         XCTAssertEqual(rt.document.appId, appId)
     }
 
-    /// みんなの記録を見る公開アプリ(joined)→ 探すを閉じて課金画面 → 閉じたら開かない
-    func testInstallPublicJoinedAppPaywallDismiss() async throws {
+    /// みんなの記録を見る公開アプリ(joined)→ 課金画面を出さずに開く(H5)
+    func testInstallPublicJoinedAppOpensWithoutPaywall() async throws {
         let fake = FakeShareClient()
         fake.installed = .success(InstalledApp(appId: "catalog-board", name: "掲示板", joined: true))
         let rt = try await makeRuntime(fake)
-        let appId = rt.document.appId
-        SharingUI.shared.showDiscover = true
-        let run = Task { await rt.installPublic(PublicAppListing(id: "catalog-board", name: "掲示板")) }
-
-        let request = try await waitForPaywall(rt)
-        XCTAssertEqual(request.reason, .join(appName: "掲示板"))
-        XCTAssertFalse(SharingUI.shared.showDiscover, "課金画面の前に探すを閉じる")
-        rt.proGate.finishPaywall()
-        await run.value
-        XCTAssertEqual(rt.document.appId, appId)
-        XCTAssertEqual(rt.toast, declined("掲示板"))
-    }
-
-    func testInstallPublicJoinedAppPaywallPurchase() async throws {
-        let fake = FakeShareClient()
-        fake.installed = .success(InstalledApp(appId: "catalog-board", name: "掲示板", joined: true))
-        let rt = try await makeRuntime(fake)
-        let run = Task { await rt.installPublic(PublicAppListing(id: "catalog-board", name: "掲示板")) }
-        _ = try await waitForPaywall(rt)
-        try await buy(rt)
-        await run.value
+        await rt.installPublic(PublicAppListing(id: "catalog-board", name: "掲示板"))
+        XCTAssertNil(rt.proGate.paywall, "インストールした人に課金画面を出さない")
         XCTAssertEqual(rt.document.appId, "catalog-board")
         XCTAssertEqual(rt.summaryBanner?.text, installed("掲示板") + L10n.tr("。みんなの投稿も見られます"))
+        XCTAssertNil(rt.toast)
     }
 
     /// 自分が公開した、みんなの記録を見るアプリ(listing.mine・joined)は課金画面を出さずに開く(#561)

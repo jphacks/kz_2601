@@ -9,6 +9,30 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+// Any authenticated request records users/{uid}.firstSeenAt once (#339: the
+// runner's account age); later requests keep the first time.
+func TestRejectDeletedRecordsFirstSeen(t *testing.T) {
+	e := newEnv(t)
+	st := store.NewMemory()
+	e.h = auth.Middleware(nil, auth.ModeDev)(RejectDeleted(st, New(st)))
+	ctx := t.Context()
+
+	if r := e.do("", http.MethodGet, "/v1/apps", nil, nil); r.code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated: %d", r.code)
+	}
+	if r := e.do("newbie", http.MethodGet, "/v1/apps", nil, nil); r.code != http.StatusOK {
+		t.Fatalf("GET /v1/apps: %d %s", r.code, r.raw)
+	}
+	first, known, err := st.UserFirstSeen(ctx, "newbie")
+	if err != nil || !known {
+		t.Fatalf("first seen not recorded: %v %v", known, err)
+	}
+	e.do("newbie", http.MethodGet, "/v1/apps", nil, nil)
+	if at, _, _ := st.UserFirstSeen(ctx, "newbie"); !at.Equal(first) {
+		t.Fatalf("first seen moved: %v -> %v", first, at)
+	}
+}
+
 func TestDeleteMe(t *testing.T) {
 	e := newEnv(t)
 	st := store.NewMemory()

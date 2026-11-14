@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ホーム画面のウィジェット(#912・iOS の MetamonWidget/Localizable.xcstrings と同じ文) -->
+<resources>
+    <string name="widget_count">件数</string>
+    <string name="widget_description">作ったアプリの集計(今月の支出など)をホーム画面に表示します。</string>
+    <string name="widget_last_7_days">直近 7 日</string>
+    <string name="widget_name">Tailor It の数字</string>
+    <string name="widget_no_app">Tailor It でアプリを作るとここに数字が出ます</string>
+    <string name="widget_no_app_review">Tailor It で記録帳を用意するとここに数字が出ます</string>
+    <string name="widget_no_records">まだ記録がありません</string>
+    <string name="widget_no_stat">「%1$s」に集計(stat)の部品がありません</string>
+    <string name="widget_recent">最近の記録</string>
+</resources>

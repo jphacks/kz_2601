@@ -12,12 +12,15 @@ public struct ComponentRegistry: Sendable {
     public typealias Builder = @MainActor @Sendable (Component, RenderContext) -> AnyView
 
     private var builders: [String: Builder] = [:]
+    /// 「この Mac では使えません」の枠で登録した type(#947)。申告(`ClientCapabilities.macUnavailableComponents`)との一致をテストで確かめる。
+    public private(set) var unavailableTypes: Set<String> = []
 
     public init() {}
 
     /// `type` 文字列で登録(ホストが schema 外の独自コンポーネントを足す時もこちら)。
     public mutating func register<V: View>(_ type: String, @ViewBuilder _ build: @escaping @MainActor @Sendable (Component, RenderContext) -> V) {
         builders[type] = { AnyView(build($0, $1)) }
+        unavailableTypes.remove(type)
     }
 
     public mutating func register<V: View>(_ type: ComponentType, @ViewBuilder _ build: @escaping @MainActor @Sendable (Component, RenderContext) -> V) {
@@ -44,7 +47,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.hstack) { c, ctx in HStackContainer(c: c, ctx: ctx) }
         r.register(.section) { c, ctx in SectionContainer(c: c, ctx: ctx) }
         // leaf
-        r.register(.text) { c, _ in TextLeaf(c: c) }
+        r.register(.text) { c, ctx in TextLeaf(c: c, ctx: ctx) }
         r.register(.button) { c, ctx in ButtonLeaf(c: c, ctx: ctx) }
         r.register(.textField) { c, ctx in TextFieldLeaf(c: c, ctx: ctx) }
         r.register(.numberField) { c, ctx in NumberFieldLeaf(c: c, ctx: ctx) }
@@ -52,6 +55,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.picker) { c, ctx in PickerLeaf(c: c, ctx: ctx) }
         r.register(.toggle) { c, ctx in ToggleLeaf(c: c, ctx: ctx) }
         r.register(.photoField) { c, ctx in PhotoFieldLeaf(c: c, ctx: ctx) }
+        r.register(.drawingField) { c, ctx in DrawingFieldLeaf(c: c, ctx: ctx) } // 審査用ビルドにも入れる(写真と同じ扱い・権限を使わない)
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
         r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
         r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }
@@ -71,15 +75,21 @@ public struct ComponentRegistry: Sendable {
         r.register(.calendar) { c, ctx in CalendarLeaf(c: c, ctx: ctx) }
         r.register(.gridTable) { c, ctx in GridTableLeaf(c: c, ctx: ctx) }
         r.register(.randomPicker) { c, ctx in RandomPickerLeaf(c: c, ctx: ctx) }
+        r.register(.bracket) { c, ctx in BracketLeaf(c: c, ctx: ctx) } // 審査用ビルドにも入れる(OS の機能を使わない)
+        r.register(.fileImport) { c, ctx in FileImportLeaf(c: c, ctx: ctx) } // 審査用ビルドにも入れる(ファイル選択は権限不要・端末内だけ)
         r.register(.flashcards) { c, ctx in FlashcardsLeaf(c: c, ctx: ctx) } // #264 審査用ビルドにも入れる(OS の機能を使わない)
         r.register(.routeGuide) { c, ctx in RouteGuideLeaf(c: c, ctx: ctx) }
         r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
-        r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
+        r.register(.openUrlButton) { c, ctx in OpenUrlButtonLeaf(c: c, ctx: ctx) }
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
         r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
+        r.register(.placeSearch) { c, ctx in PlaceSearchLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
         r.register(.qrCode) { c, ctx in QrCodeLeaf(c: c, ctx: ctx) }
+        // leaf(文字起こし・読み上げ)。端末の中だけで動くので審査用ビルドにも入れる
+        r.register(.transcribeField) { c, ctx in TranscribeFieldLeaf(c: c, ctx: ctx) }
+        r.register(.speakButton) { c, ctx in SpeakButtonLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ
         r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
@@ -120,6 +130,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
         // leaf(チャット・#260)。他の人と記録を見る作りなので審査用ビルドでは登録しない(#451 G2)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
+        // leaf(クラウドの AI と話す)。オンライン AI だけで動き、審査用ビルドはそれを持たない(#452 G4)
+        r.register(.aiChat) { c, ctx in AiChatLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
         // leaf(ドラレコ・#410)
         r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }
@@ -129,9 +141,36 @@ public struct ComponentRegistry: Sendable {
         r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
         // leaf(仲間探しの届いた人・つながった人・#507)。共有と一緒に外す
         r.register(.matchList) { c, ctx in MatchListLeaf(c: c, ctx: ctx) }
+        // leaf(通話・#447)。共有と一緒に外す
+        r.register(.callButton) { c, _ in CallButtonLeaf(c: c) }
+        // leaf(外部の公開データ・#348)。外部の Web の内容を出すので外す
+        r.register(.feed) { c, _ in FeedLeaf(c: c) }
+        #endif
+        #if os(macOS)
+        // Mac で描けない部品(#925・#947)。AI には申告で作らせず、古い DSL で来た時はこの枠で受ける。審査用ビルドでも同じ枠にする。
+        for type in ClientCapabilities.macUnavailableComponents { r.registerMacUnavailable(type) }
         #endif
         return r
     }()
+
+    #if os(macOS)
+    /// Mac で使えない部品を「この Mac では使えません」の枠で登録する(#947)。
+    mutating func registerMacUnavailable(_ type: ComponentType) {
+        register(type) { c, _ in MacUnavailableView(feature: c.title ?? Self.macUnavailableFeatureName(type)).renderCard() }
+        unavailableTypes.insert(type.rawValue)
+    }
+
+    /// 枠に出す機能の名前(部品に title が無い時)。
+    static func macUnavailableFeatureName(_ type: ComponentType) -> String {
+        switch type {
+        case .healthStat: L("ヘルスケア")
+        case .sensorValue: L("センサー")
+        case .locationTracker: L("位置の記録")
+        case .dashcam: L("ドラレコ")
+        default: type.rawValue
+        }
+    }
+    #endif
 }
 
 #if APP_STORE_REVIEW

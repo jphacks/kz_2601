@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tailor It Pro の課金画面と設定の欄(iOS の PaywallSheet / ProSettingsSection・#77)。英語は values-en -->
+<resources>
+    <string name="paywall_benefit_ai">端末で AI を動かせない時も、AI ボタンと AI との会話をサーバーの AI で使えます</string>
+    <string name="paywall_benefit_cancel">いつでも解約できます(Google Play の定期購入から)</string>
+    <string name="paywall_benefit_edits">作ったアプリへの「ここを変えて」はこれまでどおり無料</string>
+    <string name="paywall_benefit_join">シェアされたアプリに参加して、同じデータを使えます</string>
+    <string name="paywall_benefit_shared">みんなで書き込める共有のデータ(掲示板・ランキング・割り勘など)</string>
+    <string name="paywall_benefit_unlimited">毎日、新しいアプリを無制限に作れます</string>
+    <string name="paywall_benefits_title">Pro でできること</string>
+    <string name="paywall_close_ai_chat">閉じると、AI と話す部品は使えません。</string>
+    <string name="paywall_close_ai_text">閉じると、この端末では AI で書くボタンは使えません。</string>
+    <string name="paywall_fine_print">月額の自動更新の定期購入です。お支払いは購入の確定時に Google アカウントに請求されます。解約しない限り期間の終わりに自動で更新されます。解約は Google Play の「お支払いと定期購入」からいつでもできます。</string>
+    <string name="paywall_headline_ai_chat">「AI と話す」には Tailor It Pro が必要です</string>
+    <string name="paywall_headline_ai_text">「オンラインの AI で書く」には Tailor It Pro が必要です</string>
+    <string name="paywall_headline_limit_reached">今日の無料作成(%1$d 回)を使い切りました</string>
+    <string name="paywall_headline_paid_feature">「%1$s」には Tailor It Pro が必要です</string>
+    <string name="paywall_headline_settings">共有・オンラインの機能と、新しいアプリを、いくつでも</string>
+    <string name="paywall_manage">定期購入を管理</string>
+    <string name="paywall_message_failed">購入できませんでした。時間をおいて試してください。</string>
+    <string name="paywall_message_not_verified">購入を確かめられませんでした。確かめられないままだと、Google Play が 3 日以内に自動で返金します。</string>
+    <string name="paywall_message_pending">支払いの完了を待っています。完了すると自動で Pro になります。</string>
+    <string name="paywall_message_restore_failed">復元できませんでした。時間をおいて試してください。</string>
+    <string name="paywall_message_restore_none">復元できる購入は見つかりませんでした。</string>
+    <string name="paywall_message_restored">購入を復元しました。</string>
+    <string name="paywall_message_unavailable">この端末では Google Play の購入を使えません。</string>
+    <string name="paywall_plan_period">1 か月ごとの自動更新</string>
+    <string name="paywall_price_per_month">%1$s / 月</string>
+    <string name="paywall_price_unavailable">価格を取得できませんでした。通信状態を確認してください。</string>
+    <string name="paywall_pro_active">Pro をご利用中です</string>
+    <string name="paywall_pro_now">Pro になりました</string>
+    <string name="paywall_purchase">Pro にする</string>
+    <string name="paywall_purchase_price">Pro にする(%1$s / 月)</string>
+    <string name="paywall_reason_ai_chat">AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。</string>
+    <string name="paywall_reason_ai_text">この端末では AI を端末内で動かせないため、サーバーの AI を使います。</string>
+    <string name="paywall_reason_shared_data">みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。</string>
+    <string name="paywall_restore">購入を復元</string>
+    <string name="paywall_shared_data">みんなで共有するデータ</string>
+    <string name="settings_pro_free">無料</string>
+    <string name="settings_pro_plan">プラン</string>
+    <string name="settings_pro_upgrade">Pro にする</string>
+</resources>

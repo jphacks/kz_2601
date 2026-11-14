@@ -25,11 +25,80 @@ public struct SensorFrame: Sendable {
     }
 }
 
+/// 絶対高度(標高)1 回分。`accuracy`・`precision` は `CMAbsoluteAltitudeData` と同じ意味の推定誤差(m)。
+public struct AbsoluteAltitudeSample: Sendable, Equatable {
+    /// 平均海面からの高さ(m)
+    public var altitude: Double
+    public var accuracy: Double
+    public var precision: Double
+
+    public init(altitude: Double, accuracy: Double, precision: Double) {
+        self.altitude = altitude
+        self.accuracy = accuracy
+        self.precision = precision
+    }
+}
+
+/// 標高の精度。`poor` は値が荒すぎて使えない。
+public enum AbsoluteAltitudeQuality: Sendable, Equatable {
+    case good
+    case fair
+    case poor
+}
+
+/// 精度の決まり(純関数だけ。端末も OS も見ない)。
+public enum AbsoluteAltitudeRule {
+    /// ここまでなら十分細かい(m)
+    public static let goodMeters: Double = 10
+    /// ここを超えたら使わない(m)
+    public static let usableMeters: Double = 50
+
+    public static func quality(accuracy: Double, precision: Double) -> AbsoluteAltitudeQuality {
+        // 負や NaN は「誤差が分からない」= 使えない(CoreMotion は読めない時に負を返す)。
+        guard accuracy.isFinite, precision.isFinite, accuracy >= 0, precision >= 0 else { return .poor }
+        let worst = Swift.max(accuracy, precision)
+        if worst <= goodMeters { return .good }
+        if worst <= usableMeters { return .fair }
+        return .poor
+    }
+
+    public static func quality(of sample: AbsoluteAltitudeSample) -> AbsoluteAltitudeQuality {
+        guard sample.altitude.isFinite else { return .poor }
+        return quality(accuracy: sample.accuracy, precision: sample.precision)
+    }
+
+    public static func isUsable(_ sample: AbsoluteAltitudeSample) -> Bool { quality(of: sample) != .poor }
+
+    /// 精度が悪い時・値が無い時は nil。保存や表示はこれを通す。
+    public static func usableAltitude(_ sample: AbsoluteAltitudeSample?) -> Double? {
+        guard let sample, isUsable(sample) else { return nil }
+        return sample.altitude
+    }
+}
+
 @MainActor
 public protocol SensorSource: AnyObject {
     func availability(_ kind: SensorKind) -> SensorAvailability
     /// 値の流れ。購読を取り消すと(画面から消える・背面へ)センサーを止める。
     func frames(_ kind: SensorKind) -> AsyncStream<SensorFrame>
+    /// 標高が読めるか(iOS 15 以降の対応端末のみ。使えない端末は `.unavailable`)。
+    func absoluteAltitudeAvailability() -> SensorAvailability
+    /// 1 回だけ読む(`timeout` で必ず止める)。使えない端末・時間切れでは nil。
+    func absoluteAltitude(timeout: Duration) async -> AbsoluteAltitudeSample?
+    /// 続けて読む。購読を取り消すと止める。
+    func absoluteAltitudes() -> AsyncStream<AbsoluteAltitudeSample>
+}
+
+/// 標高は後から足した口(#2226)。使えない端末と同じ振る舞いを既定にする。
+extension SensorSource {
+    public func absoluteAltitudeAvailability() -> SensorAvailability { .unavailable }
+    public func absoluteAltitude(timeout: Duration) async -> AbsoluteAltitudeSample? { nil }
+    public func absoluteAltitudes() -> AsyncStream<AbsoluteAltitudeSample> { AsyncStream { $0.finish() } }
+
+    /// 既定の待ち時間(数秒)で 1 回だけ読む。
+    public func absoluteAltitude() async -> AbsoluteAltitudeSample? {
+        await absoluteAltitude(timeout: .seconds(5))
+    }
 }
 
 @MainActor
@@ -44,6 +113,7 @@ public enum SensorData {
 public final class LiveSensorData: SensorSource {
     private var motionSubs: [UUID: (MotionSample) -> Void] = [:]
     private var altitudeSubs: [UUID: (AltitudeSample) -> Void] = [:]
+    private var absoluteSubs: [UUID: (AbsoluteAltitudeSample) -> Void] = [:]
     #if os(iOS)
     private let motion = CMMotionManager()
     private let altimeter = CMAltimeter()
@@ -64,6 +134,55 @@ public final class LiveSensorData: SensorSource {
         #else
         return .unavailable
         #endif
+    }
+
+    public func absoluteAltitudeAvailability() -> SensorAvailability {
+        #if os(iOS)
+        guard CMAltimeter.isAbsoluteAltitudeAvailable() else { return .unavailable }
+        switch CMAltimeter.authorizationStatus() {
+        case .denied, .restricted: return .denied
+        default: return .available
+        }
+        #else
+        return .unavailable
+        #endif
+    }
+
+    /// 1 回だけ読む。値が来ても時間切れでも取り消されても、抜ける時に必ず `stopAbsoluteAltitudeUpdates` を呼ぶ。
+    public func absoluteAltitude(timeout: Duration) async -> AbsoluteAltitudeSample? {
+        #if os(iOS)
+        guard absoluteAltitudeAvailability() == .available else { return nil }
+        // 続けて読む購読を止めてしまわないよう、1 回読みは別インスタンスで動かす。
+        let reader = CMAltimeter()
+        let box = AbsoluteAltitudeBox()
+        defer { reader.stopAbsoluteAltitudeUpdates() }
+        reader.startAbsoluteAltitudeUpdates(to: .main) { data, _ in
+            guard let data else { return }
+            let s = LiveSensorData.sample(from: data)
+            MainActor.assumeIsolated { box.sample = s }
+        }
+        let deadline = ContinuousClock.now + timeout
+        while box.sample == nil, ContinuousClock.now < deadline, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return box.sample
+        #else
+        return nil
+        #endif
+    }
+
+    public func absoluteAltitudes() -> AsyncStream<AbsoluteAltitudeSample> {
+        AsyncStream { cont in
+            let id = UUID()
+            absoluteSubs[id] = { cont.yield($0) }
+            updateRunning()
+            cont.onTermination = { _ in
+                Task { @MainActor [weak self] in
+                    self?.absoluteSubs[id] = nil
+                    self?.updateRunning()
+                }
+            }
+        }
     }
 
     public func frames(_ kind: SensorKind) -> AsyncStream<SensorFrame> {
@@ -115,13 +234,39 @@ public final class LiveSensorData: SensorSource {
                 MainActor.assumeIsolated { self?.altitudeSubs.values.forEach { $0(s) } }
             }
         }
+        if absoluteSubs.isEmpty {
+            if absoluteRunning {
+                altimeter.stopAbsoluteAltitudeUpdates()
+                absoluteRunning = false
+            }
+        } else if !absoluteRunning, CMAltimeter.isAbsoluteAltitudeAvailable() {
+            absoluteRunning = true
+            altimeter.startAbsoluteAltitudeUpdates(to: .main) { [weak self] data, _ in
+                guard let data else { return }
+                let s = LiveSensorData.sample(from: data)
+                MainActor.assumeIsolated { self?.absoluteSubs.values.forEach { $0(s) } }
+            }
+        }
         #endif
     }
 
     #if os(iOS)
+    nonisolated static func sample(from data: CMAbsoluteAltitudeData) -> AbsoluteAltitudeSample {
+        AbsoluteAltitudeSample(altitude: data.altitude, accuracy: data.accuracy, precision: data.precision)
+    }
+
     private var altimeterRunning = false
+    private var absoluteRunning = false
     #endif
 }
+
+#if os(iOS)
+/// 1 回読みの受け皿(コールバックは main で来る)。
+@MainActor
+private final class AbsoluteAltitudeBox {
+    var sample: AbsoluteAltitudeSample?
+}
+#endif
 
 /// `METAMON_MOCK=1` / シミュレータの確認用: 10 Hz のゆっくりした波(傾きは 0〜40° を往復してしきい値 30° をまたぐ)。
 @MainActor
@@ -129,6 +274,29 @@ public final class MockSensorData: SensorSource {
     public init() {}
 
     public func availability(_ kind: SensorKind) -> SensorAvailability { .available }
+
+    public func absoluteAltitudeAvailability() -> SensorAvailability { .available }
+
+    public func absoluteAltitude(timeout: Duration) async -> AbsoluteAltitudeSample? { Self.absoluteAltitude(at: 0) }
+
+    public func absoluteAltitudes() -> AsyncStream<AbsoluteAltitudeSample> {
+        AsyncStream { cont in
+            let task = Task { @MainActor in
+                let start = Date()
+                while !Task.isCancelled {
+                    cont.yield(Self.absoluteAltitude(at: Date().timeIntervalSince(start)))
+                    try? await Task.sleep(for: .seconds(1))
+                }
+                cont.finish()
+            }
+            cont.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// 経過 `t` 秒の標高(テストでも使う)。
+    nonisolated static func absoluteAltitude(at t: Double) -> AbsoluteAltitudeSample {
+        AbsoluteAltitudeSample(altitude: 40 + 2 * sin(t / 30), accuracy: 5, precision: 3)
+    }
 
     public func frames(_ kind: SensorKind) -> AsyncStream<SensorFrame> {
         AsyncStream { cont in

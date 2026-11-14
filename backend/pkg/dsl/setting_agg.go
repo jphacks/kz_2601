@@ -1,0 +1,138 @@
+package dsl
+
+import (
+	"fmt"
+	"strings"
+)
+
+// Goal / budget read with max / min: a setting entity (settingEntities) that
+// is not single keeps one record per "set the goal" (its button opens a new
+// record form), and max / min over them is the largest / smallest value ever
+// entered, so lowering the budget from 50000 to 30000 still shows 50000
+// (iOS Aggregator / ExprEvaluator). Read it with latest, or make it single.
+
+func (l *linter) settingMaxMin() {
+	settings := l.settingEntities()
+	opened := newRecordForms(l.app)
+	logs := totalledEntities(l.app)
+	// an entered number only: min of an exam date (or of its computed
+	// days_left) is the next exam, not a setting
+	bad := func(entity, agg, field string) bool {
+		e := l.entities[entity]
+		if (agg != "max" && agg != "min") || !settings[entity] || logs[entity] || e == nil || e.Single || !opened[entity] {
+			return false
+		}
+		f := e.FieldByID(field)
+		return f != nil && f.Computed == nil && (f.Type == FieldInteger || f.Type == FieldNumber || f.Type == FieldCurrency)
+	}
+	report := func(where, entity, agg, field string) {
+		l.add(`%s: %s of %q is the largest/smallest value ever entered, so lowering (or raising) the goal/budget is ignored; read the goal as %s`,
+			where, agg, entity, goalReadFix(entity, field, false))
+	}
+	exprs := func(where string, x *Expr) {
+		walkExpr(x, func(e *Expr) {
+			if e.Kind == ExprAgg && e.Agg != nil && bad(e.Agg.Entity, e.Agg.Agg, e.Agg.Field) {
+				report(where, e.Agg.Entity, e.Agg.Agg, e.Agg.Field)
+			}
+		})
+	}
+	for _, e := range l.app.Entities {
+		for _, f := range e.Fields {
+			exprs(fmt.Sprintf("entity %q field %q computed", e.ID, f.ID), f.Computed)
+		}
+	}
+	for _, s := range l.app.Screens {
+		eachScreenComponent(s.Components, func(w string, c *Component) {
+			if bestLabel(c.Label) {
+				return // 「自己ベスト」: max / min is the point
+			}
+			where := fmt.Sprintf("screen %q %s", s.ID, w)
+			if scalarTypes[c.Type] && bad(c.Entity, c.Aggregate, c.Field) {
+				report(where+" aggregate", c.Entity, c.Aggregate, c.Field)
+			}
+			exprs(where+".value", c.Value)
+		})
+	}
+}
+
+// bestWords: a label asking for the best / worst record ever, where max /
+// min is intended (a goal or budget label never says these).
+var bestWords = []string{"ベスト", "最高", "最低", "最長", "最速", "最多", "自己", "best", "record", "longest", "fastest", "highest", "lowest", "personal"}
+
+func bestLabel(label string) bool {
+	label = strings.ToLower(label)
+	for _, w := range bestWords {
+		if strings.Contains(label, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// totalledEntities: entities read with count / sum / avg anywhere. Those are
+// logs (a budget is never summed), so their max / min is a best record.
+func totalledEntities(a *App) map[string]bool {
+	out := map[string]bool{}
+	total := func(agg string) bool { return agg == "count" || agg == "sum" || agg == "avg" }
+	exprs := func(x *Expr) {
+		walkExpr(x, func(e *Expr) {
+			if e.Kind == ExprAgg && e.Agg != nil && total(e.Agg.Agg) {
+				out[e.Agg.Entity] = true
+			}
+		})
+	}
+	for _, e := range a.Entities {
+		for _, f := range e.Fields {
+			exprs(f.Computed)
+		}
+	}
+	for _, s := range a.Screens {
+		eachScreenComponent(s.Components, func(_ string, c *Component) {
+			if scalarTypes[c.Type] && c.Entity != "" && c.Value == nil && (c.Aggregate == "" || total(c.Aggregate)) {
+				out[c.Entity] = true
+			}
+			exprs(c.Value)
+		})
+	}
+	return out
+}
+
+// newRecordForms: entities whose form a button or toolbar navigate opens
+// (without a tapped record, so each save adds a record).
+func newRecordForms(a *App) map[string]bool {
+	forms := map[string]string{}
+	for _, s := range a.Screens {
+		if s.Entity != "" {
+			forms[s.ID] = s.Entity
+		}
+	}
+	out := map[string]bool{}
+	mark := func(act *Action) {
+		if act != nil && act.Type == ActionNavigate && forms[act.Screen] != "" {
+			out[forms[act.Screen]] = true
+		}
+	}
+	for i := range a.Screens {
+		s := &a.Screens[i]
+		for j := range s.Toolbar {
+			mark(&s.Toolbar[j].Action)
+		}
+		eachScreenComponent(s.Components, func(_ string, c *Component) {
+			if c.Type == CompButton {
+				mark(c.Action)
+			}
+		})
+	}
+	return out
+}
+
+// goalReadFix: how to read a goal / budget field. settingMaxMin and
+// goalTarget share it so both lints give the same fix, matching the goal
+// bullets of the prompt (internal/ai/title_goal_rules.go).
+func goalReadFix(entity, field string, single bool) string {
+	if single {
+		return fmt.Sprintf(`{"setting":%q}`, field)
+	}
+	return fmt.Sprintf(`{"agg":"latest","entity":%q,"field":%q} (the newest record; by is optional and must be a date/datetime field of %q, omitted = creation order), or make %q "single": true and read {"setting":%q}`,
+		entity, field, entity, entity, field)
+}

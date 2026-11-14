@@ -15,6 +15,10 @@ public protocol MatchingClient: Sendable {
     func decline(appId: String, uid: String) async throws
     /// `DELETE /v1/apps/{appId}/matches/{uid}`
     func unmatch(appId: String, uid: String) async throws
+    /// `GET /v1/me/age-confirmation`: サーバーに 18 歳以上の申告が記録されているか
+    func ageConfirmation() async throws -> Bool
+    /// `PUT /v1/me/age-confirmation` `{"ageConfirmed":true}`: 申告を記録する(冪等)
+    func confirmAge() async throws
 }
 
 /// API の `details.reason`(400)。

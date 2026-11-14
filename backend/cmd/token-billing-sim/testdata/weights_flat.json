@@ -1,0 +1,6 @@
+{
+  "name": "flat: 1 per call",
+  "operations": {
+    "*": {"call": 1}
+  }
+}
