@@ -7,6 +7,8 @@ import MetamonDSL
 /// `healthStat`(#167): 端末のヘルスデータのカード。entity を持たず `HealthData.source` から読む。
 /// metric steps|weight × period today|week。today は数値(steps は target で達成率バー)、week は 7 日のグラフ。
 /// 許可が無い・この端末で使えない時は理由を出す(`HealthDataError`)。前面に戻るたびに読み直す。
+/// `live: true`(steps・#3694)は、画面に出ていて前面にいる間だけ歩数計とヘルスケアの合図を購読して数字を増やす(`HealthLiveStepsMonitor`)。
+/// 画面を離れる・背面に回ると(`.task` のキャンセル)止める。既定(live 無し)は今までどおり一発読みだけ。
 struct HealthStatLeaf: View {
     let c: Component
     @Environment(\.scenePhase) private var scenePhase
@@ -20,6 +22,7 @@ struct HealthStatLeaf: View {
 
     private var isWeight: Bool { c.metric == "weight" }
     private var isWeek: Bool { c.period == "week" }
+    private var isLive: Bool { c.live == true && !isWeight }
 
     var body: some View {
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
@@ -32,6 +35,8 @@ struct HealthStatLeaf: View {
         .task(id: scenePhase == .active) {
             guard scenePhase == .active else { return }
             await load()
+            guard isLive else { return }
+            await runLive()
         }
     }
 
@@ -176,6 +181,28 @@ struct HealthStatLeaf: View {
         } catch {
             phase = .failed(L("ヘルスデータを取得できませんでした"))
         }
+    }
+
+    // MARK: live(#3694)
+
+    /// 一発読みの値を基準に、歩数計の増分で今日(並びの最後)の値を更新し続ける。この task がキャンセルされるまで。
+    private func runLive() async {
+        guard case .loaded(let values) = phase, !values.isEmpty else { return }
+        let source = HealthData.source
+        let days = isWeek ? 7 : 1
+        let monitor = HealthLiveStepsMonitor(baseline: values.last?.value ?? 0, source: HealthData.liveSource) {
+            try await source.steps(days: days).last?.value ?? 0
+        }
+        monitor.onChange = { value in
+            guard case .loaded(var current) = phase, !current.isEmpty else { return }
+            current[current.count - 1].value = value
+            phase = .loaded(current)
+        }
+        monitor.start()
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        monitor.stop()
     }
 }
 #endif
