@@ -21,11 +21,15 @@ const StateTTL = 10 * time.Minute
 // OAuthState is oauthStates/{state}: one started connection (one use,
 // expireAt is a Firestore TTL).
 type OAuthState struct {
-	UID      string    `firestore:"uid"`
-	Provider string    `firestore:"provider"`
-	Verifier string    `firestore:"verifier"`
-	Scopes   []string  `firestore:"scopes,omitempty"`
-	ExpireAt time.Time `firestore:"expireAt"`
+	UID      string `firestore:"uid"`
+	Provider string `firestore:"provider"`
+	// Verifier is the PKCE code_verifier, or for an OAuth1Client the
+	// request token's secret.
+	Verifier string `firestore:"verifier"`
+	// RequestToken is the OAuth 1.0a request token (OAuth1Client only).
+	RequestToken string    `firestore:"requestToken,omitempty"`
+	Scopes       []string  `firestore:"scopes,omitempty"`
+	ExpireAt     time.Time `firestore:"expireAt"`
 	// CreatedAt is when Start made it (a connection cut after it is not saved).
 	CreatedAt time.Time `firestore:"createdAt,omitempty"`
 }
@@ -101,23 +105,39 @@ func (s *Service) Start(ctx context.Context, uid, provider string, scopes []stri
 	if err != nil {
 		return "", err
 	}
-	verifier, err := randomString(48)
-	if err != nil {
-		return "", err
+	st := OAuthState{UID: uid, Provider: provider, Scopes: scopes}
+	var authURL string
+	if c1, ok := cl.(OAuth1Client); ok {
+		// OAuth 1.0a: the request token first; the state rides on the
+		// callback URL (the provider sends back oauth_token + oauth_verifier,
+		// never a state of its own)
+		authURL, st.RequestToken, st.Verifier, err = c1.Begin(ctx, s.RedirectURI(provider)+"?state="+url.QueryEscape(state))
+		if err != nil {
+			return "", fmt.Errorf("request token: %w", err)
+		}
+	} else {
+		verifier, err := randomString(48)
+		if err != nil {
+			return "", err
+		}
+		sum := sha256.Sum256([]byte(verifier))
+		challenge := base64.RawURLEncoding.EncodeToString(sum[:])
+		st.Verifier = verifier
+		authURL = cl.AuthURL(state, challenge, s.RedirectURI(provider), scopes)
 	}
-	sum := sha256.Sum256([]byte(verifier))
-	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
 	now := s.now().UTC()
-	if err := s.States.PutState(ctx, state, OAuthState{UID: uid, Provider: provider, Verifier: verifier, Scopes: scopes, ExpireAt: now.Add(StateTTL), CreatedAt: now}); err != nil {
+	st.ExpireAt, st.CreatedAt = now.Add(StateTTL), now
+	if err := s.States.PutState(ctx, state, st); err != nil {
 		return "", fmt.Errorf("state: %w", err)
 	}
-	return cl.AuthURL(state, challenge, s.RedirectURI(provider), scopes), nil
+	return authURL, nil
 }
 
 // Callback finishes a connection: the state is taken once and checked, the
-// code is exchanged and the token sealed. It returns where to send the
-// device (AppReturnURL?provider=…&status=ok|error); the URL never has a
-// token or a code.
+// code (an OAuth1Client: the oauth_verifier) is exchanged and the token
+// sealed. It returns where to send the device
+// (AppReturnURL?provider=…&status=ok|error); the URL never has a token or a
+// code.
 func (s *Service) Callback(ctx context.Context, provider, state, code string) string {
 	back := func(status string) string {
 		v := url.Values{"provider": {provider}, "status": {status}}
@@ -147,7 +167,12 @@ func (s *Service) callback(ctx context.Context, provider, state, code string) er
 	if !ok || st.Provider != provider || !s.now().Before(st.ExpireAt) {
 		return ErrBadState
 	}
-	t, err := cl.Exchange(ctx, code, st.Verifier, s.RedirectURI(provider))
+	var t Token
+	if c1, ok := cl.(OAuth1Client); ok {
+		t, err = c1.Exchange1(ctx, st.RequestToken, st.Verifier, code)
+	} else {
+		t, err = cl.Exchange(ctx, code, st.Verifier, s.RedirectURI(provider))
+	}
 	if err != nil {
 		return fmt.Errorf("exchange: %w", err)
 	}
