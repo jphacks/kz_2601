@@ -401,3 +401,26 @@ func TestMicrosoftTodoDefinition(t *testing.T) {
 		t.Fatalf("own client: %+v", c.Secrets[MicrosoftTodo])
 	}
 }
+
+// 期限は JST の日付: UTC で返った時も日本の日付に直す。
+func TestMicrosoftTodoDueJST(t *testing.T) {
+	for _, c := range []struct {
+		w    outlookWhen
+		want string
+	}{
+		{outlookWhen{DateTime: "2026-11-20T00:00:00.0000000", TimeZone: "Tokyo Standard Time"}, "2026-11-20"},
+		{outlookWhen{DateTime: "2026-11-19T15:00:00.0000000", TimeZone: "UTC"}, "2026-11-20"},
+		{outlookWhen{DateTime: "2026-11-19T14:59:59", TimeZone: "utc"}, "2026-11-19"},
+		{outlookWhen{DateTime: "2026-11-20", TimeZone: ""}, "2026-11-20"},
+		{outlookWhen{DateTime: "bad", TimeZone: "UTC"}, ""},
+		{outlookWhen{DateTime: "2026-13-01T00:00:00", TimeZone: "Tokyo Standard Time"}, ""},
+	} {
+		if got := mstodoDue(c.w); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.w, got, c.want)
+		}
+	}
+	r := mstodoTask{Title: "x", DueDateTime: &outlookWhen{DateTime: "2026-11-19T15:00:00.0000000", TimeZone: "UTC"}}.row()
+	if r.Subtitle != "2026-11-20" {
+		t.Fatalf("row %+v", r)
+	}
+}
