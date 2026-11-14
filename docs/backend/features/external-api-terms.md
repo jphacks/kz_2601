@@ -40,6 +40,7 @@ registry の順(名前順)。偽の provider(`fakeFree`・`fakePaid`・`fakeOaut
 | `googleSheets` | 無料・OAuth(scope `drive.file`) | `googleCalendar` と同じ(推測) | 要確認 | 要確認 | 今の作り: シートの中身をキャッシュしない(`google_sheets.go`) | |
 | `googleTasks` | 無料・OAuth | `googleCalendar` と同じ(推測) | 要確認 | 要確認 | 今の作り: キャッシュしない | |
 | `gtfsRealtime` | 無料・鍵なし | フィードごとのライセンス(今は都営バス・CC BY 4.0)と、公共交通オープンデータセンターの [利用規約](https://developer.odpt.org/terms/center_use_rules.html)・[基本ライセンス](https://developer.odpt.org/terms/data_basic_license.html)(repo の文書)。[external-apis.md「GTFS リアルタイムのフィードと規約」](external-apis.md#gtfs-リアルタイムのフィードと規約1692) | 要確認(フィードごと) | CC BY のクレジット(フィードの `credit`)と `GTFSAttribution`・センターのフィードは `ODPTAttribution` も | 規約: 古いデータを使わない・再配布の決まり(同上)。今の作り: 30 秒キャッシュ・生のデータは端末に返さない | |
+| `jira` | 無料・OAuth(Atlassian 3LO) | Atlassian Developer Terms(推測: `https://developer.atlassian.com/platform/marketplace/atlassian-developer-terms/`) | **#1954 が Atlassian を名指しする**。節は要確認 | 要確認 | 要確認。今の作り: キャッシュしない・cloud id もトークンに持たない(`jira.go`) | |
 | `linear` | 無料・OAuth | Linear の API の規約(要確認。名前と URL も分からない) | 要確認 | 要確認 | 要確認。今の作り: キャッシュしない | |
 | `natureRemo` | 無料・利用者のトークン(#1671 まで off) | Nature Remo Cloud API の規約(要確認。開発者のページ `https://developer.nature.global/` は推測) | 要確認 | 要確認 | 要確認。今の作り: キャッシュしない・在宅が分かる値は返さない(`nature_remo.go`) | |
 | `notion` | 無料・OAuth | Notion の開発者向けの規約(要確認。名前と URL も分からない)・[Authorization](https://developers.notion.com/docs/authorization)(repo の文書) | 要確認 | 要確認 | 要確認。今の作り: キャッシュしない | |
