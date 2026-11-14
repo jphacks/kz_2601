@@ -2,6 +2,8 @@
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:42
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:47
 19585e6c607daf879faceefaa5f06dfb827de30e:backend/internal/auth/verifier.go:curl-auth-header:43
+# YOLP のテスト用の偽のアプリ ID(faf34af で追加・strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+faf34af0faa1b6a1f6f0c69c4527549ec04ff712:backend/internal/extapi/yolp_test.go:generic-api-key:15
 # LiveKit のテスト用の偽の鍵(e92d242d で追加・3e3aeafc で偽と分かる値に置き換え済み)。実の鍵ではない。
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.go:generic-api-key:41
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23
