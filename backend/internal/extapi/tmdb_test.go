@@ -264,7 +264,7 @@ func TestTMDBThroughService(t *testing.T) {
 			t.Fatalf("call %d: %+v %v", i, res, err)
 		}
 	}
-	if f.hits.Load() != 1 || e.runs() != 1 {
+	if f.hits.Load() != 1 || e.runs() != 0 { // NoCharge: nothing counted
 		t.Fatalf("cached: hits=%d runs=%d", f.hits.Load(), e.runs())
 	}
 	e.c.t = e.c.t.Add(time.Hour)
@@ -277,8 +277,8 @@ func TestTMDBThroughService(t *testing.T) {
 		if Reason(err) != ReasonUpstream || strings.Contains(err.Error(), tmdbTestKey) {
 			t.Fatalf("status %d: %v", s, err)
 		}
-		if e.runs() != 2 {
-			t.Fatalf("status %d: runs = %d, the run was not given back", s, e.runs())
+		if e.runs() != 0 {
+			t.Fatalf("status %d: runs = %d (NoCharge)", s, e.runs())
 		}
 	}
 	if w := e.wallet(user); w.Available() != 100 {
@@ -286,5 +286,14 @@ func TestTMDBThroughService(t *testing.T) {
 	}
 	if strings.Contains(e.logs.String(), tmdbTestKey) {
 		t.Fatal("the key is in the logs")
+	}
+}
+
+// The API Terms 2.A: a paid app and LLM use are commercial; until a
+// license it is never charged and never sent to AI, with the credit.
+func TestTMDBTerms(t *testing.T) {
+	p, _ := Lookup(TMDB)
+	if !p.Terms.NoCharge || !p.Terms.NoAI || p.Terms.ShowOwnDataOnly || p.Terms.Attribution != TMDBAttribution {
+		t.Fatalf("%+v", p.Terms)
 	}
 }

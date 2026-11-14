@@ -16,7 +16,7 @@ import (
 
 // The Movie Database (TMDB) API v3: movies and TV shows by title and the
 // trending ones, read with the operator's key (api.themoviedb.org/3,
-// language ja-JP). Free: a call is one `runs`.
+// language ja-JP). Free and NoCharge: nothing is counted.
 //
 //	search(q, type?, limit?)     /3/search/{movie|tv}: Rows (title / release · overview / vote / themoviedb.org page)
 //	trending(type?, window?)     /3/trending/{movie|tv|all}/{day|week}: the same rows (at most 20)
@@ -56,6 +56,8 @@ var tmdbKeyRe = regexp.MustCompile(`^[A-Za-z0-9._-]{20,1000}$`)
 
 func init() {
 	register(Provider{ID: TMDB, Billing: BillingFree, Hosts: []string{tmdbHost},
+		// API Terms 2.A: 有料のアプリ・LLM での利用は商用(別の書面の契約まで既定 off)。課金に結び付けず、AI に渡さない
+		Terms: Terms{NoCharge: true, NoAI: true, Attribution: TMDBAttribution},
 		Ops: []OpSpec{
 			{Name: "search", Args: []string{"q", "type", "limit"}, Check: checkTMDBSearch, CacheTTL: tmdbCacheTTL},
 			{Name: "trending", Args: []string{"type", "window"}, Check: checkTMDBTrending, CacheTTL: tmdbCacheTTL},
