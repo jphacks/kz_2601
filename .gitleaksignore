@@ -18,3 +18,5 @@ b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:132
 # OAuth 1.0a のテスト値(RFC 5849 の公開サンプル)。同じ行の別コミット。秘密情報ではない。
 cf0c4e2868c4163533f1789d60329d7a9ab0d5e3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:101
+# Last.fm のテスト用の偽の鍵(0 から f を並べた値)。実の鍵ではない。
+0bf93b57b79013a12bf1c6a87776c87c72a39fc4:backend/internal/extapi/lastfm_test.go:generic-api-key:24
