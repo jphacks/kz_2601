@@ -19,6 +19,7 @@ type yolpServer struct {
 	*httptest.Server
 	hits   atomic.Int64
 	last   atomic.Value // 最後の要求の URI
+	ua     atomic.Value // 最後の要求の User-Agent
 	status int
 	body   string
 }
@@ -29,6 +30,7 @@ func newYOLPServer(t *testing.T) *yolpServer {
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.hits.Add(1)
 		s.last.Store(r.URL.RequestURI())
+		s.ua.Store(r.Header.Get("User-Agent"))
 		w.Header().Set("Content-Type", "application/json")
 		body := s.body
 		if body == "" {
@@ -91,8 +93,12 @@ func TestYOLPLocalSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.uri() != "/search/local/V1/localSearch?appid="+yolpTestKey+"&dist=5&lat=36.5621&lon=136.6625&output=json&query=%E5%BA%AD%E5%9C%92&results=3&sort=dist" {
+	if s.uri() != "/search/local/V1/localSearch?dist=5&lat=36.5621&lon=136.6625&output=json&query=%E5%BA%AD%E5%9C%92&results=3&sort=dist" {
 		t.Fatalf("request %s", s.uri())
+	}
+	// アプリ ID はヘッダーだけ(URL に入れない)
+	if ua, _ := s.ua.Load().(string); ua != "Yahoo AppID: "+yolpTestKey || strings.Contains(s.uri(), yolpTestKey) {
+		t.Fatalf("user agent %q / uri %s", ua, s.uri())
 	}
 	// 名前の無い行は飛ばす・電話番号は出さない・limit で切る
 	want := []Row{

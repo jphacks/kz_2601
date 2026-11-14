@@ -14,9 +14,8 @@ import (
 )
 
 // YOLP: Yahoo! JAPAN のローカルサーチ(店・施設を言葉で探す)。無料・運営のアプリ ID
-// (EXT_YOLP_API_KEY・クエリの appid)・OAuth なし(1 回 = `runs` 1)。届くのは
-// map.yahooapis.jp だけ。アプリ ID はクエリに入るので、失敗はキュー(URL)を持たない
-// 形で返す(keyed.go)。
+// (EXT_YOLP_API_KEY・ヘッダー `User-Agent: Yahoo AppID: <ID>`。URL には入れない)・
+// OAuth なし(1 回 = `runs` 1)。届くのは map.yahooapis.jp だけ。
 //
 //	localSearch(query, lat?, lng?, dist?, limit?)   行: 名前・住所・ジャンル
 //
@@ -143,7 +142,7 @@ func (y *yolp) localSearch(ctx context.Context, in Input) (Output, error) {
 	if err != nil {
 		return Output{}, err
 	}
-	q := url.Values{"appid": {y.key}, "query": {p.query}, "output": {"json"}, "results": {strconv.Itoa(p.limit)}}
+	q := url.Values{"query": {p.query}, "output": {"json"}, "results": {strconv.Itoa(p.limit)}}
 	if p.point {
 		q.Set("lat", strconv.FormatFloat(p.lat, 'f', 4, 64))
 		q.Set("lon", strconv.FormatFloat(p.lng, 'f', 4, 64))
@@ -155,6 +154,7 @@ func (y *yolp) localSearch(ctx context.Context, in Input) (Output, error) {
 		return Output{}, errors.New("yolp: building the request failed")
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Yahoo AppID: "+y.key)
 	var a yolpAnswer
 	if err := y.send(ctx, req, &a); err != nil {
 		return Output{}, err
@@ -200,7 +200,7 @@ func yolpPoint(s string) (lat, lng string) {
 }
 
 // send は 1 回の要求。400 は引数の問題(400)、401 / 403 は運営のアプリ ID の問題(502・
-// やり直し不可)、429 / 5xx は 502(やり直し可)。失敗に URL は載せない(appid が入る)。
+// やり直し不可)、429 / 5xx は 502(やり直し可)。
 func (y *yolp) send(ctx context.Context, req *http.Request, out any) error {
 	err := sendJSON(ctx, y.hc, req, out)
 	var pe *ProviderError
