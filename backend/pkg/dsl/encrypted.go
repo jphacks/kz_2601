@@ -131,7 +131,7 @@ func checkEncryptedComponent(where string, form *Entity, c *Component, entities 
 		use("sort.field", c.Sort.Field)
 	}
 	switch c.Type {
-	case CompStat, CompChart, CompProgressBar, CompGauge:
+	case CompStat, CompChart, CompProgressBar, CompGauge, CompGrowth:
 		if c.Aggregate != "count" {
 			use("field", c.Field)
 		}

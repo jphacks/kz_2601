@@ -1,12 +1,12 @@
 # デスクトップ版(Windows・Linux)の部品の対応表
 
-DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` と同じ数)とアクション 16 種を、デスクトップ版でどう出すかを 1 行ずつ書く。親は #1746。
+DSL の全部の type(Container 7・Leaf 71 = 78。`docs/dsl/dsl.schema.json` と同じ数)とアクション 16 種を、デスクトップ版でどう出すかを 1 行ずつ書く。親は #1746。
 
 - 事実の元: `origin/develop` の `748767fd6`(openUrlButton の行と数は `origin/epic/god` の `abe167e0f`)。
 - 描ける type: `desktop/app/src/main/kotlin/jp/kz2601/metamon/desktop/DesktopSupport.kt` の `DesktopLeaves`(`containers`・`leaves`)と `io/DesktopIo.kt` の `IoLeaves.types`。
 - 描けない type: 上に無い type。適合テストの `state` は `unavailable` になり、画面には「デスクトップ版ではまだ使えない部品」の一言を出す。
 - 適合テストで違ってよい所: `desktop/app/src/test/kotlin/jp/kz2601/metamon/desktop/ConformanceAllowlist.kt` の `unavailableTypes`。この表の state が `unavailable` の行と一致する(placeSearch・callButton は適合テストの case に出てこない(`docs/dsl/conformance/coverage.json` の `notYetCovered`)ので一覧に無い)。
-- 正: iOS(`ComponentRegistry` に 77 全部を登録)と Android(`ComponentRegistry.standard` に 77 全部。`DeviceCapabilitiesTest` が抜けを落とす)はどれも描ける。Mac は `ClientCapabilities.macUnavailableComponents` の 4 つ(healthStat・sensorValue・locationTracker・dashcam)だけ「この Mac では使えません」の枠。
+- 正: iOS(`ComponentRegistry` に 78 全部を登録)はどれも描ける。Android は growth だけ知らない部品として受け、ほかの 77 は描ける(`ComponentRegistry.standard`。`DeviceCapabilitiesTest` が抜けを落とす)。Mac は `ClientCapabilities.macUnavailableComponents` の 5 つ(healthStat・sensorValue・locationTracker・dashcam・growth)だけ「この Mac では使えません」の枠。
 - 決まっていない部品(状態が「未定」)の推奨は **推奨・未確定**。決めるのは #1746 でオーナー。
 - 正典(`docs/00_decisions.md`)は変えない。ここは今のコードの写し。
 
@@ -33,7 +33,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | section | 描ける | rendered | 見出しと子 | 描ける | #1741 |
 | vstack | 描ける | rendered | 子を縦に並べる | 描ける | #1741 |
 
-## Leaf(70)
+## Leaf(71)
 
 | type | 状態 | 適合 state | 理由・代わりの形 | Mac | 関係する Issue |
 |---|---|---|---|---|---|
@@ -59,6 +59,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | flashcards | 描ける | rendered | | 描ける | #1745 |
 | gauge | 描ける | rendered | | 描ける | #1742 |
 | gridTable | 描ける | rendered | | 描ける | #1744 |
+| growth | 使えません | unavailable | 数値で育つ絵(歩数で使うことが多い)。iOS で先に作った部品で、まだ広げていない | 使えません | #3783 |
 | healthStat | 使えません | unavailable | ヘルスケアのデータ(HealthKit / Health Connect)がパソコンに無い | 使えません | #2179 |
 | icon | 描ける | rendered | `docs/dsl/icon-map.json` を Material の絵に写す | 描ける | #1742 |
 | image | 描ける | rendered | | 描ける | #1742 |

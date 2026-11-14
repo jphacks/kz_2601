@@ -72,6 +72,8 @@
 | `health` | string | この metric(`steps` / `weight`)の healthStat がある | `checkExpect` | `cases.json` の `health_steps`(`"steps"`) |
 | `healthField` | bool | health が `weight` の field がある | `checkExpect` | `cases.json` の `health_weight`(`true`) |
 | `healthLive` | bool | healthStat のどれかが `live: true`(false = どれにも無い) | `checkHealthLive` | `health_live_cases.json` の `hl_realtime`(`true`) |
+| `growth` | string | growth のどれかがこの kind(tree / flower / plant・省略は tree) | `checkGrowth` | `growth_cases.json` の `gr_steps_tree`(`tree`) |
+| `growthSteps` | bool | growth のどれかが歩数を live で読む(metric steps + `live: true`・false = どれにも無い) | `checkGrowth` | `growth_cases.json` の `gr_steps_tree`(`true`) |
 | `jitter` | bool | `app.notifications` のどれかが `jitterMinutes` を持つ | `checkNotifyNear` | `notify_near_cases.json` の `nn_create_station`(`false`) |
 | `keep` | string[] | 編集の後も `keepEntity` に残っているべき field の id | `checkKeep` | `cases.json` の `field_cap_add2`(`["date", "height", "weight", "bmi", "…`) |
 | `keepEntity` | string | `keep` / `growTo` を見る entity の id(その 2 つの前提) | `checkKeep` | `cases.json` の `field_cap_add2`(`"checkup"`) |

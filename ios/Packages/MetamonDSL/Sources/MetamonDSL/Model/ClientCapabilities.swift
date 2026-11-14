@@ -36,9 +36,10 @@ public enum ClientCapabilities {
     }
 
     /// Mac で描けない部品(#925・#947)。Mac にハード / データが無い(HealthKit・加速度 / 気圧・持ち歩く位置の追跡・ドラレコ)。
+    /// growth(数値で育つ絵)は iOS で先に作った部品で、Mac にはまだ広げていない(歩数で使うことが多い)。
     /// 表は docs/decisions/363-desktop-strategy.md「部品の対応(Mac の列)」の ×。AI には作らせず、古い DSL で来た時は
     /// Renderer が「この Mac では使えません」の枠(MacUnavailableView)で受ける。
-    public static let macUnavailableComponents: Set<ComponentType> = [.healthStat, .sensorValue, .locationTracker, .dashcam]
+    public static let macUnavailableComponents: Set<ComponentType> = [.healthStat, .sensorValue, .locationTracker, .dashcam, .growth]
     /// Mac で無効にする機能。fieldHealth = Field.health(HealthKit が無い)、
     /// nearbyShare.passby = nearbyShare の mode passby(すれ違い通信・#1955・#3248。backend は send だけで作る)。
     /// photoField / videoField の撮影(cameraCapture)は Mac のカメラで撮れる(#1043)ので外さない。カメラの無い Mac は Renderer が選ぶだけにする。

@@ -1,0 +1,6 @@
+[
+  {"id": "gr_steps_tree", "kind": "create", "group": "growth", "transcript": "歩数を数えて木に実がなるアプリを作って", "note": "歩数で木に実がなる → growth(tree・metric steps・live true)", "expect": {"growth": "tree", "growthSteps": true}},
+  {"id": "gr_steps_flower", "kind": "create", "group": "growth", "transcript": "歩くほど花が咲くアプリ", "note": "歩くほど花が咲く → growth(flower・metric steps・live true)", "expect": {"growth": "flower", "growthSteps": true}},
+  {"id": "gr_savings_tree", "kind": "create", "group": "growth", "transcript": "貯金が増えると木が育つアプリ", "note": "貯金で木が育つ → growth(entity の合計・歩数は使わない)", "expect": {"growth": "tree", "growthSteps": false}},
+  {"id": "gr_plain_steps", "kind": "create", "group": "growth", "transcript": "歩数計。今日の歩数と目標 8000 歩", "note": "育つ見た目を頼まれていない → growth は使わない(healthStat)", "expect": {"health": "steps", "growthSteps": false}}
+]

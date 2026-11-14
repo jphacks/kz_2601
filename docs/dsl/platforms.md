@@ -133,6 +133,7 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 | `flashcards` | 使える | 使える |  | 使える |  |
 | `feed` | 使える | 使える |  | 代わりの表示 | 外す |
 | `callButton` | 使える | 使える |  | 未定 | 外す |
+| `growth` | 使える | 使えない(枠) |  | 使えない |  |
 
 ### アクション
 

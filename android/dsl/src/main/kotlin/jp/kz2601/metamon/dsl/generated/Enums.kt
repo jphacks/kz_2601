@@ -264,6 +264,9 @@ enum class ComponentKind(val wire: String) {
     PIE("pie"),
     PINS("pins"),
     ROUTE("route"),
+    TREE("tree"),
+    FLOWER("flower"),
+    PLANT("plant"),
 
     /** 知らない値(新しい版)。 */
     UNKNOWN(""),

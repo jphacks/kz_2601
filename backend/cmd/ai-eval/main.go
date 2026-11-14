@@ -486,6 +486,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
 		// #3694: health_live.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkHealthLive(c.Expect, app)...)
+		// growth.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkGrowth(c.Expect, app)...)
 		// addToCalendar: calendar_add.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkCalendarAdd(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkBookLookup(c.Expect, app)...) // book_lookup.go

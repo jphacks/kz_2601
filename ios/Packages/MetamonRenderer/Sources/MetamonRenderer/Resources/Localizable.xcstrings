@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "%@ %@、目標 %@ %@、%@ %lld / %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@, goal %3$@ %4$@, %5$@ %6$lld / %7$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %@、目標 %@ %@、%@ %lld / %lld"
+          }
+        }
+      }
+    },
     "%@ %lld 件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2096,6 +2113,23 @@
         }
       }
     },
+    "あと %@ %@で次の%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ more to the next %3$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あと %@ %@で次の%@"
+          }
+        }
+      }
+    },
     "あと%lld分" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2505,6 +2539,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この版では AI と話せません"
+          }
+        }
+      }
+    },
+    "この版では歩数を読めません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steps aren't available in this version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この版では歩数を読めません"
           }
         }
       }
@@ -7086,6 +7137,23 @@
         }
       }
     },
+    "収穫!" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harvest!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "収穫!"
+          }
+        }
+      }
+    },
     "取り下げる" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7358,6 +7426,23 @@
         }
       }
     },
+    "大きな木!" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Big tree!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大きな木!"
+          }
+        }
+      }
+    },
     "完了" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7371,6 +7456,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完了"
+          }
+        }
+      }
+    },
+    "実" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fruit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実"
           }
         }
       }
@@ -8423,6 +8525,40 @@
         }
       }
     },
+    "歩数を取得できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read your steps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歩数を取得できませんでした"
+          }
+        }
+      }
+    },
+    "歩数を読む許可がありません。設定の「プライバシーとセキュリティ > モーションとフィットネス」で Tailor It をオンにしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No permission to read steps. Turn on Tailor It in Settings > Privacy & Security > Motion & Fitness"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歩数を読む許可がありません。設定の「プライバシーとセキュリティ > モーションとフィットネス」で Tailor It をオンにしてください"
+          }
+        }
+      }
+    },
     "残り %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8606,6 +8742,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "湿度"
+          }
+        }
+      }
+    },
+    "満開!" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full bloom!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "満開!"
           }
         }
       }
@@ -8929,6 +9082,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目標 %@ 歩の %lld%%"
+          }
+        }
+      }
+    },
+    "目標を決めると育ちます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a goal to make it grow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目標を決めると育ちます"
           }
         }
       }
@@ -9523,6 +9693,23 @@
         }
       }
     },
+    "育つ絵" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Growing picture"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "育つ絵"
+          }
+        }
+      }
+    },
     "自分" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9553,6 +9740,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動で計算されます"
+          }
+        }
+      }
+    },
+    "花" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "flowers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "花"
+          }
+        }
+      }
+    },
+    "葉" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "leaves"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "葉"
           }
         }
       }

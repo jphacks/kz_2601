@@ -680,6 +680,8 @@ func (a *App) Validate() error {
 				checkAIChat(where, c, entities, add) // ai_chat.go
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
+			case CompGrowth:
+				checkGrowth(where, c, entities, add) // growth.go
 			case CompDashcam:
 				checkDashcam(where, c, add)
 			case CompSensorValue:

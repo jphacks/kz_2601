@@ -305,7 +305,7 @@ public enum GridEditCopy {
         case .button, .shareButton, .openUrlButton, .locationButton, .speakButton, .aiButton, .callButton: L("ボタン")
         case .list, .table, .timeline, .matchList: L("一覧")
         case .chart: L("グラフ")
-        case .stat, .healthStat, .gauge, .progressBar: L("数値")
+        case .stat, .healthStat, .gauge, .progressBar, .growth: L("数値")
         case .image, .avatar, .icon: L("画像")
         case .calendar: L("カレンダー")
         case .mapView: L("地図")

@@ -64,6 +64,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "calendar.badge.clock" to "event",
     "calendar.badge.plus" to "edit_calendar",
     "camera" to "photo_camera",
+    "camera.macro" to "local_florist",
     "car" to "directions_car",
     "cart" to "shopping_cart",
     "chart.bar" to "bar_chart",
@@ -115,6 +116,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "house" to "home",
     "info" to "info",
     "iphone" to "smartphone",
+    "leaf" to "eco",
     "level" to "straighten",
     "link" to "link",
     "list.bullet" to "format_list_bulleted",
@@ -172,6 +174,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "timer" to "timer",
     "trash" to "delete",
     "tray" to "inbox",
+    "tree" to "park",
     "trophy" to "emoji_events",
     "tropicalstorm" to "warning",
     "video" to "videocam",
@@ -220,6 +223,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "directions_run" -> Icons.AutoMirrored.Filled.DirectionsRun
     "directions_walk" -> Icons.AutoMirrored.Filled.DirectionsWalk
     "document_scanner" -> Icons.Filled.DocumentScanner
+    "eco" -> Icons.Filled.Eco
     "edit" -> Icons.Filled.Edit
     "edit_calendar" -> Icons.Filled.EditCalendar
     "edit_note" -> Icons.Filled.EditNote
@@ -253,6 +257,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "link" -> Icons.Filled.Link
     "list_alt" -> Icons.AutoMirrored.Filled.ListAlt
     "local_fire_department" -> Icons.Filled.LocalFireDepartment
+    "local_florist" -> Icons.Filled.LocalFlorist
     "location_on" -> Icons.Filled.LocationOn
     "lock" -> Icons.Filled.Lock
     "mail" -> Icons.Filled.Mail
@@ -270,6 +275,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "notifications" -> Icons.Filled.Notifications
     "open_in_new" -> Icons.AutoMirrored.Filled.OpenInNew
     "pan_tool" -> Icons.Filled.PanTool
+    "park" -> Icons.Filled.Park
     "person" -> Icons.Filled.Person
     "person_add" -> Icons.Filled.PersonAdd
     "person_remove" -> Icons.Filled.PersonRemove
@@ -357,6 +363,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "directions_run",
     "directions_walk",
     "document_scanner",
+    "eco",
     "edit",
     "edit_calendar",
     "edit_note",
@@ -390,6 +397,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "link",
     "list_alt",
     "local_fire_department",
+    "local_florist",
     "location_on",
     "lock",
     "mail",
@@ -407,6 +415,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "notifications",
     "open_in_new",
     "pan_tool",
+    "park",
     "person",
     "person_add",
     "person_remove",

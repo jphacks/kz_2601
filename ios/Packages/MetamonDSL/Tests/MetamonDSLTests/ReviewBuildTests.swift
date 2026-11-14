@@ -62,7 +62,7 @@ final class ReviewBuildTests: XCTestCase {
     /// Mac の申告(#925): 描けない部品と機能を外す。iOS の値は変えない
     func testMacDeclaration() {
         let mac = Set(ClientCapabilities.allowedComponents(macOS: true, review: false))
-        XCTAssertEqual(ClientCapabilities.macUnavailableComponents, [.healthStat, .sensorValue, .locationTracker, .dashcam])
+        XCTAssertEqual(ClientCapabilities.macUnavailableComponents, [.healthStat, .sensorValue, .locationTracker, .dashcam, .growth])
         XCTAssertTrue(mac.isDisjoint(with: ClientCapabilities.macUnavailableComponents.map(\.rawValue)))
         XCTAssertEqual(mac.count, ClientCapabilities.allComponents.count - ClientCapabilities.macUnavailableComponents.count)
         XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: false), ["fieldHealth", "nearbyShare.passby"])

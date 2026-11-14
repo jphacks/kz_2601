@@ -465,7 +465,7 @@ func anyOf(ids []string, set map[string]bool) bool {
 }
 
 // scalarTypes show one number computed from an entity, not its records.
-var scalarTypes = map[ComponentType]bool{CompStat: true, CompProgressBar: true, CompGauge: true}
+var scalarTypes = map[ComponentType]bool{CompStat: true, CompProgressBar: true, CompGauge: true, CompGrowth: true}
 
 // settingEntities returns entities that hold a setting such as a budget or a
 // goal: read only as a single number (agg in stat.value / computed, or a

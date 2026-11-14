@@ -1118,6 +1118,28 @@ internal val Icons.Filled.DocumentScanner: ImageVector
 
 private var _documentScanner: ImageVector? = null
 
+internal val Icons.Filled.Eco: ImageVector
+    get() {
+        if (_eco != null) {
+            return _eco!!
+        }
+        _eco = materialIcon(name = "Filled.Eco") {
+            materialPath {
+                moveTo(6.05f, 8.05f)
+                curveToRelative(-2.73f, 2.73f, -2.73f, 7.15f, -0.02f, 9.88f)
+                curveToRelative(1.47f, -3.4f, 4.09f, -6.24f, 7.36f, -7.93f)
+                curveToRelative(-2.77f, 2.34f, -4.71f, 5.61f, -5.39f, 9.32f)
+                curveToRelative(2.6f, 1.23f, 5.8f, 0.78f, 7.95f, -1.37f)
+                curveTo(19.43f, 14.47f, 20.0f, 4.0f, 20.0f, 4.0f)
+                reflectiveCurveTo(9.53f, 4.57f, 6.05f, 8.05f)
+                close()
+            }
+        }
+        return _eco!!
+    }
+
+private var _eco: ImageVector? = null
+
 internal val Icons.Filled.EditCalendar: ImageVector
     get() {
         if (_editCalendar != null) {
@@ -2163,6 +2185,56 @@ internal val Icons.Filled.LocalFireDepartment: ImageVector
 
 private var _localFireDepartment: ImageVector? = null
 
+internal val Icons.Filled.LocalFlorist: ImageVector
+    get() {
+        if (_localFlorist != null) {
+            return _localFlorist!!
+        }
+        _localFlorist = materialIcon(name = "Filled.LocalFlorist") {
+            materialPath {
+                moveTo(12.0f, 22.0f)
+                curveToRelative(4.97f, 0.0f, 9.0f, -4.03f, 9.0f, -9.0f)
+                curveToRelative(-4.97f, 0.0f, -9.0f, 4.03f, -9.0f, 9.0f)
+                close()
+                moveTo(5.6f, 10.25f)
+                curveToRelative(0.0f, 1.38f, 1.12f, 2.5f, 2.5f, 2.5f)
+                curveToRelative(0.53f, 0.0f, 1.01f, -0.16f, 1.42f, -0.44f)
+                lineToRelative(-0.02f, 0.19f)
+                curveToRelative(0.0f, 1.38f, 1.12f, 2.5f, 2.5f, 2.5f)
+                reflectiveCurveToRelative(2.5f, -1.12f, 2.5f, -2.5f)
+                lineToRelative(-0.02f, -0.19f)
+                curveToRelative(0.4f, 0.28f, 0.89f, 0.44f, 1.42f, 0.44f)
+                curveToRelative(1.38f, 0.0f, 2.5f, -1.12f, 2.5f, -2.5f)
+                curveToRelative(0.0f, -1.0f, -0.59f, -1.85f, -1.43f, -2.25f)
+                curveToRelative(0.84f, -0.4f, 1.43f, -1.25f, 1.43f, -2.25f)
+                curveToRelative(0.0f, -1.38f, -1.12f, -2.5f, -2.5f, -2.5f)
+                curveToRelative(-0.53f, 0.0f, -1.01f, 0.16f, -1.42f, 0.44f)
+                lineToRelative(0.02f, -0.19f)
+                curveTo(14.5f, 2.12f, 13.38f, 1.0f, 12.0f, 1.0f)
+                reflectiveCurveTo(9.5f, 2.12f, 9.5f, 3.5f)
+                lineToRelative(0.02f, 0.19f)
+                curveToRelative(-0.4f, -0.28f, -0.89f, -0.44f, -1.42f, -0.44f)
+                curveToRelative(-1.38f, 0.0f, -2.5f, 1.12f, -2.5f, 2.5f)
+                curveToRelative(0.0f, 1.0f, 0.59f, 1.85f, 1.43f, 2.25f)
+                curveToRelative(-0.84f, 0.4f, -1.43f, 1.25f, -1.43f, 2.25f)
+                close()
+                moveTo(12.0f, 5.5f)
+                curveToRelative(1.38f, 0.0f, 2.5f, 1.12f, 2.5f, 2.5f)
+                reflectiveCurveToRelative(-1.12f, 2.5f, -2.5f, 2.5f)
+                reflectiveCurveTo(9.5f, 9.38f, 9.5f, 8.0f)
+                reflectiveCurveToRelative(1.12f, -2.5f, 2.5f, -2.5f)
+                close()
+                moveTo(3.0f, 13.0f)
+                curveToRelative(0.0f, 4.97f, 4.03f, 9.0f, 9.0f, 9.0f)
+                curveToRelative(0.0f, -4.97f, -4.03f, -9.0f, -9.0f, -9.0f)
+                close()
+            }
+        }
+        return _localFlorist!!
+    }
+
+private var _localFlorist: ImageVector? = null
+
 internal val Icons.Filled.Mail: ImageVector
     get() {
         if (_mail != null) {
@@ -2716,6 +2788,32 @@ internal val Icons.Filled.PanTool: ImageVector
     }
 
 private var _panTool: ImageVector? = null
+
+internal val Icons.Filled.Park: ImageVector
+    get() {
+        if (_park != null) {
+            return _park!!
+        }
+        _park = materialIcon(name = "Filled.Park") {
+            materialPath {
+                moveTo(17.0f, 12.0f)
+                lineToRelative(2.0f, 0.0f)
+                lineToRelative(-7.0f, -10.0f)
+                lineToRelative(-6.95f, 10.0f)
+                lineToRelative(1.95f, 0.0f)
+                lineToRelative(-3.9f, 6.0f)
+                lineToRelative(6.92f, 0.0f)
+                lineToRelative(0.0f, 4.0f)
+                lineToRelative(3.96f, 0.0f)
+                lineToRelative(0.0f, -4.0f)
+                lineToRelative(7.02f, 0.0f)
+                close()
+            }
+        }
+        return _park!!
+    }
+
+private var _park: ImageVector? = null
 
 internal val Icons.Filled.PersonAdd: ImageVector
     get() {

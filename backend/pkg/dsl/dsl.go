@@ -354,6 +354,8 @@ const (
 	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
+	// growth (growth.go): a picture that grows with a number (steps / records / expression)
+	CompGrowth ComponentType = "growth"
 	// device sensors (#419): CoreMotion / CMAltimeter live value, optional save
 	CompSensorValue ComponentType = "sensorValue"
 	// music (#412): Apple Music player + song requests from nearby friends
