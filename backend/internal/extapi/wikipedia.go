@@ -40,6 +40,7 @@ var wikipediaHosts = []string{"https://ja.wikipedia.org", "https://en.wikipedia.
 
 func init() {
 	register(Provider{ID: Wikipedia, Billing: BillingFree, Hosts: wikipediaHosts,
+		Terms: Terms{Attribution: "出典: Wikipedia(CC BY-SA 4.0・各行から記事を開けます)"},
 		Ops: []OpSpec{
 			{Name: "summary", Args: []string{"title", "lang"}, Check: checkWikipediaSummary, CacheTTL: time.Hour},
 			{Name: "search", Args: []string{"q", "lang", "limit"}, Check: checkWikipediaSearch, CacheTTL: time.Hour},
