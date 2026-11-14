@@ -43,7 +43,7 @@
     <string name="feedback_composer_sent_body">ありがとうございます。いただいた内容は改善に使います。</string>
     <string name="feedback_composer_sent_title">送信しました</string>
     <string name="feedback_composer_settings_entry">フィードバックを送る</string>
-    <string name="feedback_composer_settings_footer">端末を振っても開けます。何を送るかは送る前に選べます。</string>
+    <string name="feedback_composer_settings_footer">何を送るかは送る前に選べます。</string>
     <string name="feedback_composer_show_dsl">送る DSL をすべて見る</string>
     <string name="feedback_composer_title">フィードバック</string>
 </resources>

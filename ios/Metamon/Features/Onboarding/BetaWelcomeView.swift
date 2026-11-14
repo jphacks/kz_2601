@@ -95,7 +95,7 @@ struct BetaWelcomeView: View {
                     }
                     .accessibilityIdentifier("betaWelcome.feedback")
                 } footer: {
-                    Text("困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。")
+                    Text("困ったこと・欲しい機能を、ここからそのまま送れます。")
                 }
             }
             .navigationTitle("β 版のご案内")
