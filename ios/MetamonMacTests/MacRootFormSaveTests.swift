@@ -129,6 +129,24 @@ final class MacRootFormSaveTests: XCTestCase {
         XCTAssertFalse(edit.hasUnsavedChanges)
     }
 
+    /// 作った直後に送信が済み、仮 id(`local-…`)で開いたまま直して保存した: 同じ記録を書き換える(2 件目を作らない)。
+    /// 送信の速さ次第で上のテストが CI で落ちた(仮 id の行が見つからず新規として書いていた)
+    func testEditByTemporaryIdAfterSendUpdatesSameRecord() async throws {
+        let rt = try runtime()
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: try form(rt, memo: "朝")))
+        let record = try XCTUnwrap(rt.records(for: "notes").first)
+        XCTAssertTrue(record.id.hasPrefix("local-"), "送る前は仮 id")
+        let left = await rt.recordSync.flush()
+        XCTAssertEqual(left, 0, "作成を送り切る(行の id がサーバーの id に替わる)")
+
+        let edit = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("notes")))
+        edit.load(record)
+        edit.values["memo"] = .string("夜")
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: edit, recordId: record.id))
+
+        XCTAssertEqual(rt.records(for: "notes").map(\.data["memo"]), [.string("夜")], "新しく作らず同じ記録を書き換える")
+    }
+
     /// 書き込み(recordSync の actor)を待っている間に `text` を入れる。書き込みの入口を `WriteGate` で止めて入れる
     private func typeDuringSave(_ rt: MacAppRuntime, _ form: FormDraft, _ text: String, recordId: String? = nil) async throws {
         let action = try saveAction()
