@@ -96,6 +96,13 @@ type Provider struct {
 	// day, from its documented daily quota (0 = DefaultLimits.GlobalDaily).
 	// Not for NeedsOAuth. EXT_GLOBAL_DAILY / EXT_GLOBAL_DAILY_<PROVIDER> win.
 	GlobalDaily int
+	// UserMinute is the provider's own default calls per person per minute
+	// (0 = none). EXT_LIMIT_USER_MINUTE / EXT_LIMIT_<PROVIDER>_USER_MINUTE win.
+	UserMinute int
+	// SunsetAt, when set, is when the provider's API ends (an announced
+	// shutdown): from then on it is off (ext_unavailable), left out of the
+	// connections list and of the AI's provider list.
+	SunsetAt time.Time
 	// Fake is the stg / test provider with fixed answers (決定 5). It is
 	// never enabled in production.
 	Fake bool
@@ -104,6 +111,9 @@ type Provider struct {
 	New func(Secrets) (map[string]Operation, error)
 	// NewOAuth builds the OAuth client of a NeedsOAuth provider.
 	NewOAuth func(Secrets) (OAuthClient, error)
+	// Terms are what the provider's terms of use ask (terms.go): no
+	// charging, no AI, own data only, the credit.
+	Terms Terms
 	// ClientFrom is another provider whose OAuth client (EXT_<IT>_CLIENT_ID /
 	// _CLIENT_SECRET) this one uses when its own are not set (googleTasks →
 	// googleCalendar: one Google client and consent screen).
@@ -146,6 +156,11 @@ func (p Provider) CheckArgs(op string, args map[string]string) (OpSpec, error) {
 		}
 	}
 	return spec, nil
+}
+
+// Sunset reports whether the provider's API has ended at now (SunsetAt).
+func (p Provider) Sunset(now time.Time) bool {
+	return !p.SunsetAt.IsZero() && !now.Before(p.SunsetAt)
 }
 
 // EnvName is the provider's part of env names: googleCalendar → GOOGLE_CALENDAR.
@@ -208,7 +223,7 @@ func (p Provider) check() error {
 	if p.NeedsOAuth && (p.NameJa == "" || p.NameEn == "") {
 		return fmt.Errorf("%s: an OAuth provider needs NameJa and NameEn", p.ID)
 	}
-	return nil
+	return p.Terms.check(p)
 }
 
 // Lookup returns the registered provider id.
@@ -232,11 +247,13 @@ func Providers() []Provider {
 }
 
 // ReviewBuildFeatures are the feature keys the App Store review build may
-// list (決定 6): providers without OAuth only, fakes never.
+// list (決定 6): providers without OAuth only, fakes never, none whose API
+// has ended.
 func ReviewBuildFeatures() []string {
 	var out []string
+	now := sunsetNow()
 	for _, p := range Providers() {
-		if !p.NeedsOAuth && !p.Fake {
+		if !p.NeedsOAuth && !p.Fake && !p.Sunset(now) {
 			out = append(out, p.FeatureKey())
 		}
 	}

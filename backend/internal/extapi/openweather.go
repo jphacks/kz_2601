@@ -54,7 +54,7 @@ const (
 var owKeyRe = regexp.MustCompile(`^[A-Za-z0-9]{16,64}$`)
 
 func init() {
-	register(Provider{ID: OpenWeather, Billing: BillingFree,
+	register(Provider{ID: OpenWeather, Billing: BillingFree, Terms: Terms{Attribution: OpenWeatherAttribution},
 		Ops: []OpSpec{
 			{Name: "current", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
 			{Name: "forecast", Args: []string{"lat", "lng", "limit", "uv"}, Check: checkOWForecast},

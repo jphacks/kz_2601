@@ -233,3 +233,16 @@ func TestQiitaCachedCall(t *testing.T) {
 		t.Fatalf("bad args: %v hits=%d", err, s.hits.Load())
 	}
 }
+
+// 本文入りで 1 MB を超える答え(qiitaMaxBody 以内)も読める。
+func TestQiitaLargeAnswer(t *testing.T) {
+	s := newQiitaServer(t)
+	s.body = `[{"title":"長い記事","url":"https://qiita.com/x/items/big","likes_count":1,"created_at":"2026-01-02T09:00:00+09:00","user":{"id":"x"},"body":"` + strings.Repeat("x", 2<<20) + `"}]`
+	out, err := s.ops()["search"].Do(context.Background(), Input{Args: map[string]string{"q": "go"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Rows) != 1 || out.Rows[0].Title != "長い記事" {
+		t.Fatalf("rows %+v", out.Rows)
+	}
+}
