@@ -1797,6 +1797,23 @@
         }
       }
     },
+    "iPhone を交通系 IC カードに近づけてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold your iPhone near your transit IC card"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone を交通系 IC カードに近づけてください"
+          }
+        }
+      }
+    },
     "macOS 26 以降が必要です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2283,6 +2300,23 @@
         }
       }
     },
+    "このカードから読み取れる履歴がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no history to read on this card"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このカードから読み取れる履歴がありません"
+          }
+        }
+      }
+    },
     "このセンサーはこの端末では使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2635,6 +2669,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末ではホームを使えません"
+          }
+        }
+      }
+    },
+    "この端末では交通系 IC カードを読み取れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't read transit IC cards"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では交通系 IC カードを読み取れません"
           }
         }
       }
@@ -3672,6 +3723,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カードがありません"
+          }
+        }
+      }
+    },
+    "カードに近づけ直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold it near the card again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カードに近づけ直してください"
           }
         }
       }
@@ -5082,6 +5150,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "予定はありません"
+          }
+        }
+      }
+    },
+    "交通系 IC カードではないようです" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This doesn't look like a transit IC card"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交通系 IC カードではないようです"
+          }
+        }
+      }
+    },
+    "交通系 IC カードの読み取りに失敗しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the transit IC card"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交通系 IC カードの読み取りに失敗しました"
+          }
+        }
+      }
+    },
+    "交通系 IC カードの読み取りを中止しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped reading the transit IC card"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交通系 IC カードの読み取りを中止しました"
           }
         }
       }

@@ -7,13 +7,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Used so the apps you build can read text and links from NFC tags, and write to them. What's read is never sent off this device."
+            "value" : "Used so the apps you build can read text and links from NFC tags, write to them, and show the balance and recent history on your transit IC card. What's read is never sent off this device."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成したアプリで、NFC タグに書かれた文字や URL を読み取ったり、タグに書き込んだりするために使用します。読み取った内容は端末の外に送りません。"
+            "value" : "生成したアプリで、NFC タグに書かれた文字や URL を読み取ったり、タグに書き込んだりするためと、交通系 IC カードの残高と最近の利用履歴を表示するために使用します。読み取った内容は端末の外に送りません。"
           }
         }
       }

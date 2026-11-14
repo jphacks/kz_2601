@@ -14,9 +14,11 @@ PB=/usr/libexec/PlistBuddy
 # / 端末のカレンダー・リマインダーを読む(#1987。使う部品がまだ無い。説明文が無いと LiveDeviceCalendar は許可を求めず restricted を返す)
 # / HomeKit の家・部屋・機器を読む(#2245。使う部品がまだ無い。説明文が無いと LiveDeviceHome は許可を求めず restricted を返す)
 # / NFC タグの読み書き(#2233。使う部品がまだ無い。説明文が無いと LiveNFCTagSession は isAvailable = false を返す)
+# / 交通系 IC カードを読む(#2246。使う部品がまだ無い。説明文かシステムコードの申告が無いと LiveFeliCaTransitReader は isAvailable = false を返す)
 # / 端末の連絡先の一覧を読む(#2218。同じく部品がまだ無い。LiveDeviceContacts も説明文が無ければ restricted)
 REVIEW_REMOVED_KEYS="
 CFBundleURLTypes
+com.apple.developer.nfc.readersession.felica.systemcodes
 NFCReaderUsageDescription
 NSAlarmKitUsageDescription
 NSBluetoothAlwaysUsageDescription
