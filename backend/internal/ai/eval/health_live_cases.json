@@ -1,0 +1,4 @@
+[
+  {"id": "hl_realtime", "kind": "create", "group": "healthLive", "transcript": "リアルタイムの歩数計。歩きながら見て数字が増えてほしい", "note": "#3694 「リアルタイム」→ healthStat(steps) に live: true", "expect": {"health": "steps", "healthLive": true}},
+  {"id": "hl_plain", "kind": "create", "group": "healthLive", "transcript": "歩数計。今日の歩数と目標 8000 歩", "note": "#3694 頼まれていない時は live を付けない(開いた時に取り直すだけ)", "expect": {"health": "steps", "healthLive": false}}
+]

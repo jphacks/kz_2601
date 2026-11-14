@@ -78,7 +78,7 @@ enum FeedbackScreenshot {
             .first { $0.isKeyWindow }
     }
 
-    /// 見えている画面全体(シートも含む)。端末を振った時用。
+    /// 見えている画面全体(シートも含む)。DEBUG の自動で開く口(`METAMON_AUTO_FEEDBACK`)用。
     static func captureWindow() -> UIImage? {
         keyWindow.flatMap { render($0) }
     }
