@@ -421,6 +421,8 @@ jobs:
 
 `ls backend/cmd backend/internal` の全エントリ(用途は各パッケージの doc コメントから)。
 
+新しい `cmd`(運用コマンド・Cloud Run Job)を足す時の決まりは [adding-a-command.md](adding-a-command.md)。
+
 ```
 backend/
   Dockerfile                 # 1 イメージに全サービス。既定は /app/appconfig、ai は --command=/app/ai
