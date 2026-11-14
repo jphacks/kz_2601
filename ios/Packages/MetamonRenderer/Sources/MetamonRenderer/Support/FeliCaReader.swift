@@ -315,7 +315,8 @@ private final class FeliCaHistoryRunner: NSObject, NFCTagReaderSessionDelegate, 
         finish(.failure(canceled ? TransitCardError.canceled : TransitCardError.failed))
     }
 
-    func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
+    // `NFCTag` はこのモジュールの差し替え口(NFCTagSession.swift・#2233)と名前が同じなので、Core NFC の方を明示する
+    func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [CoreNFC.NFCTag]) {
         guard let tag = tags.first else { return }
         guard case let .feliCa(card) = tag else {
             finish(.failure(TransitCardError.notTransitCard))
