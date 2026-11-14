@@ -15,6 +15,12 @@ final class IncomingLinkTests: XCTestCase {
         XCTAssertEqual(IncomingLink(url: URL(string: "https://TAILOR-IT.app/s/tok_1")!), .share(token: "tok_1"))
     }
 
+    /// #2224: 共有シートの拡張が開くリンク(ShareInbox.openURL と同じ)
+    func testShareInboxURL() {
+        XCTAssertEqual(IncomingLink(url: ShareInbox.openURL), .shareInbox)
+        XCTAssertEqual(IncomingLink(url: URL(string: "TailorIt://Share-Inbox")!), .shareInbox)
+    }
+
     func testUnknownURLsAreIgnored() {
         for url in [
             "tailorit://import/",

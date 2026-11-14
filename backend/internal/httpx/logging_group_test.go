@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -26,38 +27,75 @@ func requestCtx(t *testing.T) context.Context {
 }
 
 func TestCloudHandlerWithGroupKeepsReportingKeysTopLevel(t *testing.T) {
-	var buf bytes.Buffer
-	ctx := requestCtx(t)
-	cloudLogger(&buf).With("svc", "ai").WithGroup("req").With("path", "/x").WithGroup("inner").
-		ErrorContext(ctx, "boom", "code", 503)
-
-	m := lines(t, &buf)[0]
-	for k, want := range map[string]any{
-		"severity":                             "ERROR",
-		"message":                              "boom",
+	common := map[string]any{
 		"svc":                                  "ai",
-		"@type":                                ReportedErrorEventType,
 		"logging.googleapis.com/trace":         "projects/proj/traces/105445aa7843bc8bf206b12000100000",
 		"logging.googleapis.com/spanId":        "0000000000000001",
 		"logging.googleapis.com/trace_sampled": true,
 		"requestId":                            "req-g",
 		"uid_hash":                             UIDHash(testUID),
+	}
+	for _, tc := range []struct {
+		name     string
+		log      func(context.Context, *slog.Logger)
+		top      map[string]any
+		inner    map[string]any
+		reported bool
+	}{
+		{
+			name:  "warn",
+			log:   func(ctx context.Context, l *slog.Logger) { l.WarnContext(ctx, "slow", "ms", 900) },
+			top:   map[string]any{"severity": "WARNING", "message": "slow"},
+			inner: map[string]any{"ms": float64(900)},
+		},
+		{
+			name:     "error",
+			log:      func(ctx context.Context, l *slog.Logger) { l.ErrorContext(ctx, "boom", "code", 503) },
+			top:      map[string]any{"severity": "ERROR", "message": "boom"},
+			inner:    map[string]any{"code": float64(503)},
+			reported: true,
+		},
 	} {
-		if m[k] != want {
-			t.Errorf("top-level %s = %v, want %v\n%s", k, m[k], want, buf.String())
-		}
-	}
-	if sc, _ := m["serviceContext"].(map[string]any); sc["service"] != "ai-stg" || sc["version"] != "ai-stg-00001" {
-		t.Errorf("top-level serviceContext = %v", m["serviceContext"])
-	}
-	want := map[string]any{"path": "/x", "inner": map[string]any{"code": float64(503)}}
-	if !reflect.DeepEqual(m["req"], want) {
-		t.Errorf("req = %v, want %v (the caller's attrs stay in the group)", m["req"], want)
-	}
-	for _, k := range []string{"@type", "serviceContext", "requestId", "uid_hash", "logging.googleapis.com/trace"} {
-		if strings.Count(buf.String(), `"`+k+`"`) != 1 {
-			t.Errorf("%s appears %d times: %s", k, strings.Count(buf.String(), `"`+k+`"`), buf.String())
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			ctx := requestCtx(t)
+			tc.log(ctx, cloudLogger(&buf).With("svc", "ai").WithGroup("req").With("path", "/x").WithGroup("inner"))
+
+			m := lines(t, &buf)[0]
+			want := maps.Clone(common)
+			maps.Copy(want, tc.top)
+			if tc.reported {
+				want["@type"] = ReportedErrorEventType
+			}
+			for k, v := range want {
+				if m[k] != v {
+					t.Errorf("top-level %s = %v, want %v\n%s", k, m[k], v, buf.String())
+				}
+			}
+			if sc, _ := m["serviceContext"].(map[string]any); tc.reported {
+				if sc["service"] != "ai-stg" || sc["version"] != "ai-stg-00001" {
+					t.Errorf("top-level serviceContext = %v", m["serviceContext"])
+				}
+			} else if _, ok := m["serviceContext"]; ok {
+				t.Errorf("serviceContext on a record below ERROR: %v", m["serviceContext"])
+			}
+			if _, ok := m["@type"]; ok != tc.reported {
+				t.Errorf("@type present = %v, want %v: %s", ok, tc.reported, buf.String())
+			}
+			wantGroup := map[string]any{"path": "/x", "inner": tc.inner}
+			if !reflect.DeepEqual(m["req"], wantGroup) {
+				t.Errorf("req = %v, want %v (the caller's attrs stay in the group)", m["req"], wantGroup)
+			}
+			once := []string{"requestId", "uid_hash", "logging.googleapis.com/trace"}
+			if tc.reported {
+				once = append(once, "@type", "serviceContext")
+			}
+			for _, k := range once {
+				if n := strings.Count(buf.String(), `"`+k+`"`); n != 1 {
+					t.Errorf("%s appears %d times: %s", k, n, buf.String())
+				}
+			}
+		})
 	}
 }
 

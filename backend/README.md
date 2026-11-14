@@ -8,7 +8,7 @@
 | cmd | 役割 | どこで動くか | 手元で回す | 詳しい docs |
 |---|---|---|---|---|
 | `cmd/ai` | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig | Cloud Run サービス `ai-stg` / `ai-prod` | `make run-ai`(`make dev` で appconfig と一緒に) | [openapi-ai.yaml](../docs/backend/openapi-ai.yaml) |
-| `cmd/ai-audit` | ai-eval の結果の DSL を「動くか」で採点する(押せないボタン・行けない画面など)。API は呼ばない | 手元 | `go run ./cmd/ai-audit` | [ai-eval の監査](../docs/backend/ai-eval/2026-10-24-audit.md) |
+| `cmd/ai-audit` | ai-eval の結果の DSL を「動くか」で採点する(押せないボタン・行けない画面など)。API は呼ばない | 手元 | `go run ./cmd/ai-audit` | [使い方](../docs/backend/ai-eval/ai-audit.md)・[ai-eval の監査](../docs/backend/ai-eval/2026-10-24-audit.md) |
 | `cmd/ai-eval` | 評価ケース(`internal/ai/eval/cases.json`)を本物の Claude で回して指標と DSL を書き出す。`-check-all` はケースの検査だけ(API なし) | 手元・`backend-ci`(`-check-all` だけ) | `go run ./cmd/ai-eval` | [ci-gate.md](../docs/backend/ai-eval/ci-gate.md) |
 | `cmd/ai-session-report` | 指定したユーザーの AI とのやり取りをセッションに切り、AI が外した疑いの強い順に並べる(読むだけ) | 手元(人が回す・定期では回さない) | `go run ./cmd/ai-session-report` | [ai-session-report.md](../docs/ops/ai-session-report.md) |
 | `cmd/appconfig` | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード・各機能の API | Cloud Run サービス `appconfig-stg` / `appconfig-prod` | `make run-appconfig`(`make dev` で ai と一緒に) | [openapi-appconfig.yaml](../docs/backend/openapi-appconfig.yaml) |
@@ -35,15 +35,55 @@
 | `dsl.Initial()` | 新規ユーザーの初期 DSL(音声画面のみ) |
 | `*ValidationError.Problems` | 失敗理由の全列挙(422 の details / AI 再生成プロンプトに流用) |
 
-## パッケージ構成(appconfig)
+## パッケージ構成(internal)
 
-| パッケージ | 役割 |
-|---|---|
-| `internal/httpx` | JSON 書き出し・エラー封筒(`WriteJSON` / `Error` / `ErrorWithDetails` / `DecodeBody`)・RequestID・Log・Recover・`ErrorEnvelope` |
-| `internal/auth` | `Middleware(verifier, mode)` + `UID(ctx)`。verifier は `FirebaseVerifier`(Admin SDK)/ `DevVerifier`(dev 専用・Bearer 値=uid) |
-| `internal/store` | `Store` interface。`Firestore`(本番・エミュレータ)と `Memory`(テスト・ローカル) |
-| `internal/appconfig` | `openapi-appconfig.yaml` のハンドラ(apps / dsl / versions / entities / records) |
-| `internal/appconfigclient` | ai が appconfig を叩く薄い HTTP クライアント(Bearer 転送) |
+`internal/` の全部(1 行 1 つ・名前順)。サブパッケージは親の行のすぐ下に置く。テスト用のデータだけのフォルダ(`testdata`・`ai/eval`・`ai/examples`)は載せない。`internal/moderation` は中が `textfilter` だけなので、その行だけを置く。
+
+| パッケージ | 役割 | 詳しい docs |
+|---|---|---|
+| `internal/ai` | 発話 → DSL の変更(初回はフルの AppDSL・以後 JSON Patch)。`pkg/dsl` で検証し、問題があれば回数を決めて作り直す | [openapi-ai.yaml](../docs/backend/openapi-ai.yaml) |
+| `internal/appcheck` | Firebase App Check のトークンを確かめる(`APP_CHECK_MODE` で扱いを決める) | [app-check.md](../docs/infra/app-check.md) |
+| `internal/appconfig` | `openapi-appconfig.yaml` のハンドラ(core は apps / dsl / versions / entities / records。各機能のルートは機能のファイルから足す) | [openapi-appconfig.yaml](../docs/backend/openapi-appconfig.yaml) |
+| `internal/appconfigclient` | ai が appconfig を叩く薄いクライアント(HTTP は Bearer 転送・Memory はプロセス内の代わり) | - |
+| `internal/appstore` | StoreKit 2 の署名付き取引(JWS)を Apple を呼ばずに手元で確かめる | [app-store-notifications.md](../docs/infra/app-store-notifications.md) |
+| `internal/appstore/appstoretest` | テスト用: 偽の CA で署名した StoreKit 形式の JWS を作る | - |
+| `internal/auth` | `Middleware(verifier, mode)` + `UID(ctx)`。verifier は `FirebaseVerifier`(Admin SDK)/ `DevVerifier`(dev 専用・Bearer 値=uid) | - |
+| `internal/books` | DSL の `lookupBook` のため、ISBN で本を引く(決まった 1 つの取得先) | [book-lookup.md](../docs/backend/features/book-lookup.md) |
+| `internal/budget` | その日の AI の費用がしきい値を超えたら、無料プランの AI をその日の残りだけ止める(`AI_FREE_DAILY_BUDGET_USD` が無ければ off) | [rate-limit.md](../docs/backend/rate-limit.md) |
+| `internal/calls` | 共有アプリの音声・ビデオ通話。ルームのトークンを出し、使った分数を数える | [calls.md](../docs/backend/features/calls.md) |
+| `internal/coins` | コインの財布と台帳。LLM の呼び出しは先に上限を押さえ、終わったら確定する | [630-token-billing.md](../docs/decisions/630-token-billing.md) |
+| `internal/coins/coinsapi` | コインの財布の appconfig の HTTP API | - |
+| `internal/entitlement` | Tailor It Pro のサーバー側の記録(購入・復元の取引を受けて持つ・照合) | [pro.md](../docs/backend/features/pro.md) |
+| `internal/extapi` | runner から外部 API(カレンダー・天気・翻訳など)を呼ぶ入口 | [external-apis.md](../docs/backend/features/external-apis.md) |
+| `internal/feeds` | DSL の feed のため、決まった取得先の一覧から公開データを読む | [external-feeds.md](../docs/backend/features/external-feeds.md) |
+| `internal/fsenv` | どの Firestore の DB に繋ぐかを決める 1 か所。stg が本番の DB を使うなら起動を止める | - |
+| `internal/googleplay` | Google Play の定期購入(Android の Pro)を Developer API で読む | [play-billing.md](../docs/android/play-billing.md) |
+| `internal/gtfsstatic` | 静的な GTFS-JP の zip から、バスに要る部分(停留所・路線の名前・各便の予定時刻)を読む | [external-apis.md](../docs/backend/features/external-apis.md) |
+| `internal/httpx` | JSON 書き出し・エラー封筒(`WriteJSON` / `Error` / `ErrorWithDetails` / `DecodeBody`)・エラーのコードの一覧・RequestID・Log・Recover・`/health` | - |
+| `internal/loop` | 自己改善ループの土台(受け箱・止める仕組み・保存)。各段はサブパッケージ | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/draft` | 振り分けたまとまりを Issue の下書きにし、人の確認を待つ | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/fixed` | 直った Issue のもとになった声の送り主に「あなたの声で直りました」を届ける | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/github` | ループ用の小さな GitHub クライアント(人が承認した Issue を作る・閉じられ方を読む) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/ingest` | 各取得先のフィードバックを共通の形にし、伏せてから受け箱に写す | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/pii` | 保存の前にフィードバックの個人情報を伏せる(LLM は使わない) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `internal/loop/triage` | 受け箱を LLM で分類・まとめ・優先度付けする | [feedback-loop-triage-agreement.md](../docs/backend/features/feedback-loop-triage-agreement.md) |
+| `internal/loop/triage/eval` | 振り分けを人のラベル付きの組と比べて一致率を測る | [feedback-loop-triage-agreement.md](../docs/backend/features/feedback-loop-triage-agreement.md) |
+| `internal/metrics` | プロダクトの指標のイベントを構造化ログに書く(入力の文や DSL の中身は書かない) | [product-metrics.md](../docs/metrics/product-metrics.md) |
+| `internal/moderation/textfilter` | ほかの人が見る文の明らかに不適切な語を断る(最小の語の一覧) | [moderation.md](../docs/infra/moderation.md) |
+| `internal/paid` | Pro の機能の一覧(`paid_features.json`)と、それを使うサーバー側の DSL の検査 | [pro.md](../docs/backend/features/pro.md) |
+| `internal/plan` | プランごとに使える量の表(無料と Pro) | [rate-limit.md](../docs/backend/rate-limit.md) |
+| `internal/ratelimit` | 1 人(と全体)が 1 日に起こせる Claude の仕事の量を制限する | [rate-limit.md](../docs/backend/rate-limit.md) |
+| `internal/runner` | 自動の動き(serverRules)の実行。outbox からきっかけを取り、実行の直前に動かしてよいか確かめて、engine で評価する | [runner.md](../docs/infra/runner.md) |
+| `internal/runner/engine` | 1 つのルールを 1 つのきっかけに当てて、することを返す(自分では I/O しない) | [automations.md](../docs/backend/features/automations.md) |
+| `internal/runner/notify` | 予定した通知の宛先を決めて送る | [notifications.md](../docs/backend/features/notifications.md) |
+| `internal/runner/notify/apns` | APNs へ送る(トークン認証) | [runner.md](../docs/infra/runner.md) |
+| `internal/runner/notify/fcm` | FCM HTTP v1 で Android へ送る | [runner.md](../docs/infra/runner.md) |
+| `internal/runner/queue` | outbox の仕事を取る・終える・間を空けて再試行する・上限で諦める | [runner.md](../docs/infra/runner.md) |
+| `internal/runner/quota` | runner の実行・書いたレコード・通知の宛先・時刻のルールの数を数えて制限する | [runner-usage.md](../docs/infra/runner-usage.md) |
+| `internal/runner/schedule` | 時刻がきっかけのルールがいつ動くかを計算する(I/O なし) | [automations.md](../docs/backend/features/automations.md) |
+| `internal/runner/scope` | 1 つのきっかけから作り、その 1 つのアプリだけに触れる runner の取っ手 | [runner.md](../docs/infra/runner.md) |
+| `internal/runner/status` | runner の結果を作成者の画面に出す決まった言葉にする(appconfig からも使う) | [automations.md](../docs/backend/features/automations.md) |
+| `internal/store` | `Store` interface(`users/{uid}/apps/{appId}` の下のアプリ・DSL の版・レコード)。`Firestore`(本番・エミュレータ)と `Memory`(テスト・ローカル) | - |
 
 機能(共有・メンバー・通報など)のルートは、その機能のファイルの `init()` から `registerRoutes` で足す(AI のプロンプトと同じ形)。`handler.go` の `New()` には core(apps / dsl / versions / entities / records)だけを置く。足したルートは `routes_test.go` の `wantRoutes` にも書く。各機能の設計は [機能の文書の索引](../docs/backend/features/README.md)。
 
@@ -112,32 +152,81 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 
 ## 環境変数
 
-| 変数 | appconfig | ai | 既定 / 備考 |
-|---|---|---|---|
-| `PORT` | o | o | Cloud Run が注入。ローカル 8080 / 8081 |
-| `GOOGLE_CLOUD_PROJECT` | o | o | Firestore と Firebase Admin の初期化。**appconfig は未設定ならインメモリ store** |
-| `AUTH_MODE` | o | o | `firebase`(既定・本番)/ `dev`。dev では Bearer 値を uid として受理(`DevVerifier`)、`FIREBASE_AUTH_EMULATOR_HOST` も設定時は `X-Debug-Uid` も可 |
-| `FIRESTORE_DATABASE` | o | o | Firestore の DB ID。既定 `(default)`。全バイナリ(appconfig / ai の回数制限 / cmd/purge / cmd/stg-cleanup)が `internal/fsenv` から読む(#290) |
-| `APP_ENV` | o | o | `stg` / `prod`。`stg` が本番の接続先(`PROD_FIRESTORE_PROJECT`/`PROD_FIRESTORE_DATABASE`、既定 `jphacks-kz2601`/`(default)`)を使うと**起動を止める**(エミュレータ時は対象外) |
-| `ALLOW_SHARED_PROD_DB` | o | o | `1` のときだけ上の停止を外す(警告ログは出る)。stg が本番と DB を共有している間(#291・#293 の分離まで)は stg に必須。deploy-cloudrun.yml が stg=`1` / prod=`0` を入れる |
-| `STORE` | o | - | `memory` でインメモリ store を強制(既定は `GOOGLE_CLOUD_PROJECT` があれば Firestore) |
-| `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
-| `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
-| `LOG_LEVEL` | o | o | `info` |
-| `LOOP_SOURCE_GOOGLEPLAY` / `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | - | - | `cmd/feedback-loop` だけ。`on` で Google Play のレビューを改善ループに取り込む(既定 off・#2147)。パッケージ名の既定は `GOOGLE_PLAY_PACKAGE_NAME`、キーが空なら job の ADC。キーは Secret Manager から(JSON の中身・パスではない)([feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)) |
-| `MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD` | o | - | `GET /v1/client-config` の Linux の最低の版 / 最新の版(未設定 = 出さない・最新 < 最低なら最低に揃える・#2131)。詳しくは `docs/infra/runtime-config.md` |
-| `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD` | o | - | 同じく Windows(#2131) |
-| `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` | o | o | AI の 1 人 1 日の単位(既定 30 / 60 / 300)。他の `RATE_LIMIT_*` と理由は [docs/backend/rate-limit.md](../docs/backend/rate-limit.md) |
-| `RATE_LIMIT_ANON_DAILY_<OS>` / `_USER_DAILY_<OS>` / `_PRO_DAILY_<OS>` | o | o | 上の 3 つを OS ごとに上書き(#2133)。`<OS>` は `IOS` / `ANDROID` / `MACOS` / `WINDOWS` / `LINUX` / `OTHER`(ヘッダ `X-Client-Platform` をそろえた値・ヘッダ無しや未知は `OTHER`)。例 `RATE_LIMIT_USER_DAILY_WINDOWS=20`。未設定 = 上書きなし(今と同じ)。ai と appconfig に同じ値を入れる |
-| `FEEDBACK_DAILY_LIMIT` | o | - | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
-| `LOOP_GENFAIL_SOURCE` / `LOOP_GENFAIL_PROJECT` / `LOOP_GENFAIL_SERVICES` / `LOOP_GENFAIL_MAX_LINES` | - | - | `cmd/feedback-loop` だけ。生成の失敗の急増を読む先(既定 `file` = `LOOP_GENFAIL_LOGS`・`logging` = Cloud Logging の API・#2146)。`logging` の既定は `GOOGLE_CLOUD_PROJECT` / `ai-<APP_ENV>` / 50000 行。job の SA に `roles/logging.viewer` が要る([feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)) |
-| `APPCONFIG_BASE_URL` | - | o | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし)。staging は `https://appconfig-stg-378953239426.asia-northeast1.run.app` |
-| `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
-| `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
-| `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
-| `DEBUG_OVERRIDES` | o | o | **stg だけ**。`1` で、`DEBUG_OVERRIDE_UIDS` の uid のリクエストに限り `X-Debug-Plan: pro` / `free` で Pro の判定をそのリクエストだけ変える(#2085)。`APP_ENV` が `stg` でない時に入っていると**起動しない**。デプロイは入れない([stg-plan-override.md](../docs/infra/stg-plan-override.md)) |
-| `DEBUG_OVERRIDE_UIDS` | o | o | 上の対象にする uid(カンマ区切り)。`DEBUG_OVERRIDES=1` の時は空だと起動しない。repo には書かない |
+Cloud Run の appconfig・ai・runner の値(デプロイが決める値・運用で変える値)の一覧と変え方は [`docs/infra/runtime-config.md`](../docs/infra/runtime-config.md) が正。ここには、全部に共通の物と、cmd ごとの入口(runtime-config.md や各 docs に無い物)だけを書く。
 
-この表と docs/ に無い環境変数の一覧: `go test -run TestEnvDocs -v ./internal/envdoc`(表示だけで落とさない)。
+ここの表と docs/ に無い環境変数の一覧: `go test -run TestEnvDocs -v ./internal/envdoc`(表示だけで落とさない)。
 
-Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。
+### 全部に共通
+
+Firestore に繋ぐ cmd は、どれも `internal/fsenv` で同じ読み方をする(#290)。
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `ALLOW_SHARED_PROD_DB` | `1` のときだけ下の `APP_ENV` の停止を外す(警告ログは出る)。stg が本番と DB を共有している間(#291・#293 の分離まで)は stg に必須。deploy-cloudrun.yml が stg=`1` / prod=`0` を入れる |
+| `APP_ENV` | `stg` / `prod`。`stg` が本番の接続先(`PROD_FIRESTORE_PROJECT`/`PROD_FIRESTORE_DATABASE`、既定 `jphacks-kz2601`/`(default)`)を使うと**起動を止める**(エミュレータ時は対象外)。`GET /health` にも出る |
+| `FIRESTORE_DATABASE` | Firestore の DB ID。既定 `(default)` |
+| `FIRESTORE_EMULATOR_HOST` | 設定時は Firestore クライアントが自動でエミュレータへ(`make emulator` は `localhost:8089`) |
+| `GIT_SHA` | デプロイしたコミット。`GET /health` の `version`(先頭 7 文字)。サーバーだけ |
+| `GOOGLE_CLOUD_PROJECT` | Firestore と Firebase Admin の初期化。**appconfig は未設定ならインメモリ store** |
+| `K_SERVICE` / `K_REVISION` | Cloud Run が注入。ログの項目に使う([observability.md](../docs/infra/observability.md)) |
+| `LOG_LEVEL` | ログの詳しさ。既定 `info` |
+| `PORT` | サーバー(appconfig・ai・runner)だけ。Cloud Run が注入。ローカル 8080 / 8081 |
+
+### cmd/ai
+
+運用で変える値(`AI_PAUSED`・`RATE_LIMIT_*`・`COIN_*` など)は [runtime-config.md](../docs/infra/runtime-config.md#運用で変える値)。
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `AI_CHAT_EFFORT` / `AI_CHAT_MODEL` / `AI_CHAT_THINKING` | チャットの呼び出しの設定([chat.md](../docs/backend/features/chat.md)) |
+| `AI_LINT_RETRY` | `1` で生成の後の検査の警告でも作り直す(既定は警告を返すだけ) |
+| `AI_LOGIC_PASS` | `1` で UI の後に計算の段を足す(#100・[expr.md](../docs/backend/features/expr.md)) |
+| `AI_TEXT_IMAGE` | `1` で aiButton の写真の入力(`inputPhoto`)を作れるようにする(既定 off・[text.md](../docs/backend/features/text.md)) |
+| `ANTHROPIC_API_KEY` | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
+| `APPCONFIG_BASE_URL` | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし) |
+| `APPSTORE_ENVIRONMENTS` | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。Pro の判定(#449)に使う |
+| `APP_CHECK_APP_IDS` / `APP_CHECK_MODE` | App Check([app-check.md](../docs/infra/app-check.md))。appconfig と同じ |
+| `AUTH_MODE` | `firebase`(既定・本番)/ `dev`。dev では Bearer 値を uid として受理(`DevVerifier`)、`FIREBASE_AUTH_EMULATOR_HOST` も設定時は `X-Debug-Uid` も可 |
+| `CLAUDE_STRUCTURED_OUTPUT` | `1` で Claude の構造化出力を使う([architecture.md](../docs/backend/architecture.md)) |
+| `FIREBASE_AUTH_EMULATOR_HOST` | ローカルのみ(`X-Debug-Uid` の有効条件) |
+| `RATE_LIMIT_COLLECTION` / `RATE_LIMIT_STORE` | 回数制限の数え先のコレクション / `memory` で手元のメモリで数える([rate-limit.md](../docs/backend/rate-limit.md)) |
+
+### cmd/appconfig
+
+運用で変える値(`MIN_IOS_BUILD`・`PLAN_*`・`CALL_*` など)は [runtime-config.md](../docs/infra/runtime-config.md#運用で変える値)。
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
+| `APPSTORE_ENVIRONMENTS` | 受け入れる App Store の環境。既定 `Sandbox,Production` |
+| `APP_CHECK_APP_IDS` / `APP_CHECK_MODE` | App Check([app-check.md](../docs/infra/app-check.md)) |
+| `AUTH_MODE` | ai と同じ。Cloud Run では未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う |
+| `EVENTS_MAX_STREAM` | 変更の通知のストリーム 1 本の長さ(`5m` のように書く・Cloud Run の時間切れより短く)([events.md](../docs/backend/features/events.md)) |
+| `FEEDBACK_DAILY_LIMIT` | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
+| `FIREBASE_AUTH_EMULATOR_HOST` | ローカルのみ(`X-Debug-Uid` の有効条件) |
+| `GOOGLE_PLAY_*` | Android の Pro の購入の確認とリアルタイム通知([play-billing.md](../docs/android/play-billing.md)) |
+| `RATE_LIMIT_COLLECTION` / `RATE_LIMIT_STORE` | ai と同じ([rate-limit.md](../docs/backend/rate-limit.md)) |
+| `SHARE_WEB_BASE_URL` | 共有リンク(`GET /s/{token}`)を出す Web の頭。無ければ appconfig 自身のホスト([sharing.md](../docs/backend/features/sharing.md)) |
+| `STORE` | `memory` でインメモリ store を強制(既定は `GOOGLE_CLOUD_PROJECT` があれば Firestore) |
+
+### cmd/runner
+
+本番で動かす手順は [runner.md](../docs/infra/runner.md)、値は [runtime-config.md](../docs/infra/runtime-config.md#運用で変える値)(`RUNNER_*`・`APNS_*`・`EXT_*`)、外部 API は [external-apis.md](../docs/backend/features/external-apis.md)。そこに無い物:
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `FCM_PROJECT_ID` | FCM を送る Firebase のプロジェクト。無ければ下の鍵の `project_id` |
+| `FCM_SERVICE_ACCOUNT_JSON` | Android へ送る FCM の SA の鍵(Secret Manager から注入・ログに出さない)。無ければ runner は起動し、Android への通知だけを飛ばす(#918) |
+
+### cmd/appstore-reconcile・cmd/feedback-loop・cmd/purge(Cloud Run Job)
+
+- `cmd/appstore-reconcile`: `APPSTORE_API_*`(App Store Server API のキー)と appconfig と同じ `APPSTORE_*`。[app-store-notifications.md](../docs/infra/app-store-notifications.md#照合ジョブ)
+- `cmd/feedback-loop`: `LOOP_*`。[feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)
+- `cmd/purge`: 共通の物と `FIREBASE_AUTH_EMULATOR_HOST`(ローカルだけ)。消す期間はフラグ。[account-purge.md](../docs/infra/account-purge.md)
+
+### 人が回す道具
+
+- `cmd/ai-eval`: `ANTHROPIC_API_KEY`(`-env-file` でファイルからも読める)。
+- `cmd/ai-session-report`・`cmd/coin-initial-backfill`・`cmd/feedback`・`cmd/matching-age-backfill`・`cmd/moderate`・`cmd/stg-cleanup`: 共通の Firestore の物だけ(`coin-initial-backfill` はエミュレータの時 `FIREBASE_AUTH_EMULATOR_HOST` も)。本番の DB に向ける時のフラグは各 docs(上の cmd の表)。
+- `cmd/smoke`: `FIREBASE_WEB_API_KEY`(Firebase の匿名ユーザーの ID トークンを取る)・`SMOKE_UID`(`AUTH_MODE=dev` の時の uid・既定 `dev-smoke`)。
+- `cmd/ai-audit`・`cmd/dslgen`・`cmd/product-metrics`: 読まない。

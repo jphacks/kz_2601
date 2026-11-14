@@ -40,6 +40,17 @@ final class EnglishCopyTests: XCTestCase {
         XCTAssertEqual(L("選び直す"), "Choose again")
     }
 
+    /// ホームの読む口(#2245): 機器の種類・特性・今の値
+    func testDeviceHomeCopyIsEnglish() {
+        XCTAssertEqual(DeviceHomeError.notAuthorized(.restricted).errorDescription, "Access to Home isn't allowed")
+        XCTAssertEqual(DeviceHomeError.noHome.errorDescription, "No home in the Home app")
+        XCTAssertEqual(DeviceAccessoryKind.light.label, "Light")
+        XCTAssertEqual(DeviceAccessoryKind.windowCovering.label, "Window covering")
+        XCTAssertEqual(DeviceHomeTrait.brightness.label, "Brightness")
+        XCTAssertEqual(DeviceHomeReading(trait: .power, value: 1).text, "On")
+        XCTAssertEqual(DeviceHomeReading(trait: .power, value: 0).text, "Off")
+    }
+
     func testMusicCopyIsEnglish() {
         XCTAssertEqual(MusicAvailability.noSubscription.message, "Playing songs needs an Apple Music subscription")
         XCTAssertEqual(L("システム設定を開く"), "Open System Settings")

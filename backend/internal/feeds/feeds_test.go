@@ -451,3 +451,83 @@ func TestDefaultEndpoints(t *testing.T) {
 		}
 	}
 }
+
+// checkRedirect: an allowlisted host only, on the same scheme as the first
+// request, at most 3 hops.
+func TestFeedsCheckRedirect(t *testing.T) {
+	ep := Endpoints{
+		Holidays: "https://a.example/syukujitsu.csv",
+		RSS:      map[string]RSSFeed{"x": {URL: "https://b.example/rss.xml"}},
+		Arxiv:    "http://c.example/api/query",
+	}
+	req := func(raw string) *http.Request {
+		r, err := http.NewRequest(http.MethodGet, raw, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	first := req("https://a.example/syukujitsu.csv")
+	hop := func(n int) []*http.Request {
+		v := make([]*http.Request, n)
+		for i := range v {
+			v[i] = first
+		}
+		return v
+	}
+	for _, c := range []struct {
+		name    string
+		to      string
+		hops    int
+		blocked bool
+	}{
+		{"allowlisted host", "https://b.example/rss.xml", 1, false},
+		{"last allowed hop", "https://a.example/other", 2, false},
+		{"too many hops", "https://b.example/rss.xml", 3, true},
+		{"host not on the list", "https://evil.example/x", 1, true},
+		{"https to http downgrade", "http://c.example/api/query", 1, true},
+		{"credentials in URL", "https://user:pw@a.example/x", 1, true},
+	} {
+		err := ep.checkRedirect(req(c.to), hop(c.hops))
+		if c.blocked != errors.Is(err, ErrRedirectBlocked) || (!c.blocked && err != nil) {
+			t.Errorf("%s: err = %v, blocked want %v", c.name, err, c.blocked)
+		}
+	}
+}
+
+func TestSleepCtxReturnsFalseWhenCanceled(t *testing.T) {
+	const long = time.Minute
+	for _, c := range []struct {
+		name string
+		d    time.Duration
+		ctx  func() (context.Context, context.CancelFunc)
+		want bool
+	}{
+		{"no wait at all", 0, func() (context.Context, context.CancelFunc) {
+			return context.WithCancel(context.Background())
+		}, true},
+		{"cancelled before the wait", long, func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			return ctx, cancel
+		}, false},
+		{"cancelled during the wait", long, func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			time.AfterFunc(time.Millisecond, cancel)
+			return ctx, cancel
+		}, false},
+	} {
+		ctx, cancel := c.ctx()
+		done := make(chan bool, 1)
+		go func() { done <- sleepCtx(ctx, c.d) }()
+		select {
+		case got := <-done:
+			if got != c.want {
+				t.Errorf("%s: sleepCtx = %t, want %t", c.name, got, c.want)
+			}
+		case <-time.After(long / 2):
+			t.Errorf("%s: sleepCtx did not return", c.name)
+		}
+		cancel()
+	}
+}
