@@ -5,6 +5,8 @@
 # LiveKit のテスト用の偽の鍵(e92d242d で追加・3e3aeafc で偽と分かる値に置き換え済み)。実の鍵ではない。
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.go:generic-api-key:41
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23
+# Unsplash のテスト用の偽の鍵(db9ba9f で追加・strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+db9ba9fb19cf8dfa82dcfae6853db07f5a8599bf:backend/internal/extapi/unsplash_test.go:generic-api-key:14
 # SharedPreferences のキー名(exactAlarm.prompted.v1)の誤検知。秘密情報ではない。
 860439072a981a5daabedf24da7f85a1036fbfef:android/app/src/main/kotlin/jp/kz2601/metamon/notifications/ExactAlarmAsk.kt:generic-api-key:45
 # SwitchBot のテスト用の偽の値(b57df1d・feat/backend-switchbot-1704 に残る。develop では strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
