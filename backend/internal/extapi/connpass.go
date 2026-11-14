@@ -32,7 +32,7 @@ import (
 //
 // v1(鍵なし)は 2025-12-31 で終わり、v2 は申請した API キーが要る(X-API-Key)。
 // フリープランは 12 秒に 1 回・1 日 100 回(2026-11-04 から)で、「業務目的では
-// 使えない」と help にある: 本番で使うプランはオーナーの判断(external-api-terms.md)。
+// 使えない」と help にある: 本番は有料のプラン(2026-11-15 オーナー・external-api-terms-modes.md)。
 // 同じ引数の答えは 10 分持ち、環境全体の 1 日の既定は connpassGlobalDaily。
 // 429 は 1 分止まる(limits.go)。キーはヘッダーだけでエラーに URL は出ない。
 const Connpass = "connpass"
@@ -51,6 +51,8 @@ const (
 	connpassCount      = 50
 	// connpassGlobalDaily は環境全体の 1 日の既定: フリープランの 100 回の 8 割。
 	connpassGlobalDaily = 80
+	// connpassUserMinute は 1 人の 1 分の既定(ボタンの連打で全体の 1 日を使い切らない)。
+	connpassUserMinute = 3
 )
 
 var (
@@ -68,6 +70,11 @@ var (
 
 func init() {
 	register(Provider{ID: Connpass, Billing: BillingFree, Hosts: connpassHosts, GlobalDaily: connpassGlobalDaily,
+		// 有料のプランで使う(2026-11-15 オーナー): 鍵が無ければ off のまま(newConnpass)。
+		// 第三者向けに出すには connpass の事前の承諾が要る(人の作業)。止まらない使い方を防ぐ控えめの上限:
+		// 環境全体 1 日 connpassGlobalDaily・1 人 1 分 connpassUserMinute(env で変えられる)
+		UserMinute: connpassUserMinute,
+		Terms:      Terms{Attribution: "イベント情報: connpass"},
 		Ops: []OpSpec{
 			{Name: "events", Args: []string{"keyword", "nickname", "prefecture", "ym", "limit"}, Check: checkConnpassEvents, CacheTTL: 10 * time.Minute},
 		},

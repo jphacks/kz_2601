@@ -50,6 +50,11 @@ type Output struct {
 	Item  *Row       `json:"item,omitempty"`
 	// ResultID is the id of what a write op made (resultIdField).
 	ResultID string `json:"resultId,omitempty"`
+	// Attribution is the credit the app shows with the rows (Terms; an op
+	// may set its own).
+	Attribution string `json:"attribution,omitempty"`
+	// NoAI: the provider's terms keep these rows out of AI input (Terms.NoAI).
+	NoAI bool `json:"noAI,omitempty"`
 	// Usage is the call's measured cost (paid providers).
 	Usage Usage `json:"-"`
 	// ValidUntil, when set, is when the first row stops being valid (ODPT

@@ -1,7 +1,7 @@
 # 生成アプリのデザインシステム(Renderer 共通 UI)
 
 > 対象: `ios/Packages/MetamonRenderer`(DSL から生成されるアプリ側の全部品)。**色の正典は `Support/SemanticColor.swift` の `SemanticPalette`**(ライト/ダーク対)で、`RenderTheme.Colors` がそれを公開し、本体(音声画面・生成中画面)の `ios/Metamon/App/Theme.swift` の色は `RenderTheme.Colors` を参照する(#102 で色の二重定義を解消)。余白・角丸は従来どおり本体と二重定義なので片方を変えたらもう片方も揃える。ウィジェット(`MetamonWidget`)だけは Renderer を import できないので brandA/brandB を複製している。
-> 目的: 「どんなアプリが欲しい?」画面・「作成中」画面と、生成後のアプリ(家計簿・筋トレ・散歩…)が**同じブランドの作り込み**に見えること。アプリごとに変えない(`app.theme.primaryColor` は使わず、常に Tailor It ブランド)。
+> 目的: 「どんなアプリに変身しましょうか?」画面・「作成中」画面と、生成後のアプリ(家計簿・筋トレ・散歩…)が**同じブランドの作り込み**に見えること。アプリごとに変えない(`app.theme.primaryColor` は使わず、常に Tailor It ブランド)。
 
 ## 1. 原則
 1. **1 ブランド**: 藍→青緑のグラデーション(アプリアイコンの紺 × ツルの生成りから取った「藍 × 生成り」・#102)が「押せる・選ばれている・いま注目」の 3 つだけを指す。装飾には使わない。
