@@ -1,0 +1,7 @@
+[
+  {"id": "nn_create_station", "kind": "create", "group": "notify-near", "transcript": "電車で寝過ごさないアプリ。降りる駅を地図で保存しておいて、駅に近づいたら通知して", "note": "KB_2304 目的地の接近 → near(once・location field)", "expect": {"notifyNear": true, "notifyNearRepeat": "once", "jitter": false, "substitution": false}},
+  {"id": "nn_create_danger", "kind": "create", "group": "notify-near", "transcript": "危ない場所を地図に登録して、その近くに来たら毎回警告してほしい", "note": "sp_2512 危険な場所 → near(daily = 着くたび)", "expect": {"notifyNear": true, "notifyNearRepeat": "daily", "substitution": false}},
+  {"id": "nn_create_random", "kind": "create", "group": "notify-near", "transcript": "毎晩ランダムな時間に通知が来て、その時の写真を撮って記録するアプリ", "note": "tk_a_2508 ランダムな時刻 → time + jitterMinutes", "expect": {"jitter": true, "notifyNear": false, "substitution": false}},
+  {"id": "nn_create_early", "kind": "create", "group": "notify-near", "transcript": "タスクの期限を管理して、期限より少し早めに、毎回違うタイミングで通知して", "note": "os_2515 内緒の前倒し → offsetMinutes -N + jitterMinutes N", "expect": {"jitter": true, "notifyNear": false, "substitution": false}},
+  {"id": "nn_edit_random", "kind": "edit", "group": "notify-near", "base": "example:kakeibo", "transcript": "毎晩9時ごろに記録を促す通知を出して。時刻は毎回少しずらして", "note": "既存アプリに time + jitterMinutes の通知を足す", "expect": {"jitter": true, "patch": true}}
+]

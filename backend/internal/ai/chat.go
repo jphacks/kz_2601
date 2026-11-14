@@ -336,14 +336,17 @@ func (s *Service) ClearChat(uid, appID string) error {
 // still answering, so in practice it is already done).
 func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, err error) {
 	started := time.Now()
+	ctx = withCostTally(ctx) // tokens of the turn for ai.chat
+	defer func() { s.logChat(ctx, req, out, err, time.Since(started)) }()
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId is required"}
 	}
-	ctx = withRestriction(ctx, NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures))
+	ctx = withRestriction(ctx, s.clientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures))
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err
 	}
+	ctx = withServerPush(ctx, s.serverRulesOn(ctx, "")) // chat: the creator has not opted out yet
 	if wantsChatFirst(req) {
 		return s.chatFirst(ctx, req, incoming, started)
 	}
@@ -409,8 +412,11 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		bctx := context.WithoutCancel(ctx)
 		prompt := chatUserMessage(cv.messages, loc, turn, false, nil)
 		callStart := time.Now()
+		untrack := tallyOf(ctx).track() // an early question returns before this call ends (coins wait)
 		go func() {
-			done <- s.chatAttempt(bctx, cfg, prompt, bgAR, func(q earlyQuestion) { questions <- q })
+			a := s.chatAttempt(bctx, cfg, prompt, bgAR, func(q earlyQuestion) { questions <- q })
+			untrack()
+			done <- a
 		}()
 		select {
 		case q := <-questions:
@@ -605,7 +611,7 @@ func (s *Service) callChatWith(ctx context.Context, cfg ChatConfig, system strin
 	defer cancel()
 	t := time.Now()
 	var ttft time.Duration
-	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{
 		System:     system,
 		Messages:   []Message{{Role: "user", Content: user}},

@@ -1,0 +1,70 @@
+# エージェントの PR で「人の確認が必須」にする場所(#370・#366)。scripts/agent-pr-guard.sh が読む。
+# 1 行 1 項目: <種類> <パターン>。種類ごと・パターンの名前順。
+# パターンはリポジトリの根からのパス。末尾が / ならその下すべて。* は / をまたいで一致する。
+# 一覧は docs/backend/features/feedback-loop-agent-pr.md の「対象外の領域」と揃える。
+
+# GitHub の設定・workflow
+github .github/
+
+# 認可
+auth android/app/src/main/kotlin/jp/kz2601/metamon/auth/
+auth android/services/src/main/kotlin/jp/kz2601/metamon/services/AuthService.kt
+auth android/services/src/main/kotlin/jp/kz2601/metamon/services/live/FirebaseAuthService.kt
+auth backend/internal/appcheck/
+auth backend/internal/auth/
+auth ios/Metamon/Features/Auth/
+
+# 課金・コイン・使用量の上限
+billing android/app/src/main/kotlin/jp/kz2601/metamon/purchase/
+billing android/services/src/main/kotlin/jp/kz2601/metamon/services/purchase/
+billing backend/cmd/*/coins.go
+billing backend/cmd/appstore-reconcile/
+billing backend/cmd/coin-initial-backfill/
+billing backend/internal/ai/coins.go
+billing backend/internal/appstore/
+billing backend/internal/budget/
+billing backend/internal/coins/
+billing backend/internal/entitlement/
+billing backend/internal/paid/
+billing backend/internal/ratelimit/
+billing ios/Metamon/Features/Coins/
+billing ios/Metamon/Features/Purchase/
+billing ios/Packages/MetamonServices/Sources/MetamonServices/Coins/
+billing ios/Packages/MetamonServices/Sources/MetamonServices/Purchase/
+billing ios/StoreKit/
+
+# データの削除
+deletion backend/cmd/purge/
+deletion backend/internal/store/*purge*
+
+# 正典・法務・DSL のスキーマ
+docs docs/00_decisions.md
+docs docs/dsl/dsl.schema.json
+docs docs/legal/
+
+# この検査そのもの(一覧を緩める差分も人が見る)
+guard scripts/agent-pr-guard-test.sh
+guard scripts/agent-pr-guard.paths
+guard scripts/agent-pr-guard.sh
+
+# インフラ
+infra infra/
+
+# ループ自身
+loop backend/cmd/feedback-loop/
+loop backend/internal/loop/
+
+# AI の指示文・カタログ
+prompt */catalog.go
+prompt */prompt.go
+
+# 秘密の形をしたファイル(.gitignore の secrets と揃える)
+secret *.env
+secret *.env.*
+secret *.key
+secret *.p12
+secret *.p8
+secret *.pem
+secret *GoogleService-Info*.plist
+secret *google-services.json
+secret *serviceAccountKey*.json

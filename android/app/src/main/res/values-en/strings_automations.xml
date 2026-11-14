@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Automations (#905, iOS AutomationsView) -->
+<resources>
+    <string name="automations_conflict">Didn\'t switch because it overlapped with another change. Reloaded the latest state.</string>
+    <string name="automations_empty">This app has no automations.</string>
+    <string name="automations_fix">Fix it?</string>
+    <string name="automations_fix_request">The automation “%1$s” keeps failing. Please fix it so it works</string>
+    <string name="automations_last_run">Last run: %1$s</string>
+    <string name="automations_load_failed">Couldn\'t load the automations</string>
+    <string name="automations_loading">Loading</string>
+    <string name="automations_not_creator">Only the person who made this app can see its automations.</string>
+    <string name="automations_notify_paused">Notifications are paused for now. Automations still run.</string>
+    <string name="automations_off">Off</string>
+    <string name="automations_on">On</string>
+    <string name="automations_quota">Runs today</string>
+    <string name="automations_quota_footer">Resets at midnight Japan time.</string>
+    <string name="automations_retry">Retry</string>
+    <string name="automations_stopped">Tailor It has stopped this app\'s automations.</string>
+    <string name="automations_toggle_failed">Couldn\'t switch. Please try again later.</string>
+    <string name="automations_toggle_label">Run “%1$s”</string>
+    <string name="automations_until">Lifts automatically at %1$s.</string>
+</resources>

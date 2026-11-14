@@ -38,7 +38,7 @@ gh pr ready            # Draft 解除
 - `feature/*` → `develop`: Squash merge 推奨(履歴が1コミット=1PRになる)。タイトルは Conventional Commits に直す。
 - `develop` → `main`: **実機(iPhone 13)で E2E を通してから**。Merge commit(squash しない。develop と main の履歴を揃える)。マージすると Cloud Run prod に自動デプロイ。
 - 変更を触らない領域の CI(例: iOS だけ触った PR の `backend-ci`)は自動で skip され、required check は満たされる。
-- `scripts-ci`(`.github/workflows/scripts-ci.yml`)は `*.sh`・`scripts/**`・`.github/workflows/**` を触った時だけ走り、shellcheck・`scripts/ai-cost-test.sh`・actionlint を回す。required check ではない(ローカルでは `git ls-files -z '*.sh' | xargs -0 shellcheck` と `actionlint`)。
+- `scripts-ci`(`.github/workflows/scripts-ci.yml`)は `*.sh`・`scripts/**`・`.github/workflows/**` などを触った時だけ走る。required check ではない。回す物は [scripts-ci](#scripts-ciシェルスクリプトと-workflow-の検査)。
 
 ## hotfix / release
 
@@ -69,13 +69,54 @@ gh pr create --base main --title "release: Day2 デモ版"
 
 scope は `ios` / `appconfig` / `ai` / `dsl` / `infra` あたり。1コミット1意図。`WIP` コミットは squash 前提なら可。
 
+## backend-ci(Go のビルド・lint・テスト・5 分以内)
+
+`.github/workflows/backend-ci.yml`。発火は PR(opened・synchronize・reopened・ready_for_review)と `develop` / `main` への push。同じ PR(push ならブランチ)の古い実行は取り消す(`concurrency`)。
+
+workflow の `paths:` は使わない。required check にした時、backend を触らない PR では check が "Expected" のまま待ち続けてマージできなくなるため。代わりに ubuntu の `backend-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、本体の `backend-ci` を `if:` でスキップする(スキップは required check 上は成功扱い)。required check の名前はジョブ名 `backend-ci`(`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` と一致させる)。
+
+| ジョブ | 走る時 | 上限 | 中身 |
+|---|---|---|---|
+| `backend-changes` | push・非 Draft の PR | 2 分 | PR では下の場所が変わったかを見る。push は常に「回す」 |
+| `backend-ci` | `backend-changes` が「回す」と出した時 | **5 分** | 下の step |
+
+`backend-changes` が「回す」とする場所(PR の時):
+
+| 変わった場所 | 理由 |
+|---|---|
+| `backend/**` | 本体 |
+| `docs/dsl/conformance/expr/**`・`docs/dsl/examples/**` | backend のテストが読む |
+| `android/dsl/src/main/kotlin/**/generated/**` | `cmd/dslgen` の生成物(`TestGeneratedKotlinIsUpToDate` が古さを見る・#1006) |
+| `.github/workflows/backend-ci.yml` | この workflow 自身 |
+
+`backend-ci` の step(`backend/` で動く):
+
+| step | すること |
+|---|---|
+| `actions/setup-go` | `backend/go.mod` の版。キャッシュの鍵は `go.sum` と `go.mod` |
+| `go mod download` | 依存を落とす |
+| `go vet` | `go vet ./...` |
+| `golangci-lint` | `golangci-lint-action`(`version: latest`・`--timeout=3m`・設定は `backend/.golangci.yml`)。1 回目は `continue-on-error` |
+| `golangci-lint(再試行)` | 1 回目が失敗した時だけもう 1 回。2 回目の結果がジョブの成否(バイナリの取得の 5xx を拾うため。本当の指摘なら 2 回目も落ちる) |
+| `go build` | `go build ./...` |
+| `ai-eval cases (offline)` | `go run ./cmd/ai-eval -check-all internal/ai/eval`。評価ケース・編集の土台の JSON を形に合った読み方で検証する(API は呼ばない)。形の分からないファイルは失敗にする |
+| `go test (-race)` | `go test ./... -race -count=1` |
+
+- **5 分を超えたら**(`timeout-minutes: 5` でジョブが止まる)、lint の対象やテストを削らずに遅い原因を直す。Firestore エミュレータの試験は 5 分に収まらないので別の workflow(下の backend-emulator)。
+- 落ちた時の見方:
+  - `go vet`・`go build`: ログの `file:line` をそのまま直す
+  - `golangci-lint`: 1 回目だけ赤で 2 回目が緑ならジョブは成功(取得の一時的な失敗)。2 回目も赤なら指摘を直す。手元は `cd backend && golangci-lint run --timeout=3m`
+  - `ai-eval cases (offline)`: `internal/ai/eval` の JSON の形の誤り。手元は `cd backend && go run ./cmd/ai-eval -check-all internal/ai/eval`
+  - `go test (-race)`: `WARNING: DATA RACE` があればデータ競合。手元は `cd backend && go test ./... -race -count=1`
+  - backend を触っていないのに走った時は、上の表の場所(`docs/dsl/examples/**` など)を触っていないか見る
+
 ## ios-ci の仕組み(変更のあったモジュールだけテスト)
 
 macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、必要なテストだけ macOS で回す。required check は ubuntu の集約ジョブ `ios-ci`(macOS ジョブがスキップでも成功で終わる)。
 
 | 変わった場所 | macOS ジョブ | 回るテスト |
 |---|---|---|
-| `ios/Packages/MetamonDSL/**` だけ | `ios-dsl` | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+| `ios/Packages/MetamonDSL/**` だけ | `ios-dsl` | macOS の `xcodebuild test`(MetamonDSLTests・`ios/scripts/mac-package-test.sh`)。アプリのビルド・シミュレータ無し |
 | MetamonDSL + 他の iOS 変更 | `ios-xcode` | MetamonDSLTests / MetamonRendererTests / MetamonServicesTests / MetamonTests |
 | `ios/Packages/MetamonRenderer/**` | `ios-xcode` | MetamonRendererTests + MetamonTests |
 | `ios/Packages/MetamonServices/**` | `ios-xcode` | MetamonServicesTests + MetamonTests |
@@ -94,22 +135,193 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
   gh run rerun <run-id>
   ```
 
+## mac-ci(Mac アプリと共有パッケージの macOS ビルド・テスト)
+
+`.github/workflows/mac-ci.yml`(#928)。ios-ci と同じく ubuntu の `mac-changes` で変わった場所を見て、必要な時だけ macOS で回す。**required check にするかはオーナーが判断する**(今の `REQUIRED_CHECKS` には入っていない)。
+
+- きっかけ: PR(opened / synchronize / reopened / ready_for_review・Draft は除く)と `develop` / `main` への push。PR では新しい push で古い実行を取り消す。push では取り消さない。
+- ジョブ(名前は workflow と同じ): `mac-changes`(ubuntu・判定)→ `mac-build-test`(`macos-26`・上限 40 分)→ `mac-ci`(ubuntu・集約。`mac-build-test` がスキップでも成功、失敗・キャンセルなら失敗)。
+- `ios/MetamonMac` が無いブランチでは `mac-build-test` を飛ばす。
+
+| 変わった場所 | Mac アプリ(MetamonMac)のビルドと MetamonMacTests | パッケージのテスト(macOS) |
+|---|---|---|
+| `ios/Packages/MetamonDSL/**`・DSL のテストデータ(`docs/dsl/conformance/expr/**`・`docs/dsl/dsl.schema.json`・`docs/dsl/examples/**`・`backend/internal/ai/examples/**`・`backend/pkg/dsl/testdata/**`) | する | DSL / Renderer / Services(DSL は全員の依存) |
+| `ios/Packages/MetamonRenderer/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**` | する | Renderer |
+| `ios/Packages/MetamonServices/**` | する | Services |
+| `ios/MetamonMac/**`・`ios/MetamonMacTests/**`・`ios/Shared/**`(iOS と共有するランタイムの部品)・`ios/project.yml`・`ios/scripts/select-firebase-plist.sh` | する | なし |
+| `.github/workflows/mac-ci.yml`・`ios/scripts/mac-package-test.sh` | する | 全部 |
+| 上のどれも変わっていない | しない | なし(`mac-ci` は成功) |
+| `develop` / `main` への push(上のどれかが変更) | する | 全部 |
+
+**回す物**: `xcodegen generate` → `MetamonMac` の Debug ビルド(`platform=macOS`)→ Mac アプリをホストにした単体テスト `MetamonMacTests`(ビルドする時はいつも)→ 表で決まったパッケージのテスト(`ios/scripts/mac-package-test.sh <パッケージ名>`・各パッケージのフォルダで `xcodebuild test -destination platform=macOS`)。
+
+**回さない物**(重い・要らない物は macOS の分を使わない):
+
+- 署名・アーカイブ・配布用のビルド(`CODE_SIGNING_ALLOWED=NO`。証明書や Firebase の plist などの秘密を使わない)。
+- iOS のシミュレータ・iOS アプリ・UI テスト(iOS は ios-ci が受け持つ)。
+- 関係の無い変更の時の macOS ジョブ(判定は ubuntu の `mac-changes` で済ませる)。
+
+**時間の目安**: `mac-build-test` は全部を回す時(develop への push)で 10〜15 分。キャッシュ(SwiftPM・`DerivedData-mac`)が効かない時は延びる。判定と集約は数十秒。macOS runner は分単価が高いので、原因を見ずに Re-run を重ねない。失敗した時はテスト結果(`mac-test-results`・3 日)が artifact に上がる。
+
+**ios-ci との分担**:
+
+| | ios-ci | mac-ci |
+|---|---|---|
+| 対象 | iOS アプリ(シミュレータ)と、それが使うパッケージ | Mac アプリ(MetamonMac)と、それが使うパッケージ |
+| MetamonDSL だけの変更 | `ios-dsl` が macOS で MetamonDSLTests を回す | `mac-build-test` が DSL / Renderer / Services を回す |
+| UI テスト | develop / main への push(PR は `ui-tests` ラベルの時) | 無し |
+
+- 今は MetamonDSL だけを変えた PR で、DSL のテストが ios-ci と mac-ci の両方で回る(二重)。まとめ方は #1135 で決める(案: ios-ci の `ios-dsl` をやめて mac-ci に任せる)。**#1135 の決まりが出たら、この節と ios-ci の表をそれに合わせて直す。**
+- 手元で回す時、repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。repo(clone)と DerivedData(`MAC_DERIVED_DATA`)の両方を保護の外(例: `~/src`)に置く。CI では起きない。
+
+## android-ci(Android アプリの JVM テスト・ビルド)
+
+`.github/workflows/android-ci.yml`(#837)。PR が Open(非 Draft)の時と、`develop` / `main` への push で回る。**ubuntu だけ**で、エミュレータは使わない。ios-ci と同じく `android-changes` で変わった場所を見て、関係ない PR では Gradle を起動しない(workflow の `paths:` は使わない。required check が永遠に待ちになるため)。
+
+| ジョブ | いつ回るか | 回すもの |
+|---|---|---|
+| `android-build` | mode が `full`(`android/dsl/**` 以外の `android/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**`・`docs/dsl/dsl.schema.json`・この workflow。push では `android/dsl/**` も) | `./gradlew test assembleStgDebug` → `:app:compileStgDebugAndroidTestKotlin`(androidTest はコンパイルだけ)→ lint(非ブロッキング) |
+| `android-changes` | 毎回 | `dorny/paths-filter` で mode(`none` / `light` / `full`)と light で回す Gradle のタスクを決める |
+| `android-ci` | 毎回(集約) | ほかの 3 つの結果をまとめる。スキップは成功、失敗・キャンセルは失敗 |
+| `android-light` | mode が `light`(PR で `android/dsl/**` だけ・`docs/dsl/conformance/expr/**`・`docs/dsl/icon-map.json` と backend の `*.go`・iOS の `ClientCapabilities.swift` / `Localizable.xcstrings`) | 変わった物に関係する単体テストだけ(`:dsl:test`・`SymbolIconTableTest`・`DeviceCapabilitiesTest`・`RuntimeCopyIosEnglishTest`) |
+
+- 変わった場所と回すテストの細かい対応は [`docs/android/ci.md`](android/ci.md#形)。
+- 集約ジョブ `android-ci` は required check にできる形だが、`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` にはまだ入っていない。**必須にするかはオーナーが判断する**。
+- `google-services.json` は CI に置かない。無くてもビルドは通り、認証はモックになる。
+
+落ちた時の見方:
+
+- **unit(`test`・`android-light` の `gradle`)**: 成果物 `android-test-reports`(full)/ `android-light-test-reports`(light)に Gradle のテストのレポート(HTML)がある。手元では `cd android && ./gradlew test` か、落ちたタスクだけ(例: `./gradlew :dsl:test`)。
+- **androidTest のコンパイル**: 本番コードの変更で `androidTest` のコードが壊れた印。`./gradlew :app:compileStgDebugAndroidTestKotlin` で再現する。実行はしていないので、端末での確認は [`docs/android/ci.md`](android/ci.md#ci-で検証されるもの--手元で確かめるもの) の手順で手元で行う。
+- **lint**: 非ブロッキング(`continue-on-error`)なので `android-ci` は落ちない。結果は job summary と警告に出て、レポートは成果物 `android-lint-reports`。手元では `./gradlew :app:lintStgDebug :renderer:lintDebug :services:lintDebug`。
+
+## desktop-ci(Windows・Linux のデスクトップ版のテスト・配布物)
+
+`.github/workflows/desktop-ci.yml`(#1757)。`desktop/`(Compose Multiplatform Desktop)を ubuntu と windows の両方で確かめる。PR が Open(非 Draft)の時・`develop` / `main` への push・手動(`workflow_dispatch`)で回る。workflow の `paths:` は使わない(android-ci と同じ理由)。
+
+| ジョブ | いつ回るか | 回すもの |
+|---|---|---|
+| `desktop-build (ubuntu-latest)` | `run` が true | `./gradlew :desktop:test :dsl:test :whisper:test`。`package` が true なら `:desktop:packageDeb` で deb を作り、成果物 `desktop-deb` に残す |
+| `desktop-build (windows-latest)` | `run` が true | `.\gradlew.bat :desktop:test :dsl:test :whisper:test`。`package` が true なら `:desktop:packageMsi` で msi を作り、成果物 `desktop-msi` に残す |
+| `desktop-changes` | 毎回 | `dorny/paths-filter` で `run`(テストを回すか)と `package`(配布物を作るか)を決める |
+| `desktop-ci` | 毎回(集約) | ほかのジョブの結果をまとめる。スキップは成功、失敗・キャンセルは失敗 |
+
+`run` が true になる変更(1 つでも当たれば回す。手動の時は必ず true):
+
+| 変わった場所 | 理由 |
+|---|---|
+| `.github/workflows/desktop-ci.yml` | この workflow 自身 |
+| `android/app/src/main/res/values*/**` | 同梱する文言 |
+| `android/dsl/**`(`*.md` 以外) | 取り込む DSL |
+| `android/gradle/libs.versions.toml` | 依存の版 |
+| `android/renderer/src/main/**`・`android/services/src/main/**`(`*.md` 以外) | 取り込むソース・文言 |
+| `android/whisper/src/**`(`*.md` 以外) | 取り込む純 Kotlin の部分とそのテスト(#1751) |
+| `desktop/**`(`*.md` 以外) | デスクトップ版そのもの |
+| `docs/dsl/conformance/**`・`docs/dsl/examples/**` | 適合テストと同梱の例 |
+
+- **PR では配布物を作らない**(`package` は push と手動の時だけ true)。PR で確かめたいのはテストで、jpackage で deb・msi を 2 つの OS で作るのは時間がかかるため。配布物は 7 日で消える。署名はしない・秘密は使わない。
+- 配布物を手で作る: `gh workflow run desktop-ci.yml --ref <ブランチ>`(Actions タブの「Run workflow」でも同じ)。終わったら `gh run download <run-id> -n desktop-deb`(Windows 版は `-n desktop-msi`)。
+- 集約ジョブ `desktop-ci` は required check にできる形だが、`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` にはまだ入っていない。**必須にするかはオーナーが判断する**。
+
+落ちた時の見方:
+
+- `desktop-build` は OS ごとに分かれ、片方が落ちてももう片方は最後まで回る(`fail-fast: false`)。どちらの OS かを先に見る。
+- テストが落ちたら、成果物 `desktop-test-reports-ubuntu-latest` / `desktop-test-reports-windows-latest` にレポート(HTML)がある(`desktop/app/build/reports/tests/`・`desktop/build/dsl/reports/tests/`・`desktop/whisper/build/reports/tests/`)。
+- 手元では `cd desktop && ./gradlew :desktop:test :dsl:test :whisper:test`(JDK 17 以上)。Windows だけで落ちる時は、パスの区切りや改行(CRLF)の違いを疑う。
+- 「配布物を作る」の step が落ちたら jpackage のエラーをログで見る(手元では `./gradlew :desktop:packageDeb`)。「配布物を残す」が落ちたら `desktop/app/build/compose/binaries/main/<deb|msi>/` が空だった(`if-no-files-found: error`)。
+
+## infra-ci(Terraform の書式と構文の検査)
+
+`.github/workflows/infra-ci.yml`。`infra/`(GCP の構成の Terraform・[`infra/README.md`](../infra/README.md))を検査する。**GCP には触らない**(state の backend を使わずに init するので、認証も秘密も要らない)。
+
+- いつ回るか: `infra/**` かこの workflow を触る PR(Draft でも回る)と、`develop` / `main` への push。required check ではないので、ほかの CI と違って workflow の `paths:` で絞っている。
+- ジョブは `terraform` の 1 つ(ubuntu・5 分上限・Terraform `1.9.8`)。
+
+| step | 検査すること |
+|---|---|
+| `terraform fmt -check -recursive` | 書式。直していない `.tf` があると落ちる |
+| `terraform init -backend=false -input=false` | provider を取ってくる(state には繋がない) |
+| `terraform validate` | 構文・参照・型 |
+| import ブロックも含めて validate | `imports.prod.tf.example` を `imports.tf` に写して、もう一度 `terraform validate`(prod を取り込む `import` ブロックが壊れていないか。[取り込みの手順](../infra/README.md#既存の-prod-を取り込む)) |
+
+落ちた時の見方:
+
+- **fmt**: 手元で `cd infra && terraform fmt -recursive` をかけて commit する。ログに書式のずれたファイル名が出る。
+- **init**: provider の版の指定(`versions.tf`)か、取ってくる時の通信の失敗。後者なら Re-run。
+- **validate**: ログの `Error:` に、ファイルと行が出る。手元では `cd infra && terraform init -backend=false && terraform validate`(GCP の認証なしで回る)。
+- **import ブロックの validate だけ落ちる**: `imports.prod.tf.example` の `import` の `to` が、`.tf` から消えた・名前が変わったリソースを指している。リソースの名前を変えたら example も合わせる。
+- plan と apply は CI では回さない。人が手元で回す([`infra/README.md`](../infra/README.md))。
+
+## scripts-ci(シェルスクリプトと workflow の検査)
+
+`.github/workflows/scripts-ci.yml`(#574)。required check ではないので、workflow の `paths:` で対象を触った時だけ回る: `**/*.sh`・`scripts/**`・`.github/workflows/**`・`ios/scripts/**`・`**/Package.resolved`・`ios/Metamon/Resources/ThirdPartyLicenses.json`・`LICENSE`・`docs/infra/runtime-config.md`。PR は Open(非 Draft)の時だけ、ほかに `develop` / `main` への push。ジョブはどれも ubuntu・5 分上限。
+
+| ジョブ | 回す物 | 手元で同じことをする |
+|---|---|---|
+| `actionlint` | `.github/workflows/*.yml` の検査(actionlint `1.7.12` を公式の Release から版を固定して取る) | `actionlint` |
+| `ai-cost-test` | `scripts/ai-cost-test.sh`・`scripts/runner-usage-test.sh`・`scripts/demo-check-test.sh`・`scripts/rollout-test.sh` を順に | 各 `scripts/<名前>-test.sh` |
+| `deploy-env-check` | `scripts/check-deploy-env.sh`(`deploy-cloudrun.yml` の `--update-env-vars` と [`docs/infra/runtime-config.md`](infra/runtime-config.md) の表が合っているか・#509) | `scripts/check-deploy-env.sh` |
+| `licenses-check` | `python3 ios/scripts/third-party-licenses.py --check`(アプリに同梱するライセンスの一覧が `Package.resolved`・`LICENSE` と合っているか・#306) | 同じコマンド |
+| `shellcheck` | 追跡中の `*.sh` 全部(shellcheck `0.11.0` を版を固定して取る) | `git ls-files -z '*.sh' \| xargs -0 shellcheck` |
+
+- `ai-cost-test` のジョブ名は最初の 1 本の名前のままで、今は 4 本の `*-test.sh` をまとめて回している。
+- `scripts/agent-pr-guard-test.sh` はこの workflow では回っていない(手元で回す)。
+
+新しい `scripts/<名前>-test.sh` を足す時の決まり:
+
+- 外のサービス(GCP・ネットワーク・API キー)に触らない。`gcloud`・`curl` などは、使い捨てのフォルダ(`mktemp -d`・`trap` で消す)の `bin/` に偽のコマンドを書き、`PATH="$TMP/bin:$PATH"` で先に置く(例: `scripts/demo-check-test.sh`・`scripts/rollout-test.sh`)。
+- 固定の入力と期待値は `scripts/testdata/<名前>/` に置く(例: `scripts/testdata/ai-cost/`)。期待値を出力から直せるようにするなら `--update` を付ける(例: `scripts/ai-cost-test.sh --update`)。
+- 先頭で `set -euo pipefail` と `cd "$(dirname "$0")"`。落ちる時は `FAIL: <理由>` を出して 0 以外で終わる。shellcheck も通す。
+- 足したら `ai-cost-test` のジョブに `- run: scripts/<名前>-test.sh` の 1 行を足す。**workflow の変更なので、その 1 行は人が確かめてから入れる**。
+
+落ちた時の見方:
+
+- `shellcheck` / `actionlint`: ログにファイル・行・規則の番号(`SC2086` など)が出る。意図して外す時は、その行の上に `# shellcheck disable=SCxxxx` と理由を書く。
+- `ai-cost-test`: どの `run:` の step が赤いかで、どの `*-test.sh` かが分かる。`FAIL:` の行が理由。手元でその 1 本を回す。
+- `deploy-env-check`: env を足した・外した時に `docs/infra/runtime-config.md` の表を直していない。表を workflow に合わせる。
+- `licenses-check`: 依存を変えたのに一覧が古い。`python3 ios/scripts/third-party-licenses.py` で一覧を作り直して commit する(使い方はスクリプト冒頭のコメント)。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
 
-- 発火: `backend/**` かこの workflow を触る PR(非 Draft)と、`develop` / `main` への push。
-- gcloud SDK の `cloud-firestore-emulator` を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、`t.Skip("FIRESTORE_EMULATOR_HOST not set")` を持つパッケージに `go test` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
-- Firestore 系テスト(`TestFirestore*` / `*/firestore`)が 1 件でもスキップされたら失敗(黙ってスキップさせない)。通った件数は job summary に出る。
-- **required check にはまだしていない**(マージ条件は上の 3 本のまま)。必須にするかはオーナーが判断する。必須にするなら `paths:` をやめて `backend-ci` と同じ paths-filter 方式に変える。
-- 起動・試験の中身は `scripts/firestore-emulator.sh`。手元で同じことをするには `make -C backend test-emulator`(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+**何を回すか**: エミュレータが無いと `t.Skip("FIRESTORE_EMULATOR_HOST not set")` で飛ばされる store まわりのテスト。対象のパッケージは決め打ちせず、`scripts/firestore-emulator.sh test` がその文字列を持つ `*_test.go` を grep して集める(今は `internal/store`・`internal/appconfig`・`internal/runner` とその下の `queue` / `quota`・`internal/ai`・`internal/coins` など)。
+
+**いつ回るか**:
+
+| きっかけ | 試験ジョブ `backend-emulator-test` |
+|---|---|
+| PR(opened / synchronize / reopened / ready_for_review・Draft は除く)で `backend/**`・`.github/workflows/backend-emulator.yml`・`scripts/firestore-emulator.sh` のどれかが変わった | 回る |
+| 上の 3 つのどれも変わっていない PR | 飛ばす(集約ジョブは成功) |
+| `develop` / `main` への push(push 前との差分に上の 3 つのどれかがある) | 回る |
+
+- workflow の `paths:` は使わず、`backend-emulator-changes`(`dorny/paths-filter`)で判定する(`backend-ci` と同じ理由: required にした時に check が待ちのままにならないように)。
+- ジョブは 3 つ: `backend-emulator-changes`(判定)→ `backend-emulator-test`(試験・上限 15 分)→ `backend-emulator`(集約。試験を飛ばしたら成功、回したらその結果)。
+- 時間の目安: 試験ジョブが回った時で 3〜4 分(gcloud とエミュレータの取得込み)。回らない時は判定と集約で数十秒。
+
+**中身**: gcloud SDK の `cloud-firestore-emulator`(版は固定)を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、集めたパッケージに `go test -count=1 -json` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
+
+**skip されていないかの確かめ方**(`scripts/firestore-emulator.sh` の `test` が見る):
+
+- 出力に `FIRESTORE_EMULATOR_HOST not set` が 1 回でも出たら失敗(`::error::emulator tests were skipped`)。
+- Firestore 系テスト(名前が `TestFirestore*` か、サブテストが `*/firestore`)が 1 件でもスキップされたら失敗し、その名前を並べる。
+- 通った Firestore 系テストの件数を job summary に `Firestore emulator tests passed: <件数>` で出す。0 件なら失敗。件数が前より急に減っていたら、テストが別の理由でスキップされていないかを見る。
+
+**落ちた時の見方**:
+
+1. `backend-emulator` が赤 → 中身は `backend-emulator-test` の方。そちらを開く。
+2. `Firestore エミュレータ起動` の step で落ちた → 90 秒で応答しなかった。ログ(`emulator.log`)はその step の中と、最後の `エミュレータログ(失敗時)` に出る。gcloud・Java の取得の失敗なら Re-run でよいことが多い。
+3. `go test` の step で落ちた → 上の `::error::` 行(スキップ・件数 0)か、普通のテストの失敗。手元で `make -C backend test-emulator` で再現する(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+4. `backend-emulator-changes` が赤 → paths-filter の失敗。Re-run。
+
+**required check にはまだしていない**(`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` は `backend-ci` / `ios-ci` / `secrets-scan` の 3 本)。必須にするかはオーナーが判断する(決めること)。必須にする時に登録する名前は集約ジョブの `backend-emulator`。
 
 ## CI が落ちた時の見方
 
 1. PR の Checks タブ → 赤い job をクリック → 失敗した step を開く(`::error` 行が要点)。
 2. 各 job の典型的な原因:
    - `backend-ci`: `golangci-lint` の指摘(未使用変数・エラー未処理)、`go test -race` のデータ競合。ローカルで `cd backend && go vet ./... && go test ./... -race` を先に通す。
-   - `ios-ci`: 実体は `ios-dsl` / `ios-xcode` ジョブ(`ios-ci` はその結果を集約するだけ)。赤い方を開く。DSL だけなら `cd ios/Packages/MetamonDSL && swift test` で再現。ビルドエラーはローカルの `xcodegen generate && xcodebuild build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` で再現。**タイムアウト(30分)** なら SwiftPM の依存が重い → キャッシュが効いているか(`SwiftPM キャッシュ` step の cache-hit)を見る。macOS runner は分単価が高いので、原因を特定せずに Re-run を連打しない。
+   - `ios-ci`: 実体は `ios-dsl` / `ios-xcode` ジョブ(`ios-ci` はその結果を集約するだけ)。赤い方を開く。DSL だけなら `ios/scripts/mac-package-test.sh MetamonDSL` で再現(`swift test` は文字列カタログを訳さないので英語の文言のテストだけ落ちる)。ビルドエラーはローカルの `xcodegen generate && xcodebuild build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` で再現。**タイムアウト(30分)** なら SwiftPM の依存が重い → キャッシュが効いているか(`SwiftPM キャッシュ` step の cache-hit)を見る。macOS runner は分単価が高いので、原因を特定せずに Re-run を連打しない。
    - `secrets-scan`: gitleaks が秘密らしき文字列を検出。**本物なら即座にキーを無効化(ローテート)**してから履歴を消す(`git filter-repo`)。誤検知なら `.gitleaksignore` に fingerprint を追加。
 3. 直して push すれば同じ PR の古い実行は自動キャンセルされ再実行される。
 4. どうしても原因不明なら `gh run view <run-id> --log-failed` でログを全部落として読む。
@@ -125,6 +337,33 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 | `workflow_dispatch` | 選んだ環境(backend 未変更でも強制デプロイ) | 選んだ環境 |
 
 - push では `backend/**` かこの workflow 自身に変更がある時だけ本体ジョブが走る(`dorny/paths-filter`。workflow の `paths:` は required check 対策で使わない)。
+- 手で回す: Actions の deploy-cloudrun → Run workflow で `environment`(`staging` / `production`)と `staged_rollout`(`dry-run` / `execute`・staging だけ効く)を選ぶ。`gh workflow run deploy-cloudrun.yml -f environment=staging` でも同じ。
+- 同じ環境へのデプロイは直列(`concurrency: deploy-<環境>`・`cancel-in-progress: false`)。後から来た実行は前の実行が終わるまで待つ(途中で切らない)。待っている実行が 2 本になると、古い方は GitHub が取り消す(最新の版だけが出る)。
+
+**ジョブ**(名前は workflow の `name:` と同じ):
+
+| ジョブ | 役割 |
+|---|---|
+| `deploy-changes` | 変更の判定と、行き先(`environment`・`suffix` = `stg` / `prod`)・段階的なリリースの形(`rollout` = `off` / `dry-run` / `execute`)を決める |
+| `deploy` | 下の流れ全部。GitHub Environment(`staging` / `production`)に紐づく。上限は 20 分(`execute` の時だけ 70 分) |
+
+**環境ごとの違い**:
+
+| | staging(`develop` / 手で staging) | production(`main` / 手で production) |
+|---|---|---|
+| サービス | `appconfig-stg` / `ai-stg` | `appconfig-prod` / `ai-prod`、変数 `RUNNER_DEPLOY=1` の時だけ `runner-prod`(非公開・手順は [docs/infra/runner.md](infra/runner.md)) |
+| `APP_ENV` / `ALLOW_SHARED_PROD_DB` | `stg` / `1`(DB の分離まで本番と同じ DB を使う) | `prod` / `0` |
+| 段階的なリリース | push は `dry-run`(100% で出してコマンドを log に出すだけ)。手で `execute` を選ぶと `--no-traffic` で出して 5 → 25 → 100%([staged-rollout.md](infra/staged-rollout.md#deploy-の-workflow-での動き)) | `off`(いつも 100%。`execute` を選んでも warning を出して無視) |
+| スモーク(非ブロッキング) | デモ 3 本 | 家計簿 1 本 + `-cleanup` |
+| `APP_CHECK_MODE`・`FIRESTORE_DATABASE` | GitHub の Environment 変数(未設定なら `off`・`(default)`) | 同じ(Environment ごとに別の値を入れられる) |
+
+**env の表の検査(`scripts/check-deploy-env.sh`)との関係**: `deploy` の最初の step で `scripts/check-deploy-env.sh` を回し、workflow の `--update-env-vars` のキーが [runtime-config.md の「デプロイが決める値」](infra/runtime-config.md#デプロイが決める値)の表と合っているか(`--set-env-vars` を使っていないか・「運用で変える値」の表のキーを上書きしていないか)を見る。ずれていればビルドの前に止まる。同じ検査は `scripts-ci` でも回るので、workflow か runtime-config.md を変える PR の時点で気づける。env を足す・外す時は workflow と runtime-config.md の表を同じ PR で直す。
+
+**止める・戻す(人の操作)**:
+
+- 走っているデプロイを止める: Actions の画面で Cancel。`execute` の段階の途中なら、旧のリビジョンに 100% 戻してから終わる([staged-rollout.md の「人が途中で止める」](infra/staged-rollout.md#人が途中で止める))。それ以外の step の途中で止めると、そこまでに出したサービスは新しい版のまま。
+- 出てしまった悪い版を戻す: 前のリビジョンにトラフィックを戻す([incident-runbook.md 手順 B](ops/incident-runbook.md#6-手順-b-悪いデプロイを戻す))。次の push で同じ版がまた出ないよう、`develop` / `main` に戻すコミットを入れる。
+- 推測: 自動デプロイそのものを一時的に止めたい時は、Actions の画面で workflow を Disable するのが一番早い(workflow に止めるための変数は無い)。止めるかどうか・誰が戻すかは決めること。
 - 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
 - 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
 - その後 **スモーク(`backend/cmd/smoke`・非ブロッキング)** を流して表を job summary に貼る(失敗してもデプロイは成功扱い)。staging はデモ 3 本(Claude 3 回)、**production は家計簿 1 本だけ(`-only kakeibo`・Claude 2 回)+ `-cleanup`** で作った `smoke-*` アプリを `DELETE /v1/apps/{id}`(archive)する。認証は `FIREBASE_WEB_API_KEY`(repo Variable)で Firebase 匿名ユーザーの ID トークンを取る。手元から同じことをするには `cd backend && FIREBASE_WEB_API_KEY=<key> make smoke-stg` / `make smoke-prod`(#66)。

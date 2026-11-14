@@ -1,0 +1,304 @@
+{
+  "description": "Patterns the prompt rules teach (fourth JPHACKS batch): per-kind factor by nested if times a count and its monthly sum, enum weekday mapped to a number filtered against weekday(today), basal metabolism times an activity factor and today's remainder, average with vs without a habit rounded to one decimal.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "trash",
+        "name": "ゴミ",
+        "fields": [
+          {"id": "kind", "name": "種類", "type": "enum", "options": ["ペットボトル", "缶", "紙", "プラ"]},
+          {"id": "count", "name": "数", "type": "integer"},
+          {"id": "date", "name": "日付", "type": "date"},
+          {
+            "id": "co2",
+            "name": "CO2 削減",
+            "type": "number",
+            "computed": {
+              "op": "mul",
+              "args": [
+                {"ref": "count"},
+                {
+                  "if": {"op": "eq", "args": [{"ref": "kind"}, "ペットボトル"]},
+                  "then": 30,
+                  "else": {
+                    "if": {"op": "eq", "args": [{"ref": "kind"}, "缶"]},
+                    "then": 40,
+                    "else": {"if": {"op": "eq", "args": [{"ref": "kind"}, "紙"]}, "then": 10, "else": 20}
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "titleField": "kind"
+      },
+      {
+        "id": "lecture",
+        "name": "授業",
+        "fields": [
+          {"id": "subject", "name": "授業", "type": "string"},
+          {"id": "weekday", "name": "曜日", "type": "enum", "options": ["月", "火", "水", "木", "金"]},
+          {
+            "id": "wd",
+            "name": "曜日の番号",
+            "type": "integer",
+            "computed": {
+              "if": {"op": "eq", "args": [{"ref": "weekday"}, "月"]},
+              "then": 2,
+              "else": {
+                "if": {"op": "eq", "args": [{"ref": "weekday"}, "火"]},
+                "then": 3,
+                "else": {
+                  "if": {"op": "eq", "args": [{"ref": "weekday"}, "水"]},
+                  "then": 4,
+                  "else": {
+                    "if": {"op": "eq", "args": [{"ref": "weekday"}, "木"]},
+                    "then": 5,
+                    "else": {"if": {"op": "eq", "args": [{"ref": "weekday"}, "金"]}, "then": 6, "else": 0}
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "titleField": "subject"
+      },
+      {
+        "id": "body",
+        "name": "自分",
+        "fields": [
+          {"id": "sex", "name": "性別", "type": "enum", "options": ["男性", "女性"]},
+          {"id": "age", "name": "年齢", "type": "integer"},
+          {"id": "height", "name": "身長", "type": "number"},
+          {"id": "weight", "name": "体重", "type": "number"},
+          {"id": "activity", "name": "活動", "type": "enum", "options": ["低い", "ふつう", "高い"]},
+          {
+            "id": "kcal",
+            "name": "必要なカロリー",
+            "type": "integer",
+            "computed": {
+              "op": "round",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "sub",
+                          "args": [
+                            {
+                              "op": "add",
+                              "args": [{"op": "mul", "args": [10, {"ref": "weight"}]}, {"op": "mul", "args": [6.25, {"ref": "height"}]}]
+                            },
+                            {"op": "mul", "args": [5, {"ref": "age"}]}
+                          ]
+                        },
+                        {"if": {"op": "eq", "args": [{"ref": "sex"}, "男性"]}, "then": 5, "else": -161}
+                      ]
+                    },
+                    {
+                      "if": {"op": "eq", "args": [{"ref": "activity"}, "低い"]},
+                      "then": 1.5,
+                      "else": {"if": {"op": "eq", "args": [{"ref": "activity"}, "ふつう"]}, "then": 1.75, "else": 2}
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "titleField": "sex"
+      },
+      {
+        "id": "meal",
+        "name": "食事",
+        "fields": [
+          {"id": "name", "name": "食事", "type": "string"},
+          {"id": "kcal", "name": "カロリー", "type": "integer"},
+          {"id": "date", "name": "日付", "type": "date"}
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "day",
+        "name": "1 日",
+        "fields": [
+          {"id": "date", "name": "日付", "type": "date"},
+          {"id": "drinks", "name": "エナドリ", "type": "integer"},
+          {"id": "score", "name": "出来", "type": "integer"}
+        ],
+        "titleField": "date"
+      }
+    ],
+    "records": {
+      "body": [{"id": "b1", "data": {"activity": "ふつう", "age": 20, "height": 170, "sex": "男性", "weight": 60}}],
+      "day": [
+        {"id": "d1", "data": {"date": "2026-10-25", "drinks": 1, "score": 4}},
+        {"id": "d2", "data": {"date": "2026-10-26", "drinks": 2, "score": 3}},
+        {"id": "d3", "data": {"date": "2026-10-27", "drinks": 1, "score": 4}},
+        {"id": "d4", "data": {"date": "2026-10-28", "drinks": 0, "score": 2}},
+        {"id": "d5", "data": {"date": "2026-10-24", "drinks": 0, "score": 5}}
+      ],
+      "lecture": [
+        {"id": "l1", "data": {"subject": "数学", "weekday": "水"}},
+        {"id": "l2", "data": {"subject": "英語", "weekday": "水"}},
+        {"id": "l3", "data": {"subject": "体育", "weekday": "金"}},
+        {"id": "l4", "data": {"subject": "国語", "weekday": "月"}}
+      ],
+      "meal": [
+        {"id": "m1", "data": {"name": "朝", "date": "2026-10-28", "kcal": 500}},
+        {"id": "m2", "data": {"name": "昼", "date": "2026-10-28", "kcal": 800}},
+        {"id": "m3", "data": {"name": "昨日", "date": "2026-10-27", "kcal": 900}}
+      ],
+      "trash": [
+        {"id": "t1", "data": {"count": 2, "date": "2026-10-03", "kind": "ペットボトル"}},
+        {"id": "t2", "data": {"count": 1, "date": "2026-10-20", "kind": "缶"}},
+        {"id": "t3", "data": {"count": 3, "date": "2026-10-21", "kind": "プラ"}},
+        {"id": "t4", "data": {"count": 5, "date": "2026-09-30", "kind": "紙"}}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "rules4/co2-bottle",
+      "expr": {"ref": "co2"},
+      "row": {"entity": "trash", "record": {"id": "t1", "data": {"count": 2, "date": "2026-10-03", "kind": "ペットボトル"}}},
+      "expected": {"type": "number", "value": 60, "text": "60"}
+    },
+    {
+      "name": "rules4/co2-other",
+      "expr": {"ref": "co2"},
+      "row": {"entity": "trash", "record": {"id": "t3", "data": {"count": 3, "date": "2026-10-21", "kind": "プラ"}}},
+      "expected": {"type": "number", "value": 60, "text": "60"}
+    },
+    {
+      "name": "rules4/co2-blank-kind",
+      "expr": {"ref": "co2"},
+      "row": {"entity": "trash", "record": {"id": "t9", "data": {"count": 1}}},
+      "expected": {"type": "number", "value": 20, "text": "20"}
+    },
+    {
+      "name": "rules4/co2-month",
+      "expr": {"entity": "trash", "agg": "sum", "field": "co2", "filter": {"value": null, "op": "thisMonth", "field": "date"}},
+      "expected": {"type": "number", "value": 160, "text": "160"}
+    },
+    {
+      "name": "rules4/wd-wed",
+      "expr": {"ref": "wd"},
+      "row": {"entity": "lecture", "record": {"id": "l1", "data": {"subject": "数学", "weekday": "水"}}},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "rules4/wd-blank",
+      "expr": {"ref": "wd"},
+      "row": {"entity": "lecture", "record": {"id": "l9", "data": {"subject": "x"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "rules4/today-wed",
+      "expr": {
+        "entity": "lecture",
+        "agg": "count",
+        "filter": {"value": {"op": "weekday", "args": [{"op": "today", "args": []}]}, "op": "eq", "field": "wd"}
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "rules4/today-fri",
+      "now": "2026-10-30T08:00:00+09:00",
+      "expr": {
+        "entity": "lecture",
+        "agg": "count",
+        "filter": {"value": {"op": "weekday", "args": [{"op": "today", "args": []}]}, "op": "eq", "field": "wd"}
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "rules4/today-sun",
+      "now": "2026-11-01T08:00:00+09:00",
+      "expr": {
+        "entity": "lecture",
+        "agg": "count",
+        "filter": {"value": {"op": "weekday", "args": [{"op": "today", "args": []}]}, "op": "eq", "field": "wd"}
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "rules4/kcal-male",
+      "expr": {"ref": "kcal"},
+      "row": {
+        "entity": "body",
+        "record": {"id": "b1", "data": {"activity": "ふつう", "age": 20, "height": 170, "sex": "男性", "weight": 60}}
+      },
+      "expected": {"type": "number", "value": 2743, "text": "2743"}
+    },
+    {
+      "name": "rules4/kcal-female-low",
+      "expr": {"ref": "kcal"},
+      "row": {
+        "entity": "body",
+        "record": {"id": "b2", "data": {"activity": "低い", "age": 30, "height": 160, "sex": "女性", "weight": 50}}
+      },
+      "expected": {"type": "number", "value": 1784, "text": "1784"}
+    },
+    {
+      "name": "rules4/kcal-missing-weight",
+      "expr": {"ref": "kcal"},
+      "row": {"entity": "body", "record": {"id": "b3", "data": {"activity": "高い", "age": 30, "height": 160, "sex": "女性"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "rules4/kcal-left-today",
+      "expr": {
+        "op": "sub",
+        "args": [
+          {"entity": "body", "agg": "latest", "field": "kcal"},
+          {"entity": "meal", "agg": "sum", "field": "kcal", "filter": {"value": null, "op": "today", "field": "date"}}
+        ]
+      },
+      "expected": {"type": "number", "value": 1443, "text": "1443"}
+    },
+    {
+      "name": "rules4/avg-with-drinks",
+      "expr": {
+        "op": "div",
+        "args": [
+          {
+            "op": "round",
+            "args": [
+              {
+                "op": "mul",
+                "args": [{"entity": "day", "agg": "avg", "field": "score", "filter": {"value": 0, "op": "gt", "field": "drinks"}}, 10]
+              }
+            ]
+          },
+          10
+        ]
+      },
+      "expected": {"type": "number", "value": 3.7, "text": "3.7"}
+    },
+    {
+      "name": "rules4/avg-without-drinks",
+      "expr": {
+        "op": "div",
+        "args": [
+          {
+            "op": "round",
+            "args": [
+              {
+                "op": "mul",
+                "args": [{"entity": "day", "agg": "avg", "field": "score", "filter": {"value": 0, "op": "eq", "field": "drinks"}}, 10]
+              }
+            ]
+          },
+          10
+        ]
+      },
+      "expected": {"type": "number", "value": 3.5, "text": "3.5"}
+    }
+  ]
+}

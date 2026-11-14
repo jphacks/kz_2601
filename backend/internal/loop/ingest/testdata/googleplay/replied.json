@@ -1,0 +1,27 @@
+{
+  "reviews": [
+    {
+      "reviewId": "gp:AOqpTOE-replied-1",
+      "authorName": "佐藤 花子",
+      "comments": [
+        {
+          "userComment": {
+            "text": "声で直せるのが便利。たまに固まります。",
+            "lastModified": {"seconds": 1762819200},
+            "starRating": 4,
+            "reviewerLanguage": "ja",
+            "device": "akita",
+            "androidOsVersion": 35,
+            "appVersionName": "1.1.3"
+          }
+        },
+        {
+          "developerComment": {
+            "text": "ご報告ありがとうございます。次の版で直します。",
+            "lastModified": {"seconds": "1762822800"}
+          }
+        }
+      ]
+    }
+  ]
+}

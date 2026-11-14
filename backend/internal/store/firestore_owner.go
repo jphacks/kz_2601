@@ -31,7 +31,7 @@ func (f *Firestore) installRef(id, uid string) *firestore.DocumentRef {
 
 // ClaimApp implements Store. Create is atomic, so concurrent claims agree.
 func (f *Firestore) ClaimApp(ctx context.Context, uid, appID string) (string, error) {
-	_, err := f.ownerRef(appID).Create(ctx, ownerDoc{UID: uid, CreatedAt: time.Now().UTC()})
+	_, err := f.ownerRef(appID).Create(ctx, ownerDoc{UID: uid, CreatedAt: Now()})
 	if err == nil {
 		return uid, nil
 	}
@@ -96,7 +96,7 @@ func (f *Firestore) RecordInstall(ctx context.Context, id, uid, appID string, co
 				return err
 			}
 		}
-		if err := tx.Set(ref, installDoc{AppID: appID, CreatedAt: time.Now().UTC()}); err != nil {
+		if err := tx.Set(ref, installDoc{AppID: appID, CreatedAt: Now()}); err != nil {
 			return err
 		}
 		if bump {

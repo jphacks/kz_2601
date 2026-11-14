@@ -19,10 +19,10 @@ public final class RecordSyncEngine {
 
         public var label: String {
             switch self {
-            case .synced: "最新"
-            case .pending(let n): "未送信 \(n) 件"
-            case .syncing(let n): "送信中(\(n) 件)"
-            case .offline(let n): n == 0 ? "オフライン" : "オフライン・未送信 \(n) 件"
+            case .synced: L("最新")
+            case .pending(let n): L("未送信 \(n) 件")
+            case .syncing(let n): L("送信中(\(n) 件)")
+            case .offline(let n): n == 0 ? L("オフライン") : L("オフライン・未送信 \(n) 件")
             }
         }
     }
@@ -41,6 +41,16 @@ public final class RecordSyncEngine {
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var isForeground = true
     @ObservationIgnored private var started = false
+    /// 取り消せる削除の待ち(M11)。ticket.id → 送る時刻を待つ Task。`RecordSyncEngine+Undo.swift`
+    @ObservationIgnored var undoable: [UUID: (ticket: DeletionTicket, timer: Task<Void, Never>)] = [:]
+    /// 送信の列へ積んでいる途中の取り消し待ち削除。`wipe` はこれを待ってから列を空にする(消した後に積まれて次の人に残らない)
+    @ObservationIgnored var committing: [UUID: Task<Void, Never>] = [:]
+    /// `wipe` ごとに増やす。積む途中で wipe を跨いだ削除は積まない
+    @ObservationIgnored var wipeGeneration = 0
+    /// appId → entity → 暗号化して保存する field(#233・`AppDSL.encryptedFields`)。AppRuntime が DSL を読むたびに入れる
+    @ObservationIgnored public var encryptedFields: [String: [String: Set<String>]] = [:]
+    /// 暗号化の鍵と封筒(#233)。テストはメモリの鍵を入れる
+    @ObservationIgnored public var cipher = FieldCipher()
 
     public init(store: RecordStore, queue: SyncQueue, client: any AppConfigClient, connectivity: any ConnectivityMonitor) {
         self.store = store
@@ -95,15 +105,38 @@ public final class RecordSyncEngine {
     /// アカウント削除用(#119): 購読を止め、未送信キューとローカル DB を空にする。次の `start()` で再開できる。
     public func wipe() async {
         stop()
+        wipeGeneration += 1
+        dropPendingDeletions { _ in true }
+        await settleCommitting() // 時間切れで積む途中の削除を待つ(列を空にした後に積まれないように)
         await queue.discardAll()
         await store.removeEverything()
         await refreshStatus()
     }
 
+    /// サインアウトの前に未送信を送り切る。オフライン・連続失敗で止まった・`timeout` を過ぎたらそこまで。
+    /// - Returns: 残った未送信の件数
+    public func flush(timeout: Duration = .seconds(10)) async -> Int {
+        await commitPendingDeletions() // 取り消し待ちの削除も送る
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while isOnline, clock.now < deadline {
+            let draining = await queue.isDraining
+            if !draining {
+                await queue.resume()
+                let left = await queue.count
+                let paused = await queue.isPaused
+                if left == 0 || paused { break }
+            }
+            try? await Task.sleep(for: .milliseconds(100)) // 別の送信が流れている間は待つ
+        }
+        await refreshStatus()
+        return await queue.count
+    }
+
     /// 前面復帰でも未送信を流す(背面でネットワークが戻っていた場合の取りこぼし防止)。
     public func setForeground(_ active: Bool) {
         isForeground = active
-        if active { kick() }
+        if active { kick() } else { Task { await commitPendingDeletions() } } // 背面で落とされても削除は失わない
     }
 
     /// 設定シートの「今すぐ同期」。
@@ -120,7 +153,7 @@ public final class RecordSyncEngine {
         }
     }
 
-    private func refreshStatus() async {
+    func refreshStatus() async {
         let n = await queue.count
         let draining = await queue.isDraining
         pendingCount = n
@@ -134,13 +167,19 @@ public final class RecordSyncEngine {
 
     /// ローカル DB の内容(即時)。削除待ちは除く。
     public func cached(appId: String, entity: String) async -> [Record] {
-        await store.records(appId: appId, entity: entity)
+        await shown(appId: appId, entity: entity)
+    }
+
+    /// `cached` の復号する前(暗号文のまま)。AES-GCM の復号を main actor の外で `Self.opened(_:cipher:)` でやる時に使う。
+    public func cachedSealed(appId: String, entity: String) async -> [Record] {
+        await sealedShown(appId: appId, entity: entity)
     }
 
     /// サーバー全件を取り、ローカルを置換(未送信行は残す)して返す。失敗はそのまま投げる(呼び出し側がローカル表示を続ける)。
     public func pull(appId: String, entity: String) async throws -> [Record] {
         let server = try await client.list(appId: appId, entity: entity)
-        return await store.replace(appId: appId, entity: entity, with: server)
+        await store.replace(appId: appId, entity: entity, with: server)
+        return await shown(appId: appId, entity: entity)
     }
 
     // MARK: - Write(楽観的)
@@ -148,12 +187,27 @@ public final class RecordSyncEngine {
     /// 表示名を送らなかった投稿に backend が付ける名前(appconfig `defaultAuthorName`)。送信前のローカル行にも同じものを出す。
     nonisolated public static let anonymousName = "匿名"
 
+    /// ローカル行の時刻。小数秒まで持つ(同じ秒に続けて作った行も作った順に並ぶ: aiChat の自分 → AI・サーバーの createdAt と同じ精度)
+    private static let timestamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
     /// 作成(`recordId == nil`)または更新。ローカルに即反映し、更新後の一覧を返す。送信はキューが行う。
     /// - Parameter author: shared / public の entity に作る時の投稿者(#250)。uid はローカル行の作者判定と「自分の投稿」用、
     ///   name は POST で送る表示名(nil なら送らない)。更新では使わない。
     public func save(appId: String, entity: String, recordId: String?, data: [String: JSONValue],
                      author: (uid: String?, name: String?)? = nil) async -> [Record] {
-        let now = ISO8601DateFormatter().string(from: .now)
+        await write(appId: appId, entity: entity, recordId: recordId, data: data, author: author).records
+    }
+
+    /// `save` と同じ。書いた行の id も返す(作成なら仮 id `local-<clientId>` = 断られた時の `SyncEvent` の recordId)。
+    public func write(appId: String, entity: String, recordId: String?, data plain: [String: JSONValue],
+                      author: (uid: String?, name: String?)? = nil) async -> (records: [Record], recordId: String) {
+        let (data, unsaved) = await seal(appId: appId, entity: entity, recordId: recordId, data: plain)
+        let written: String
+        let now = Self.timestamp.string(from: .now)
         if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             let oldVideos = VideoValue.localIDs(in: row.data)
             let oldAudios = AudioValue.localIDs(in: row.data)
@@ -164,6 +218,7 @@ public final class RecordSyncEngine {
             if row.pendingOp != .create { row.pendingOp = .update }
             await store.upsert(row)
             await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .update, data: data))
+            written = recordId
         } else {
             let clientId = UUID().uuidString.lowercased()
             let row = LocalRecord(appId: appId, entity: entity, recordId: LocalRecord.temporaryId(clientId: clientId), data: data,
@@ -172,9 +227,39 @@ public final class RecordSyncEngine {
             await store.upsert(row)
             await queue.enqueue(SyncOperation(id: clientId, appId: appId, entity: entity, recordId: row.recordId, kind: .create, data: data,
                                               authorName: author?.name))
+            written = row.recordId
         }
         kick()
-        return await store.records(appId: appId, entity: entity)
+        if let field = unsaved.sorted().first {
+            onEvent?(.rejected(appId: appId, entity: entity, message: FieldCipher.unsavedMessage, field: field, recordId: written))
+        }
+        return (await shown(appId: appId, entity: entity), written)
+    }
+
+    /// `Field.encrypted`(#233)の値を暗号化する。鍵はこの entity にまだ読めない暗号文が無い時だけ作る(別の端末の鍵の同期を待つ)。
+    private func seal(appId: String, entity: String, recordId: String?, data: [String: JSONValue]) async
+        -> (data: [String: JSONValue], unsaved: Set<String>) {
+        guard let fields = encryptedFields[appId]?[entity], !fields.isEmpty, !fields.isDisjoint(with: data.keys) else { return (data, []) }
+        let rows = await store.rows(appId: appId, entity: entity)
+        let stored = recordId.flatMap { id in rows.first { $0.isKnown(as: id) }?.data }
+        let hasCiphertext = rows.contains { $0.data.values.contains(where: FieldCipher.isEnvelope) }
+        return cipher.sealed(data, fields: fields, stored: stored, mayCreateKey: !hasCiphertext)
+    }
+
+    /// 表示用: 暗号文を端末で復号する(#233)。鍵は暗号文がある時だけ引く。
+    func opened(_ records: [Record]) -> [Record] {
+        Self.opened(records, cipher: cipher, lockedText: FieldCipher.lockedText)
+    }
+
+    /// `opened` の main actor の外でも呼べる版(鍵の読み出しと復号)。`lockedText` は main で `FieldCipher.lockedText` を引いて渡す。
+    public nonisolated static func opened(_ records: [Record], cipher: FieldCipher, lockedText: @autoclosure () -> String) -> [Record] {
+        guard records.contains(where: { $0.data.values.contains(where: FieldCipher.isEnvelope) }) else { return records }
+        let key = cipher.keys.load()
+        return records.map { r in
+            var r = r
+            r.data = cipher.opened(r.data, key: key, lockedText: lockedText())
+            return r
+        }
     }
 
     /// 印を付ける / 外す(#255)。押した瞬間にローカルの件数と状態を変え、サーバーの `{count, mine}` で確定する。
@@ -201,6 +286,7 @@ public final class RecordSyncEngine {
 
     /// アプリ削除(#180): その appId の未送信キューとローカル DB を消す。サーバー削除が成功してから呼ぶ。
     public func purge(appId: String) async {
+        dropPendingDeletions { $0.appId == appId }
         await queue.discard(appId: appId)
         await store.removeAll(appId: appId)
         await refreshStatus()
@@ -208,19 +294,18 @@ public final class RecordSyncEngine {
 
     /// 削除。ローカルでは即座に一覧から消え(行は delete 待ちで残る)、送信成功で行も消える。
     public func delete(appId: String, entity: String, recordId: String) async -> [Record] {
-        if let row = await store.row(appId: appId, entity: entity, recordId: recordId) {
+        if let row = await store.current(appId: appId, entity: entity, recordId: recordId) {
             store.videos.remove(VideoValue.localIDs(in: row.data)) // 端末内の動画ファイル(#206)
             store.audios.remove(AudioValue.localIDs(in: row.data)) // 端末内の録音(#420)
         }
         let result = await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .delete))
         if result == .cancelledCreate {
             await store.remove(appId: appId, entity: entity, recordId: recordId) // まだサーバーに無い行はその場で消す
-        } else if var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
-            row.pendingOp = .delete
-            await store.upsert(row)
+        } else {
+            await store.markDeleting(appId: appId, entity: entity, recordId: recordId)
         }
         kick()
-        return await store.records(appId: appId, entity: entity)
+        return await shown(appId: appId, entity: entity)
     }
 }
 

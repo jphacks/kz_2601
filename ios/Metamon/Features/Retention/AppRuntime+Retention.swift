@@ -79,56 +79,6 @@ extension AppRuntime {
     }
 }
 
-/// 確認した期間(appId → entity → 日数)。端末ごと。アプリを消したら一緒に消える程度の情報なので UserDefaults。
-enum RetentionConsent {
-    private static func key(_ appId: String) -> String { "retention.consent.\(appId)" }
-
-    static func days(appId: String, defaults: UserDefaults = .standard) -> [String: Int] {
-        (defaults.dictionary(forKey: key(appId)) as? [String: Int]) ?? [:]
-    }
-
-    static func set(_ days: Int, appId: String, entity: String, defaults: UserDefaults = .standard) {
-        var all = Self.days(appId: appId, defaults: defaults)
-        all[entity] = days
-        defaults.set(all, forKey: key(appId))
-    }
-}
-
-/// 確認ダイアログの中身。
-struct RetentionPrompt: Identifiable, Equatable {
-    struct Item: Equatable {
-        var entity: String
-        var name: String
-        var days: Int
-        var isShared: Bool
-    }
-
-    var appId: String
-    var version: Int
-    var items: [Item]
-    var id: String { "\(appId)#\(version)#" + items.map { "\($0.entity)=\($0.days)" }.joined(separator: ",") }
-
-    init(appId: String, version: Int, entities: [Entity]) {
-        self.appId = appId
-        self.version = version
-        items = entities.compactMap { e in e.retentionDays.map { Item(entity: e.id, name: e.name, days: $0, isShared: e.isShared) } }
-    }
-
-    static func key(appId: String, entity: Entity) -> String { key(appId: appId, entity: entity.id, days: entity.retentionDays ?? 0) }
-    static func key(appId: String, entity: String, days: Int) -> String { "\(appId)/\(entity)=\(days)" }
-
-    /// 「支出」は30日、「日記」は1週間 … たった記録が自動で消えます。
-    func message(english: Bool) -> String {
-        let parts = items.map { english ? "\($0.name): \(RecordRetention.periodLabel(days: $0.days, english: true))" : "「\($0.name)」は\(RecordRetention.periodLabel(days: $0.days))" }
-        let shared = items.contains(where: \.isShared)
-        if english {
-            return "Entries older than the period will be deleted automatically (\(parts.joined(separator: ", "))). Deleted entries cannot be restored."
-                + (shared ? " For shared entries, only the ones you added are deleted." : "")
-        }
-        return parts.joined(separator: "、") + "たった記録を自動で消します。消えた記録は元に戻せません。" + (shared ? "共有の記録は自分が追加したものだけが消えます。" : "")
-    }
-}
-
 /// 確認ダイアログ。生成直後は音声シートが閉じる途中なので、少し待ってから出す(`PublicDataPromptHost` と同じ)。
 struct RetentionPromptHost: ViewModifier {
     @Environment(AppRuntime.self) private var rt
@@ -136,9 +86,10 @@ struct RetentionPromptHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .task(id: rt.retentionPrompt?.id) {
+            // H7: 要約バナー・公開の確認など前のお知らせが閉じてから(`PostBuildNotice`)
+            .task(id: PromptTurn(id: rt.retentionPrompt?.id, turn: rt.isNoticeTurn(.retention))) {
                 shown = nil
-                guard rt.retentionPrompt != nil else { return }
+                guard rt.retentionPrompt != nil, rt.isNoticeTurn(.retention) else { return }
                 try? await Task.sleep(for: .milliseconds(900))
                 guard !Task.isCancelled else { return }
                 shown = rt.retentionPrompt
@@ -188,8 +139,14 @@ struct RetentionSettingsSection: View {
             } header: {
                 Text("記録の自動削除")
             } footer: {
-                Text("期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。")
+                Text(Self.footer(entities: entities))
             }
         }
+    }
+
+    /// 共有の記録の注記は、期間のある entity に共有のものがある時だけ(審査用の版・自分だけの記録には共有が無い)。
+    static func footer(entities: [Entity]) -> String {
+        let base = L10n.tr("期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。")
+        return entities.contains(where: \.isShared) ? base + L10n.tr("共有の記録は自分が追加したものだけが消えます。") : base
     }
 }

@@ -1,0 +1,192 @@
+{
+  "description": "addMinutes: \"HH:mm\" wraps within the day, dates / datetimes move by elapsed minutes, minutes from fields and expressions.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "trips",
+        "name": "予定",
+        "fields": [
+          {"id": "dest", "name": "行き先", "type": "string"},
+          {"id": "arrive", "name": "着きたい時刻", "type": "string"},
+          {"id": "travel_min", "name": "移動時間", "type": "integer"},
+          {"id": "arrive_at", "name": "着く日時", "type": "datetime"},
+          {"id": "day", "name": "日", "type": "date"},
+          {
+            "id": "depart",
+            "name": "出発時刻",
+            "type": "string",
+            "computed": {
+              "op": "addMinutes",
+              "args": [{"ref": "arrive"}, {"op": "neg", "args": [{"op": "coalesce", "args": [{"ref": "travel_min"}, 0]}]}]
+            }
+          }
+        ],
+        "titleField": "dest"
+      }
+    ],
+    "records": {
+      "trips": [
+        {
+          "id": "t1",
+          "data": {"arrive": "09:00", "arrive_at": "2026-10-28T09:00:00+09:00", "day": "2026-10-28", "dest": "金沢駅", "travel_min": 45}
+        },
+        {"id": "t2", "data": {"arrive": "00:20", "dest": "空港", "travel_min": 90}}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "addMinutes/hhmm-forward",
+      "expr": {"op": "addMinutes", "args": ["09:00", 30]},
+      "expected": {"type": "string", "value": "09:30", "text": "09:30"}
+    },
+    {
+      "name": "addMinutes/hhmm-backward",
+      "expr": {"op": "addMinutes", "args": ["09:00", -45]},
+      "expected": {"type": "string", "value": "08:15", "text": "08:15"}
+    },
+    {
+      "name": "addMinutes/hhmm-wrap-before-midnight",
+      "expr": {"op": "addMinutes", "args": ["00:10", -30]},
+      "expected": {"type": "string", "value": "23:40", "text": "23:40"}
+    },
+    {
+      "name": "addMinutes/hhmm-wrap-after-midnight",
+      "expr": {"op": "addMinutes", "args": ["23:50", 20]},
+      "expected": {"type": "string", "value": "00:10", "text": "00:10"}
+    },
+    {
+      "name": "addMinutes/hhmm-wrap-many-days",
+      "expr": {"op": "addMinutes", "args": ["09:00", 3000]},
+      "expected": {"type": "string", "value": "11:00", "text": "11:00"}
+    },
+    {
+      "name": "addMinutes/h-mm-single-digit-hour",
+      "expr": {"op": "addMinutes", "args": ["9:05", 0]},
+      "expected": {"type": "string", "value": "09:05", "text": "09:05"}
+    },
+    {
+      "name": "addMinutes/hhmmss-keeps-seconds",
+      "expr": {"op": "addMinutes", "args": ["09:00:30", 1]},
+      "expected": {"type": "string", "value": "09:01:30", "text": "09:01:30"}
+    },
+    {
+      "name": "addMinutes/hhmmss-zero-seconds",
+      "expr": {"op": "addMinutes", "args": ["09:00:00", 1]},
+      "expected": {"type": "string", "value": "09:01", "text": "09:01"}
+    },
+    {
+      "name": "addMinutes/minutes-rounded",
+      "expr": {"op": "addMinutes", "args": ["09:00", 1.5]},
+      "expected": {"type": "string", "value": "09:02", "text": "09:02"}
+    },
+    {
+      "name": "addMinutes/minutes-string-number",
+      "expr": {"op": "addMinutes", "args": ["09:00", "15"]},
+      "expected": {"type": "string", "value": "09:15", "text": "09:15"}
+    },
+    {"name": "addMinutes/24-00-invalid", "expr": {"op": "addMinutes", "args": ["24:00", 10]}, "expected": {"type": "nil"}},
+    {"name": "addMinutes/not-a-time", "expr": {"op": "addMinutes", "args": ["later", 10]}, "expected": {"type": "nil"}},
+    {
+      "name": "addMinutes/minutes-missing",
+      "expr": {"op": "addMinutes", "args": ["09:00", "abc"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addMinutes/minutes-too-large",
+      "expr": {"op": "addMinutes", "args": ["09:00", 1000000000000]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addMinutes/datetime-string",
+      "expr": {"op": "addMinutes", "args": ["2026-10-28T09:00:00+09:00", -45]},
+      "expected": {"type": "date", "value": "2026-10-28T08:15:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "addMinutes/datetime-crosses-day",
+      "expr": {"op": "addMinutes", "args": ["2026-10-28T23:30:00Z", 60]},
+      "expected": {"type": "date", "value": "2026-10-29T09:30:00+09:00", "text": "2026-10-29"}
+    },
+    {
+      "name": "addMinutes/date-is-midnight",
+      "expr": {"op": "addMinutes", "args": ["2026-10-28", 90]},
+      "expected": {"type": "date", "value": "2026-10-28T01:30:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "addMinutes/date-backward",
+      "expr": {"op": "addMinutes", "args": ["2026-10-28", -30]},
+      "expected": {"type": "date", "value": "2026-10-27T23:30:00+09:00", "text": "2026-10-27"}
+    },
+    {
+      "name": "addMinutes/now",
+      "expr": {"op": "addMinutes", "args": [{"op": "now", "args": []}, 15]},
+      "expected": {"type": "date", "value": "2026-10-28T15:45:45+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "addMinutes/text-of-datetime",
+      "expr": {"op": "toString", "args": [{"op": "addMinutes", "args": ["2026-10-28T23:30:00+09:00", 60]}]},
+      "expected": {"type": "string", "value": "2026-10-29", "text": "2026-10-29"}
+    },
+    {
+      "name": "addMinutes/dst-elapsed-minutes",
+      "timeZone": "America/New_York",
+      "expr": {"op": "addMinutes", "args": ["2026-03-08T01:30:00-05:00", 60]},
+      "expected": {"type": "date", "value": "2026-03-08T03:30:00-04:00", "text": "2026-03-08"}
+    },
+    {
+      "name": "addMinutes/dst-hhmm-is-clock",
+      "timeZone": "America/New_York",
+      "expr": {"op": "addMinutes", "args": ["01:30", 60]},
+      "expected": {"type": "string", "value": "02:30", "text": "02:30"}
+    },
+    {
+      "name": "addMinutes/ref-depart",
+      "expr": {"ref": "depart"},
+      "row": {"entity": "trips", "record": {"id": "t1", "data": {"arrive": "09:00", "dest": "金沢駅", "travel_min": 45}}},
+      "expected": {"type": "string", "value": "08:15", "text": "08:15"}
+    },
+    {
+      "name": "addMinutes/ref-depart-wraps",
+      "expr": {"ref": "depart"},
+      "row": {"entity": "trips", "record": {"id": "t2", "data": {"arrive": "00:20", "dest": "空港", "travel_min": 90}}},
+      "expected": {"type": "string", "value": "22:50", "text": "22:50"}
+    },
+    {
+      "name": "addMinutes/ref-depart-no-travel",
+      "expr": {"ref": "depart"},
+      "row": {"entity": "trips", "record": {"id": "t3", "data": {"arrive": "08:00", "dest": "駅"}}},
+      "expected": {"type": "string", "value": "08:00", "text": "08:00"}
+    },
+    {
+      "name": "addMinutes/ref-no-arrive",
+      "expr": {"ref": "depart"},
+      "row": {"entity": "trips", "record": {"id": "t4", "data": {"dest": "駅", "travel_min": 10}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addMinutes/datetime-field",
+      "expr": {"op": "addMinutes", "args": [{"ref": "arrive_at"}, {"op": "neg", "args": [{"ref": "travel_min"}]}]},
+      "row": {
+        "entity": "trips",
+        "record": {"id": "t1", "data": {"arrive_at": "2026-10-28T09:00:00+09:00", "dest": "金沢駅", "travel_min": 45}}
+      },
+      "expected": {"type": "date", "value": "2026-10-28T08:15:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "addMinutes/date-field",
+      "expr": {"op": "addMinutes", "args": [{"ref": "day"}, 600]},
+      "row": {"entity": "trips", "record": {"id": "t1", "data": {"day": "2026-10-28", "dest": "金沢駅"}}},
+      "expected": {"type": "date", "value": "2026-10-28T10:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "addMinutes/minutes-from-expr",
+      "expr": {"op": "addMinutes", "args": ["18:00", {"op": "mul", "args": [{"op": "neg", "args": [{"ref": "travel_min"}]}, 2]}]},
+      "row": {"entity": "trips", "record": {"id": "t1", "data": {"dest": "金沢駅", "travel_min": 45}}},
+      "expected": {"type": "string", "value": "16:30", "text": "16:30"}
+    },
+    {"name": "addMinutes/number-value", "expr": {"op": "addMinutes", "args": [900, 10]}, "expected": {"type": "nil"}},
+    {"name": "addMinutes/bool-value", "expr": {"op": "addMinutes", "args": [true, 10]}, "expected": {"type": "nil"}}
+  ]
+}

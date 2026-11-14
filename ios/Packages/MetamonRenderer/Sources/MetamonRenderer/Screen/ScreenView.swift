@@ -5,9 +5,17 @@ import MetamonDSL
 public struct ScreenView: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.formToolbarAccessory) private var formToolbarAccessory
+    /// Mac: Esc・⌘W・アプリの切り替えの前に入力の有無を見るための控え(iOS は nil)
+    @Environment(\.openForms) private var openForms
     let route: Route
     @State private var form: FormDraft?
     @State private var locals = ScreenLocals()
+    /// 入力のあるフォームを閉じる前の確認(M10)
+    @State private var confirmDiscard = false
+    #if os(iOS)
+    /// クリップボードに記録(#1871)が載っているか
+    @State private var pasteboardHasRecord = false
+    #endif
 
     public init(route: Route) { self.route = route }
 
@@ -15,17 +23,27 @@ public struct ScreenView: View {
         if let screen = rt.dsl.screen(route.screen) {
             let ctx = RenderContext(route: route, form: form, locals: locals)
             GridScreenLayout(screen: screen, ctx: ctx)
+                .environment(\.dslNestingDepth, 0) // 部品から開いたシートの画面も 0 段から数える
                 .background(RenderTheme.Colors.canvas)
                 .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .modifier(PublicFormNotice(screen: screen)) // #253 公開の entity のフォームに「誰でも見られます」
+                .modifier(MacFormTabScope(screen: screen, ctx: ctx)) // Mac: Tab を DSL の並びで回す(#2065)
                 .navigationTitle(screen.title)
-                .navigationBarTitleDisplayMode(.inline)
+                .inlineNavigationTitle()
                 .toolbar {
                     // フォーム画面はホストの FAB を隠す代わりに、ナビバー右上(DSL のボタンより左)に小さな入口を置く(#83)
                     if screen.entity != nil, let accessory = formToolbarAccessory {
-                        ToolbarItem(placement: .topBarTrailing) { accessory }
+                        ToolbarItem(placement: .platformTrailing) { accessory }
                     }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
+                    #if os(iOS)
+                    // 記録のコピー・貼り付け(#1871)
+                    if let form, RecordClipboardMenu.isVisible(form: form, record: clipboardRecord(form), hasRecord: pasteboardHasRecord, rt: rt) {
+                        ToolbarItem(placement: .platformTrailing) {
+                            RecordClipboardMenu(form: form, record: clipboardRecord(form), hasRecord: pasteboardHasRecord)
+                        }
+                    }
+                    #endif
+                    ToolbarItemGroup(placement: .platformTrailing) {
                         // 同じフォームを開く button がある画面では右上の＋を出さない(#416)
                         ForEach(DuplicateAddControl.toolbar(of: screen, in: rt.dsl).filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
                             Button {
@@ -33,22 +51,44 @@ public struct ScreenView: View {
                             } label: {
                                 if let icon = tb.icon { Label(tb.label, systemImage: icon) } else { Text(tb.label) }
                             }
+                            .macIconButtonHelp(tb.label, hoverHighlight: false) // Mac のツールバーはアイコンだけになる(#1335)
                         }
                     }
-                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)
+                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)。
+                    // Mac はソフトキーボードが無い(.keyboard は Touch Bar に出てしまう)ので出さない(#1337)
+                    #if os(iOS)
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button(L("完了")) { KeyboardState.dismiss() }.fontWeight(.semibold)
                     }
+                    #endif
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button(L("閉じる")) { rt.close(route) }
+                        SheetCloseToolbarItem {
+                            if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
+                        }
+                    }
+                    // M10: 積まれたフォームに入力があれば、標準の戻るの代わりに確認付きの戻るを出す
+                    if guardsBack {
+                        ToolbarItem(placement: .platformLeading) {
+                            Button { confirmDiscard = true } label: {
+                                Image(systemName: "chevron.backward").fontWeight(.semibold)
+                            }
+                            .iconButtonLabel(L("戻る"), hoverHighlight: false)
+                            .accessibilityIdentifier("form.back")
                         }
                     }
                 }
+                // 標準の戻るを隠すと、端から払って戻る操作も止まる(払って入力を失わない)
+                .navigationBarBackButtonHidden(guardsBack)
+                // M10: シートのフォームに入力があれば、下に払って閉じない(「閉じる」で破棄を確認する)
+                .interactiveDismissDisabled(hasUnsavedInput)
+                .discardFormConfirmation(isPresented: $confirmDiscard) { rt.close(route) }
+                #if os(iOS)
+                .modifier(RecordPasteboardWatcher(hasRecord: $pasteboardHasRecord))
+                #endif
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
-                    if route.recordId == nil { setUpForm(screen) }
+                    if route.recordId == nil { setUpForm(screen) } // single(#267)は読み込み後に既存の 1 件へ差し替わる
                     await rt.load(entities: rt.dsl.entitiesNeeded(by: screen))
                     setUpForm(screen)
                 }
@@ -60,16 +100,57 @@ public struct ScreenView: View {
         }
     }
 
+    #if os(iOS)
+    /// フォームの「記録をコピー」で載せる保存済みの記録(新規は nil)。
+    private func clipboardRecord(_ form: FormDraft) -> Record? {
+        form.recordId.flatMap { id in rt.records(for: form.entity.id).first { $0.id == id } }
+    }
+    #endif
+
+    /// 戻る・閉じるで入力を失うか(M10)。push された画面も、シート・全画面の中ならシートを払って閉じられる。
+    private var hasUnsavedInput: Bool {
+        Self.guardsDiscard(route: route, paths: rt.paths, form: form)
+    }
+
+    /// 積まれた画面で、戻る(ボタン・端から払う)を確認付きに替えるか(M10)。
+    private var guardsBack: Bool {
+        Self.isPushed(route, paths: rt.paths) && hasUnsavedInput
+    }
+
+    /// 閉じる・戻るの前に破棄を確認するか(M10): 保存していない入力があり、シート・全画面の中か push された画面。
+    /// タブ・メインの根のフォームは離れる操作が無い(タブ切替では入力は残る)ので確認しない。
+    static func guardsDiscard(route: Route, paths: [String: [Route]], form: FormDraft?) -> Bool {
+        guard form?.hasUnsavedChanges == true else { return false }
+        return route.stack == "sheet" || route.stack == "full" || isPushed(route, paths: paths)
+    }
+
+    /// `route` が NavigationStack に積まれた(根ではない)画面か。
+    static func isPushed(_ route: Route, paths: [String: [Route]]) -> Bool {
+        (paths[route.stack] ?? []).contains(route)
+    }
+
     /// `screen.entity` があればドラフトを用意。recordId 付きなら既存レコードをロード(編集モード)。
     private func setUpForm(_ screen: Screen) {
         guard let entityId = screen.entity, let entity = rt.dsl.entity(entityId) else {
-            form = nil
+            replaceForm(with: nil)
             return
         }
-        let record = route.recordId.flatMap { id in rt.records(for: entityId).first { $0.id == id } }
+        let record = Self.formRecord(entity: entity, recordId: route.recordId, records: rt.records(for: entityId))
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
-            form = Self.makeDraft(entity: entity, record: record, rt: rt)
+            replaceForm(with: Self.makeDraft(entity: entity, record: record, rt: rt))
         }
+    }
+
+    private func replaceForm(with next: FormDraft?) {
+        if let form, form !== next { openForms?.untrack(form) }
+        form = next
+        if let next { openForms?.track(next, at: route) }
+    }
+
+    /// フォームが編集するレコード。single の entity(#267)は recordId によらず、その 1 件(無ければ nil = 初期値の新規)。
+    static func formRecord(entity: Entity, recordId: String?, records: [Record]) -> Record? {
+        if entity.single { return SingleRecord.pick(records) }
+        return recordId.flatMap { id in records.first { $0.id == id } }
     }
 
     /// フォームのドラフト(既存レコードなら編集・権限、新規なら直前に積まれた初期値)。適合テストの描画の木(`RenderTree`)も同じ作り方を使う。
@@ -78,10 +159,11 @@ public struct ScreenView: View {
         let draft = FormDraft(entity: entity, record: record)
         if let record {
             draft.isReadOnly = !rt.canEdit(entity: entity.id, record: record)
-            draft.canDelete = rt.canDelete(entity: entity.id, record: record)
+            draft.canDelete = !entity.single && rt.canDelete(entity: entity.id, record: record) // single の 1 件は消さない(#267)
         } else {
             // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
             for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }
+            draft.markClean() // 直前に積まれた初期値は入力ではない(閉じても確認しない・M10)
         }
         return draft
     }

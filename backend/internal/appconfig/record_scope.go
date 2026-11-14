@@ -72,8 +72,8 @@ const notPublishedReason = "not_published"
 // app's entities for the caller. Records of shared entities live once per
 // app, so they follow the DSL the app's creator published (apps_public),
 // not the caller's copy; the copy still supplies the field definitions.
-// The creator's own copy decides for the creator (publish skips a DSL with
-// no shared entity, so the mirror may lag behind it).
+// The creator's own copy decides for the creator (the mirror follows it:
+// the creator's commits publish in the same transaction, see commitPublish).
 type sharingRules struct {
 	creator bool     // the caller created the app
 	pub     *dsl.App // the creator's published DSL; nil = none usable

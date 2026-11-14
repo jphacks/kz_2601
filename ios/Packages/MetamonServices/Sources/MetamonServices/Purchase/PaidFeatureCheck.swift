@@ -3,7 +3,7 @@ import Foundation
 /// 「これでいく」の前に出す有料機能の確認カードの中身(#77)。
 public struct PaidConfirmation: Equatable, Sendable {
     public var features: [PaidFeature]
-    /// 「購入して作る」で generate に渡す文(ready の transcript / 案の instruction)
+    /// 「Pro にする」で買った後に generate に渡す文(ready の transcript / 案の instruction)
     public var paidText: String
     /// 「この機能なしで作る」で generate に渡す文(backend の freeTranscript / freeInstruction)
     public var freeText: String

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Mac のウィジェットの拡張はサンドボックスが必須(#984) -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- 本体(MetamonMac.entitlements)と同じ App Group。本体が書いた WidgetSnapshot を読む -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.jp.kz2601.metamon</string>
+	</array>
+</dict>
+</plist>

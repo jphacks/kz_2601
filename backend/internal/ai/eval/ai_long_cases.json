@@ -1,0 +1,6 @@
+[
+  {"id": "al_thanks_letter", "kind": "create", "group": "ailong", "transcript": "相手と出来事を入れると、AI がお礼の手紙を丁寧に書いてくれるアプリ", "note": "手紙 = aiButton generate の length long(output は text)", "expect": {"aiTask": "generate", "aiLength": "long"}},
+  {"id": "al_trip_plan", "kind": "create", "group": "ailong", "transcript": "行き先と日数を入れたら、AI が1日ごとの旅行の計画を詳しく作ってくれるアプリ", "note": "計画 = aiButton generate の length long", "expect": {"aiLength": "long"}},
+  {"id": "al_minutes_summary", "kind": "create", "group": "ailong", "transcript": "長い議事録を貼り付けると、AI が決まったことと宿題をまとめてくれるアプリ", "note": "長い入力の要約 = aiButton summarize の length long(input は text field)", "expect": {"aiTask": "summarize", "aiLength": "long"}},
+  {"id": "al_short_cheer", "kind": "create", "group": "ailong", "transcript": "毎日の気分を記録して、AI が励ましの一言をくれるアプリ", "note": "一言は短い答え。length long を付けない(short のまま)", "expect": {"aiLength": "short"}}
+]

@@ -27,6 +27,7 @@ Expr := number | string | boolean
       | {"agg": "count|sum|avg|min|max|latest|earliest", "entity": "<entityId>", "field"?: "<fieldId>", "by"?: "<dateFieldId>", "filter"?: Filter | [Filter]}
       | {"op": "<name>", "args": [Expr, ...]}
       | {"if": Expr, "then": Expr, "else": Expr}
+      | {"setting": "<fieldId>"}
 ```
 
 | 形 | 意味 |
@@ -36,6 +37,7 @@ Expr := number | string | boolean
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
+| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず、式を書ける所ならどこでも書ける(`stat.value`・通知の `when` も可。server rules は不可。`progressBar` / `gauge` の `value` は数値リテラルのみなので書けない。`progressBar.target` には書ける・下記)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
 
 `agg.filter` は `Filter` 1 つ、または配列(AND)。`Filter.value` には Expr を書ける。computed 内の agg では `value` の `ref` は**外側のレコード**を指す:
 
@@ -70,9 +72,10 @@ Expr := number | string | boolean
 | 日付 | `now` `today` | なし(`args: []`) | 日時 / 今日の日付(端末ローカル) |
 | | `daysBetween` | (a, b) | 数値 = b − a の日数 |
 | | `daysUntil` | (d) | 数値 = d − 今日 の日数(過ぎたら負) |
-| | `addDays` | (d, n) | 日付 = d の n 日後 |
+| | `addDays` | (d, n) | 日付 = d の n 日後(n は四捨五入。絶対値が 100000 日 = 約 273 年を超えると「—」) |
 | | `nextOccurrence` | (d, `"monthly"` \| `"yearly"`) | 日付 = d から毎月 / 毎年くり返す日のうち、**今日以降で最も近い日**(0:00)。d が今日以降なら d。日が無い月は月末に寄せる(§3.1)。第 2 引数は文字列リテラルだけ(#266) |
 | 時刻 | `hoursBetween` | (start, end) | 数値 = end − start の時間数(小数。30 分 = 0.5)。**end < start は日付またぎとして +24h**(22:00→05:00 = 7)。同じ時刻は 0 |
+| | `addMinutes` | (t, n) | t の n 分後(n は四捨五入・負なら前・数値 field や式も可。絶対値が 100000 日ぶん = 144000000 分を超えると「—」)。**t が `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"`)なら `"HH:mm"` の文字列**で 24 時間で一周する(00:20 の 90 分前 = `"22:50"`・秒があれば `"HH:mm:ss"`)。**t が日付・日時なら日時**で、経過した分を足す(`"YYYY-MM-DD"` と date field はその日の最初の時刻 = ふつう 0:00 から数える。夏時間の切り替えをまたぐと時計の表示は切り替えぶんずれる)。数値・真偽の t は「—」。例: 出発時刻 = `addMinutes(ref arrive, neg(coalesce(ref travel_min, 0)))`。古い iOS は `supportedFeatures` の `expr.addMinutes` で見分ける(README §5.3) |
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
 | 変換 | `toNumber` `toString` | 任意 1 個 | 数値(変換不可はエラー)/ 文字列 |
 | その他 | `coalesce` | (a, b) | a が空(nil・空文字)/評価エラーなら b |
@@ -93,7 +96,7 @@ Expr := number | string | boolean
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
-時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。iOS の `timePicker` は未入力の時も今の時刻を表示するので、表示中の時刻をそのまま保存値にする(触らずに保存して時刻が空 = 勤務時間「—」にならない・#229)。
+時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列で、`00:00`〜`23:59` だけ(`24:00` 以降は「—」) = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。iOS の `timePicker` は未入力の時も今の時刻を表示するので、表示中の時刻をそのまま保存値にする(触らずに保存して時刻が空 = 勤務時間「—」にならない・#229)。
 
 ## 4. 置き場所
 
@@ -114,6 +117,7 @@ Expr := number | string | boolean
 - **`Field.type = "ref"` + `refEntity`**: 他エンティティのレコード参照。保存値はレコード id の文字列。入力は **`picker`**(選択肢 = refEntity のレコード、表示は titleField)。list/table では参照先の titleField を表示する。
 - **`settlement`(Leaf)**: `{"type":"settlement","entity":"members","nameField":"name","balanceField":"balance"}` + `id?` `area?` `title?`。balance(正=受け取る・負=払う)から貪欲法(最大の債務者 → 最大の債権者に min(|負|, 正) を送る、を繰り返す)で「A → B ¥1,200」を列挙。割り勘専用の割り切り部品。合計 0 にならない端数(1 円未満の丸め差)は無視してよい。全員 0 なら「精算は不要です」。
 - progressBar / gauge の `value` は従来どおり**数値リテラルのみ**(Expr は不可。後述 §8)。
+- progressBar の `target` は数値か `{"setting": "<fieldId>"}`(single の entity の数値 field)。利用者が変える目標(1 日の歩数の目標など)でバーが動く。値が空・0 以下の間は「—」(supportedFeatures `progressBar.settingTarget`)。
 
 ## 5. 評価ルール(iOS)
 
@@ -152,6 +156,7 @@ Expr := number | string | boolean
 | `list.item.toggle` | `list item.toggle "name" must be a boolean field (got string)` / `... is computed (read-only)` |
 | `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
 | `nextOccurrence` | `nextOccurrence.args[1]: must be the string "monthly" or "yearly"` / `repeat monthly needs entity + field` / `repeat yearly needs a date or datetime field` |
+| `setting`・single(#267) | `{"setting":"cycle"} is not a field of a single entity (settings: cycle_days)` / `is ambiguous: more than one single entity has field ...` / `entity "settings" is single ...; read its value with {"setting":"<fieldId>"} instead of agg` / `list over single entity "settings"` / `deleteRecord on single entity "settings"` |
 | `streak` / `doneInDays` | `streak needs {"ref": <daily check field>} of this entity` / `"started" is not a daily check; streak only works on a field used as list item.toggle with "resets":"daily"` / `number of days must be an integer literal 1..366` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
 | `Field.hidden`(§7.6) | `list item.trailing "correct" of entity "questions" is hidden ...` / `computed shows hidden field questions.correct; a hidden value may only be compared ...` / `a computed field cannot be hidden` |
@@ -240,7 +245,7 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - lookup の多段(`a.b.c`)。必要なら参照先 entity に computed を作って 1 段で読む。
 - 副作用(式からの保存・通知・遷移)。
 - サーバー側評価・集計 API(評価は iOS。件数が増えたら README 決定表 #10 の集計 API と合わせて検討)。
-- progressBar/gauge の `value`/`target` を Expr にすること(stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
+- progressBar/gauge の `value`・gauge の `max` を Expr にすること(progressBar.target の `{"setting"}` だけは入れた。stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
 - タイムゾーン指定・通貨換算。
 - 乱数(`random` op)。式は描画・レコード再取得のたびに評価されるので、乱数を入れると表示のたびに値が変わる。「ランダムに 1 件選ぶ」は専用 Leaf `randomPicker`(#263・ボタンを押した時だけ選び、部品の表示状態に持つ)で書く。
 

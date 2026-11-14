@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "家計とやること", "voiceEntry": "floating"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "expenses", "name": "支出", "titleField": "memo", "fields": [
+      {"id": "memo", "name": "メモ", "type": "string"},
+      {"id": "date", "name": "日付", "type": "date", "required": true},
+      {"id": "amount", "name": "金額", "type": "currency", "required": true}
+    ]},
+    {"id": "summaries", "name": "週のまとめ", "fields": [
+      {"id": "week", "name": "週", "type": "date", "required": true},
+      {"id": "total", "name": "合計", "type": "currency"},
+      {"id": "count", "name": "件数", "type": "integer"}
+    ]},
+    {"id": "tasks", "name": "やること", "titleField": "title", "fields": [
+      {"id": "title", "name": "題", "type": "string", "required": true},
+      {"id": "due", "name": "締め切り", "type": "date"},
+      {"id": "done", "name": "済み", "type": "boolean"}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "家計", "components": [
+      {"type": "list", "entity": "expenses", "item": {"title": "memo", "subtitle": "amount"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "over_budget", "on": {"record": "created", "entity": "expenses"},
+     "if": {"op": "gt", "args": [{"agg": "sum", "entity": "expenses", "field": "amount", "filter": {"field": "date", "op": "thisMonth", "value": null}}, 50000]},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "予算", "body": "今月の支出が {total} 円になりました",
+       "with": {"total": {"agg": "sum", "entity": "expenses", "field": "amount", "filter": {"field": "date", "op": "thisMonth", "value": null}}}}}]},
+    {"id": "weekly_summary", "on": {"every": "weekly", "weekday": "sun", "time": "20:00"},
+     "do": [
+       {"createRecord": {"entity": "summaries", "values": {
+         "week": {"op": "today", "args": []},
+         "total": {"agg": "sum", "entity": "expenses", "field": "amount", "filter": {"field": "date", "op": "thisWeek", "value": null}},
+         "count": {"agg": "count", "entity": "expenses", "filter": {"field": "date", "op": "thisWeek", "value": null}}}}},
+       {"notify": {"to": {"kind": "owner"}, "title": "今週のまとめ", "body": "今週は {count} 件・{total} 円でした",
+         "with": {
+           "count": {"agg": "count", "entity": "expenses", "filter": {"field": "date", "op": "thisWeek", "value": null}},
+           "total": {"agg": "sum", "entity": "expenses", "field": "amount", "filter": {"field": "date", "op": "thisWeek", "value": null}}}}}
+     ]},
+    {"id": "due_soon", "on": {"every": "daily", "time": "08:00", "each": "tasks"},
+     "if": {"op": "and", "args": [
+       {"op": "neq", "args": [{"ref": "done"}, true]},
+       {"op": "eq", "args": [{"op": "daysUntil", "args": [{"ref": "due"}]}, 3]}]},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "締め切り", "body": "{title} の締め切りまであと 3 日です"}}]}
+  ]
+}

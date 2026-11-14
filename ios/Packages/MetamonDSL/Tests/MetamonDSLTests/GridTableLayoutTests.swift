@@ -86,4 +86,22 @@ final class GridTableLayoutTests: XCTestCase {
         XCTAssertNil(GridTableLayout.todayColumn(labels: ["月", "火", "木"], now: wed, calendar: cal), "今日の曜日が無ければ強調なし")
         XCTAssertNil(GridTableLayout.todayColumn(labels: ["早番", "遅番", "水"], now: wed, calendar: cal), "曜日の表でなければ強調しない")
     }
+
+    /// 巨大な値・Int の端の rowRange で落ちない(`Int(1e20)` と `from + 23` の桁あふれ)。
+    func testHugeValuesDoNotCrash() throws {
+        let e = try entity(#"{"id":"x","name":"x","fields":[{"id":"t","name":"t","type":"string"},{"id":"day","name":"d","type":"enum","options":["月"]},{"id":"p","name":"p","type":"integer"}]}"#)
+        let grid = try component(#"{"type":"gridTable","entity":"x","columnField":"day","rowField":"p","titleField":"t"}"#)
+        let records = [
+            Record(id: "big", data: ["t": "x", "day": "月", "p": .number(1e20)]),
+            Record(id: "neg", data: ["t": "x", "day": "月", "p": .number(-1e300)]),
+            Record(id: "max", data: ["t": "x", "day": "月", "p": .string("9223372036854775807")]),
+            Record(id: "ok", data: ["t": "x", "day": "月", "p": 2]),
+        ]
+        let layout = GridTableLayout(component: grid, entity: e, records: records)
+        XCTAssertEqual(layout.rows.map(\.label), ["1", "2", "3", "4", "5", "6"], "範囲外の値は見出しを広げない")
+        XCTAssertEqual(layout.records(at: .init(column: 0, row: 1)).map(\.id), ["ok"])
+
+        let edge = try component(#"{"type":"gridTable","entity":"x","columnField":"day","rowField":"p","titleField":"t","rowRange":{"from":9223372036854775800,"to":9223372036854775807}}"#)
+        XCTAssertEqual(GridTableLayout(component: edge, entity: e, records: []).rows.count, 8)
+    }
 }

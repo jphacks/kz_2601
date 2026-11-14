@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 位置の記録(locationTracker・#869)と「記録中」バー・通知の文言。iOS の LocationTrackerLeaf / TrackingBar の写し。英語は values-en。 -->
+<resources>
+    <string name="renderer_tracker_auto_stopped">%1$d 分たったので記録を止めました</string>
+    <string name="renderer_tracker_bar_spoken">位置を記録中・経過 %1$s</string>
+    <string name="renderer_tracker_bar_stop_label">位置の記録を停止</string>
+    <string name="renderer_tracker_cancel">キャンセル</string>
+    <string name="renderer_tracker_channel">位置の記録</string>
+    <string name="renderer_tracker_confirm_message">ここまでに記録した地点はそのまま残ります。</string>
+    <string name="renderer_tracker_confirm_title">位置の記録を停止しますか?</string>
+    <string name="renderer_tracker_denied">正確な位置の許可が無いので記録できません</string>
+    <string name="renderer_tracker_footnote">押した時だけ位置を記録します(最長 %1$d 分で自動停止)</string>
+    <string name="renderer_tracker_notification_text">停止を押すまで、アプリを閉じても位置を記録します</string>
+    <string name="renderer_tracker_notification_title">位置を記録中</string>
+    <string name="renderer_tracker_open_settings">設定を開く</string>
+    <string name="renderer_tracker_other_active">別の記録が進行中です</string>
+    <string name="renderer_tracker_progress">%1$d 点を記録・あと %2$d 分で自動停止</string>
+    <string name="renderer_tracker_recording">記録中</string>
+    <string name="renderer_tracker_requesting">位置情報の許可を待っています</string>
+    <string name="renderer_tracker_save_failed">記録を保存できませんでした</string>
+    <string name="renderer_tracker_start">記録を開始</string>
+    <string name="renderer_tracker_stop">記録を停止</string>
+    <string name="renderer_tracker_stop_other">その記録を停止</string>
+    <string name="renderer_tracker_stop_short">停止</string>
+    <string name="renderer_tracker_unavailable">位置を取れないので記録を止めました</string>
+    <string name="renderer_tracker_waiting">位置を待っています…</string>
+</resources>

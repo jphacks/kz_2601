@@ -1,0 +1,6 @@
+[
+  {"id": "feed_arxiv_nlp", "kind": "create", "group": "feed", "transcript": "自然言語処理の最新の論文を arXiv で追って、読んだ論文のメモも残せるアプリ", "note": "feed arxiv(cs.CL)+ 読書メモの entity。tk_2418 / sd_2510 の形", "expect": {"has": ["feed"], "feed": "arxiv", "unreachable": 0}},
+  {"id": "feed_arxiv_ai_default", "kind": "create", "group": "feed", "transcript": "AI の新着論文の一覧が見られるようにして", "note": "feed arxiv(分野が無い → cs.AI)", "expect": {"has": ["feed"], "feed": "arxiv", "unreachable": 0}},
+  {"id": "feed_diet_kodomo", "kind": "create", "group": "feed", "transcript": "国会でこども家庭庁についてどんな議論がされているか見られるアプリ", "note": "feed diet(query: こども家庭庁)。D_2206 の形", "expect": {"has": ["feed"], "feed": "diet", "unreachable": 0}},
+  {"id": "feed_nhk_not_available", "kind": "create", "group": "feed", "transcript": "NHK のニュースを読めるアプリ", "note": "NHK の RSS は規約で使えない → feed rss / arxiv / diet で代わりを作らない", "expect": {"feed": "none"}}
+]

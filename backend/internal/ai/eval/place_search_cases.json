@@ -1,0 +1,9 @@
+[
+  {"id": "ps_cowork", "kind": "create", "group": "placeSearch", "transcript": "近くのコワーキングスペースを探して、行ったところを記録したい。電源があったかもメモしたい", "note": "C_2214 コワプラ。query コワーキング・電源は手で残す(toggle / メモ)", "expect": {"placeSearch": "query", "has": ["placeSearch"], "substitution": true}},
+  {"id": "ps_lunch_lottery", "kind": "create", "group": "placeSearch", "transcript": "近くの飲食店を候補に登録して、どこでお昼を食べるか抽選で決めたい", "note": "sp_2504 Funeat。category restaurant + randomPicker", "expect": {"placeSearch": "category", "has": ["placeSearch", "randomPicker"]}},
+  {"id": "ps_cinema", "kind": "create", "group": "placeSearch", "transcript": "近くの映画館を探して、見に行きたい映画と映画館を記録するアプリ", "note": "tk_2419。category movieTheater・上映時間は出ないので summary で伝える", "expect": {"placeSearch": "any", "has": ["placeSearch"], "substitution": true}},
+  {"id": "ps_hobby_area", "kind": "create", "group": "placeSearch", "transcript": "住みたい街を探すために、今いる場所の近くのスーパーや公園を調べてメモしておきたい", "note": "F_2202 ほびすま。近くの施設を記録(物件は無い)", "expect": {"placeSearch": "any", "has": ["placeSearch"]}},
+  {"id": "ps_here_address", "kind": "create", "group": "placeSearch", "transcript": "今いる場所を緯度経度じゃなくて住所や地名で友達に LINE で伝えたい", "note": "KB_2308 UnMap。locationButton.addressField + shareButton", "expect": {"locationAddress": true, "has": ["locationButton", "shareButton"]}},
+  {"id": "ps_plain_spots", "kind": "create", "group": "placeSearch", "transcript": "行きたいお店のリストを作りたい。店名とメモだけでいい", "note": "近くを探すとは言っていないので placeSearch も住所もいらない", "expect": {"lacks": ["placeSearch"], "locationAddress": false}},
+  {"id": "ps_add_search", "kind": "edit", "base": "ps_plain_spots", "group": "placeSearch", "transcript": "近くのカフェを探してそのまま登録できるようにして", "note": "既存の店の entity のフォームに placeSearch を add", "expect": {"patch": true, "placeSearch": "any", "has": ["placeSearch"]}}
+]

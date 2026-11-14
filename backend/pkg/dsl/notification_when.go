@@ -17,6 +17,7 @@ func checkWhenNotification(where string, n *Notification, entities map[string]*E
 	}{
 		{"time", n.Time != ""}, {"weekday", n.Weekday != ""}, {"entity", n.Entity != ""}, {"field", n.Field != ""},
 		{"offsetMinutes", n.OffsetMinutes != 0}, {"titleField", n.TitleField != ""}, {"enabledField", n.EnabledField != ""},
+		{"alarm", n.Alarm},
 	} {
 		if kv.set {
 			extra = append(extra, kv.key)

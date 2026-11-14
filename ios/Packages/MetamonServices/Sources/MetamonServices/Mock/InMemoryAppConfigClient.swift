@@ -51,6 +51,14 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         apps = AppListEdit.applyingOrder(ids, to: apps)
     }
 
+    public func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary {
+        guard let i = apps.firstIndex(where: { $0.id == appId }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "app not found (in-memory)")
+        }
+        apps[i].glanceStat = glanceStat.isEmpty ? nil : glanceStat
+        return apps[i]
+    }
+
     /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
     public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
 
@@ -62,8 +70,15 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         tables[entity] ?? []
     }
 
+    /// サーバー(Go の time.Time = RFC 3339 の小数秒)と同じ精度。同じ秒に作った記録も作った順に並ぶ
+    private static func stamp() -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: .now)
+    }
+
     public func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record {
-        let now = ISO8601DateFormatter().string(from: .now)
+        let now = Self.stamp()
         let record = Record(id: UUID().uuidString, data: data, createdAt: now, updatedAt: now)
         tables[entity, default: []].append(record)
         return record
@@ -85,7 +100,7 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         }
         var r = tables[entity]![i]
         for (k, v) in data { r.data[k] = v }
-        r.updatedAt = ISO8601DateFormatter().string(from: .now)
+        r.updatedAt = Self.stamp()
         tables[entity]![i] = r
         return r
     }

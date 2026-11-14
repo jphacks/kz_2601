@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MapKit
 import CoreLocation
 import AVFoundation
@@ -10,7 +14,7 @@ import MetamonDSL
 /// 進み方・読み上げる時は `RouteGuidance`(MetamonDSL・純粋ロジック)が決める。
 ///
 /// - 位置は **使用中だけ**(When In Use・`CLBackgroundActivitySession` を使わない)。アプリを閉じると案内も止まる(審査用ビルドでも残せる)。
-/// - 案内中は画面を消さない(`isIdleTimerDisabled`)。止める・画面を離れる・到着で戻す。
+/// - 案内中は画面を消さない(`ScreenAwake`)。止める・画面を離れる・到着で戻す。
 /// - 道を外れた位置が 3 回続いたら現在地から引き直す(最短 15 秒おき)。
 /// - モック(`METAMON_MOCK=1`)は権限・通信を使わず、金沢駅から目的地への L 字の経路を 0.5 秒ごとに約 30 点で進む。
 @MainActor
@@ -38,7 +42,7 @@ final class RouteGuideSession {
     private var offRouteFixes = 0
     private var lastReroute: Date?
     private var task: Task<Void, Never>?
-    private var keptScreenOn = false
+    @ObservationIgnored private var screenAwake: ScreenAwake.Hold?
     private let synthesizer = AVSpeechSynthesizer()
 
     static var isMock: Bool { PlacePicking.isMock }
@@ -69,7 +73,9 @@ final class RouteGuideSession {
         synthesizer.stopSpeaking(at: .immediate)
         keepScreenOn(false)
         if isActive { phase = .idle }
+        #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     /// 車 / 徒歩の切り替え。案内中なら今の位置から引き直す。
@@ -132,7 +138,7 @@ final class RouteGuideSession {
 
     /// MKPlacemark は iOS 26 で非推奨。iOS 26 以降は init(location:address:) を使う。
     private static func mapItem(_ c: RouteGuidance.Coord) -> MKMapItem {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *) {
             return MKMapItem(location: CLLocation(latitude: c.lat, longitude: c.lng), address: nil)
         }
         return MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: c.lat, longitude: c.lng)))
@@ -207,14 +213,16 @@ final class RouteGuideSession {
         let text = Self.text(cue)
         lastCue = text
         guard voiceOn else { return }
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         if session.category != .playback || session.mode != .voicePrompt {
             try? session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
         }
         try? session.setActive(true)
+        #endif
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .word) }
         let u = AVSpeechUtterance(string: text)
-        u.voice = AVSpeechSynthesisVoice(language: LanguagePreference.shared.code == "en" ? "en-US" : "ja-JP")
+        SpeechVoice.configure(u, language: LeafSpeech.voiceLanguage(uiCode: LanguagePreference.shared.code)) // 設定の声・速さ(#2229)
         synthesizer.speak(u)
     }
 
@@ -247,8 +255,11 @@ final class RouteGuideSession {
     }
 
     private func keepScreenOn(_ on: Bool) {
-        guard on != keptScreenOn else { return }
-        keptScreenOn = on
-        UIApplication.shared.isIdleTimerDisabled = on
+        if on {
+            if screenAwake == nil { screenAwake = ScreenAwake.shared.hold() }
+        } else {
+            screenAwake?.release()
+            screenAwake = nil
+        }
     }
 }

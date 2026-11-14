@@ -1,0 +1,13 @@
+{
+  "dsl": "examples/tournament.json",
+  "records": {
+    "entrant": [
+      { "id": "p1", "data": { "name": "青木", "seed": 1, "wins": 1 }, "createdAt": "2026-11-01T09:00:00+09:00" },
+      { "id": "p2", "data": { "name": "井上", "seed": 2, "wins": 1 }, "createdAt": "2026-11-01T09:01:00+09:00" },
+      { "id": "p3", "data": { "name": "上田", "wins": 0 }, "createdAt": "2026-11-01T09:02:00+09:00" },
+      { "id": "p4", "data": { "name": "江藤", "wins": 1 }, "createdAt": "2026-11-01T09:03:00+09:00" },
+      { "id": "p5", "data": { "name": "小川" }, "createdAt": "2026-11-01T09:04:00+09:00" },
+      { "id": "p6", "data": { "name": "加藤", "seed": 3 }, "createdAt": "2026-11-01T09:05:00+09:00" }
+    ]
+  }
+}

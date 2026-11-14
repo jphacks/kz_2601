@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nearby_nothing_to_send">No records to send</string>
+    <string name="nearby_send_default">Send to someone nearby</string>
+    <plurals name="nearby_send_hint">
+        <item quantity="one">Finds nearby devices and sends %1$d record</item>
+        <item quantity="other">Finds nearby devices and sends %1$d records</item>
+    </plurals>
+</resources>

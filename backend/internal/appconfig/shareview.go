@@ -96,6 +96,8 @@ type webNode struct {
 
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
+var textPlaceholderRe = regexp.MustCompile(`\{\{[^{}]*\}\}`)
+
 type webRenderer struct {
 	app      *dsl.App
 	peek     RecordPeek
@@ -252,6 +254,14 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 		n = r.container(s, c, depth)
 	case dsl.CompText, dsl.CompLabel, dsl.CompMarkdown:
 		n.Kind, n.Text, n.Style = "text", clip(c.Text, maxWebText), c.Style
+		if e := r.app.EntityByID(s.Entity); c.Type == dsl.CompText && e != nil { // {{fieldId}} is a record value: not shown on the web (#253)
+			n.Text = textPlaceholderRe.ReplaceAllStringFunc(n.Text, func(m string) string {
+				if dsl.TextSubstitutes(e, m[2:len(m)-2]) {
+					return "—"
+				}
+				return m
+			})
+		}
 		if c.Style == "title" || c.Style == "headline" {
 			n.Kind = "heading"
 		}
@@ -308,20 +318,21 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 			n.Cols = int(*c.Max)
 		}
 		n.Text = strings.Repeat("☆", n.Cols)
-	case dsl.CompPhotoField, dsl.CompVideoField:
+	case dsl.CompPhotoField, dsl.CompVideoField, dsl.CompDrawingField:
 		n.Kind, n.Label = "button", r.inputLabel(s, c)
 		n.Style = "secondary"
 	case dsl.CompButton, dsl.CompShareButton, dsl.CompOpenURLButton:
-		n.Kind, n.Label, n.Style = "button", clip(c.Label, 40), c.Style
-		if n.Label == "" {
-			n.Label = "共有"
+		n.Kind, n.Label, n.Style = "button", clip(c.Label, 40), c.Style // no label: "share" (shareButton)
+		if n.Label == "" && c.App != "" {
+			n.Label = openAppNames[c.App] // openUrlButton app: the service's name, never its link
 		}
 	case dsl.CompLink:
 		n.Kind, n.Text, n.Href = "link", clip(c.Text, 80), safeHref(c.URL)
 	case dsl.CompFlashcards: // #264: the field names only (no cards), the deck is in the app
+		n.Kind = "flashcards"
 		front, back := r.fieldName(c.Entity, c.Front), r.fieldName(c.Entity, c.Back)
 		if front != "" && back != "" {
-			n.Title = clip("カード(表: "+front+" / 裏: "+back+")", 80)
+			n.Items = []string{clip(front, 30), clip(back, 30)}
 		}
 	}
 	return n, true
@@ -438,4 +449,11 @@ func clip(s string, n int) string {
 		return s
 	}
 	return string([]rune(s)[:n-1]) + "…"
+}
+
+// openAppNames labels an openUrlButton app without label on the web view
+// (iOS shows 「PayPay を開く」 etc.; the page needs only the name, never the link).
+var openAppNames = map[string]string{
+	"paypay": "PayPay", "line": "LINE", "slack": "Slack", "discord": "Discord", "x": "X",
+	"instagram": "Instagram", "maps": "Maps", "mail": "Mail", "phone": "Tel",
 }

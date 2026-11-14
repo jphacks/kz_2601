@@ -121,6 +121,8 @@ func screenIDs(a *App) string {
 
 // canLeave reports whether a screen shown fullScreen has a control that
 // closes it: back, or saveRecord without a then-screen (iOS closes the form).
+// Only for modals: on a tab / home root saveRecord has nothing to close
+// (rootFormSave, root_form.go).
 func canLeave(s *Screen) bool {
 	leaves := func(act *Action) bool {
 		return act != nil && (act.Type == ActionBack || (act.Type == ActionSaveRecord && act.Screen == ""))

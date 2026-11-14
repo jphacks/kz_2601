@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "履修と行きたい店", "voiceEntry": "none"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "roster", "name": "名簿", "titleField": "name", "fields": [
+      {"id": "student_id", "name": "学籍番号", "type": "string", "required": true},
+      {"id": "name", "name": "氏名", "type": "string"}
+    ]},
+    {"id": "registrations", "name": "履修登録", "titleField": "student_id", "fields": [
+      {"id": "student_id", "name": "学籍番号", "type": "string", "required": true},
+      {"id": "course", "name": "科目", "type": "string"},
+      {"id": "mismatch", "name": "名簿に無い", "type": "boolean"}
+    ]},
+    {"id": "shops", "name": "店", "titleField": "name", "fields": [
+      {"id": "name", "name": "店名", "type": "string", "required": true}
+    ]},
+    {"id": "visits", "name": "訪問", "fields": [
+      {"id": "shop", "name": "店", "type": "ref", "refEntity": "shops", "required": true},
+      {"id": "date", "name": "日付", "type": "date"}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "履修登録", "components": [
+      {"type": "list", "entity": "registrations", "item": {"title": "student_id", "subtitle": "course"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "roster_check", "on": {"every": "daily", "time": "07:00", "each": "registrations"},
+     "lookup": {"op": "notExists", "entity": "roster", "field": "student_id", "equals": "student_id"},
+     "do": [{"updateRecord": {"values": {"mismatch": true}}}]},
+    {"id": "new_registration", "on": {"record": "created", "entity": "registrations"},
+     "lookup": {"op": "notExists", "entity": "roster", "field": "student_id", "equals": "student_id"},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "名簿に無い登録", "body": "{student_id} は名簿にありません"}}]},
+    {"id": "unvisited", "on": {"every": "weekly", "weekday": "sun", "time": "10:00", "each": "shops"},
+     "lookup": {"op": "notExists", "entity": "visits", "field": "shop", "equals": "$id"},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "まだ行っていない店", "body": "{name} にまだ行っていません"}}]}
+  ]
+}

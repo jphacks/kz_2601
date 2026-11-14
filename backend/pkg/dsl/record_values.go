@@ -60,6 +60,10 @@ func hasFilterField(e *Entity, id string) bool {
 // "value":{"me":true}} on a shared/public entity. It reports whether f was
 // such a filter (the caller then skips the Expr / period checks).
 func checkMeFilter(where string, f *Filter, e *Entity, add func(string, ...any)) bool {
+	if isMyFollowsValue(f.Value) { // #270: follow.go
+		checkFollowsFilter(where+".filter", f, e, add)
+		return true
+	}
 	me := isMeValue(f.Value)
 	_, mark := markOf(f.Field)
 	if f.Field != RecordAuthor && !mark && !me {

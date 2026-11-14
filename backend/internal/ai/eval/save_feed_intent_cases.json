@@ -1,0 +1,6 @@
+[
+  {"id": "sfx_osaka_weather_diary", "kind": "create", "group": "savefeed-intent", "transcript": "大阪の毎日の天気と気温を自動で記録しておいて、あとで一覧で見返したい", "note": "#742 on {every: daily} + saveFeed{provider: weather, region: 270000, entity: weather_log}・入力フォームは作らない(-server-rules)", "expect": {"has": ["list"], "serverRules": true, "ruleTrigger": "daily", "ruleAction": "saveFeed", "ruleSim": true}},
+  {"id": "sfx_warnings_log", "kind": "create", "group": "savefeed-intent", "transcript": "石川県に出た警報や注意報を毎朝記録に残して、去年の冬と比べられるようにしたい", "note": "#742 saveFeed{provider: warnings, region: 170000}・summary だけの記録(-server-rules)", "expect": {"serverRules": true, "ruleTrigger": "daily", "ruleAction": "saveFeed", "ruleSim": true}},
+  {"id": "sfx_pressure_headache_chart", "kind": "create", "group": "savefeed-intent", "transcript": "頭痛が気圧のせいか確かめたい。気圧は毎日自動で記録して、頭痛は自分でつけて、両方をグラフで見たい", "note": "#742 saveFeed{provider: pressure} の記録 + 手でつける headache の entity・chart(場所の言及が無いので 130000)(-server-rules)", "expect": {"chart": true, "serverRules": true, "ruleAction": "saveFeed", "ruleSim": true}},
+  {"id": "sfx_forecast_view_only", "kind": "create", "group": "savefeed-intent", "transcript": "東京の今日の天気予報を見られる画面がほしい", "note": "#742 見るだけ = feed weather。記録して残す話が無いので serverRules / saveFeed を作らない", "expect": {"has": ["feed"], "feed": "weather", "serverRules": false}}
+]

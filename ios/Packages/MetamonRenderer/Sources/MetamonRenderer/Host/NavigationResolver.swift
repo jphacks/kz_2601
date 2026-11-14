@@ -76,6 +76,27 @@ public enum NavigationResolver {
         return s
     }
 
+    /// `close` で動けるか(積まれた画面・モーダル)。タブ / main の根は閉じる先が無い。
+    public static func canClose(_ state: NavigationState, _ route: Route) -> Bool {
+        !(state.paths[route.stack] ?? []).isEmpty || modalStacks.contains(route.stack)
+    }
+
+    /// 保存の後の動き(#1719)。
+    public enum AfterSave: Equatable, Sendable {
+        /// `saveRecord.screen` へ
+        case navigate(String)
+        /// 積まれた画面・モーダルを閉じる
+        case close
+        /// タブ / main の根で閉じる先が無い: その場で「保存しました」を出す。新規なら入力を空に戻す(続けて入れられる)
+        case stay(resetForm: Bool)
+    }
+
+    /// 行き先があればそこへ、閉じられれば閉じる、根なら留まる(何も起きないように見えるのを防ぐ・#1719)。
+    public static func afterSave(_ state: NavigationState, from route: Route, screen: String?, isNewRecord: Bool) -> AfterSave {
+        if let screen, !screen.isEmpty { return .navigate(screen) }
+        return canClose(state, route) ? .close : .stay(resetForm: isNewRecord)
+    }
+
     static func dismissModals(_ state: NavigationState) -> NavigationState {
         var s = state
         s.sheet = nil
@@ -92,6 +113,16 @@ public enum NavigationResolver {
             return Route(screen: tab, stack: Route.tabStack(tab))
         }
         return Route(screen: dsl.initialScreen)
+    }
+
+    /// `route` の画面が今も出ているか(閉じたシート・戻った画面ではないか)。タブ / main の根は常に出ている(タブを切り替えても入力は残る)。
+    public static func isPresented(_ route: Route, in state: NavigationState, dsl: AppDSL) -> Bool {
+        if state.paths[route.stack]?.contains(route) == true { return true }
+        switch route.stack {
+        case "sheet": return state.sheet == route
+        case "full": return state.fullScreen == route
+        default: return route == rootRoute(of: route.stack, dsl: dsl)
+        }
     }
 
     static func rootRoute(of stack: String, dsl: AppDSL) -> Route? {

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -33,7 +34,8 @@ func init() {
 		mux.HandleFunc("POST /v1/shares/{token}/import", h.importShare)
 		mux.HandleFunc("POST /v1/apps/{appId}/publish", h.publishApp)
 		mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
-		mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
+		mux.HandleFunc("GET /v1/public-apps", h.listPublicApps) // deprecated: older iOS builds
+		mux.HandleFunc("POST /v1/public-apps/search", h.searchPublicApps)
 		mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
 	})
 }
@@ -65,6 +67,20 @@ func newShareToken() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
+}
+
+// shareToken reads the {token} path value. Besides idRe it rejects values
+// made only of dots, which URL resolution treats as path segments.
+func shareToken(r *http.Request) (string, error) {
+	tok := r.PathValue("token")
+	if !validShareToken(tok) {
+		return "", apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid token")
+	}
+	return tok, nil
+}
+
+func validShareToken(tok string) bool {
+	return idRe.MatchString(tok) && strings.Trim(tok, ".") != ""
 }
 
 // newAppID matches what iOS generates for appIds (lowercase UUID v4).
@@ -176,7 +192,7 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := store.Share{Token: tok, AppID: id, OwnerUID: uidOf(r), Name: app.Name, Version: app.CurrentVersion,
-		DSL: app.DSL, CreatedAt: time.Now().UTC()}
+		DSL: app.DSL, CreatedAt: store.Now()}
 	if err := h.store.CreateShare(r.Context(), s); err != nil {
 		fail(w, err)
 		return
@@ -187,7 +203,7 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 
 // liveShare loads a share that has not been revoked (404 otherwise).
 func (h *Handler) liveShare(r *http.Request) (*store.Share, error) {
-	tok, err := pathID(r, "token")
+	tok, err := shareToken(r)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +238,7 @@ func (h *Handler) getShare(w http.ResponseWriter, r *http.Request) {
 
 // revokeShare: DELETE /v1/shares/{token} (owner only, idempotent).
 func (h *Handler) revokeShare(w http.ResponseWriter, r *http.Request) {
-	tok, err := pathID(r, "token")
+	tok, err := shareToken(r)
 	if err != nil {
 		fail(w, err)
 		return
@@ -253,7 +269,7 @@ func (h *Handler) importShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	name, ok := importName(w, r)
+	name, ok := h.importName(w, r)
 	if !ok {
 		return
 	}
@@ -475,6 +491,10 @@ func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, err.Error()))
 		return
 	}
+	if err := h.checkListingText(r, name, desc, author, tags); err != nil { // #321
+		fail(w, err)
+		return
+	}
 	c, err := h.store.PutCatalogApp(r.Context(), uidOf(r), store.CatalogApp{
 		ID: id, Name: name, Description: desc, Tags: tags, AuthorName: author,
 		Components: componentTypes(parsed), Version: app.CurrentVersion, DSL: app.DSL,
@@ -518,13 +538,43 @@ func matches(c *store.CatalogApp, q string) bool {
 // listPublicApps: GET /v1/public-apps?q=&sort=popular|new&pageSize=. The
 // catalog is small, so search is an in-memory substring match over at most
 // store.MaxCatalogApps listings (no full-text index).
+// Kept for older iOS builds; POST /v1/public-apps/search takes the same in a body.
 func (h *Handler) listPublicApps(w http.ResponseWriter, r *http.Request) {
-	p, err := parsePaging(r)
+	vals := r.URL.Query()
+	h.servePublicApps(w, r, publicAppSearch{Q: vals.Get("q"), Sort: vals.Get("sort"),
+		PageSize: vals.Get("pageSize"), PageToken: vals.Get("pageToken")})
+}
+
+// publicAppSearch: the GET query, or the POST body (pageSize is a number there).
+type publicAppSearch struct {
+	Q, Sort, PageSize, PageToken string
+}
+
+// searchPublicApps: POST /v1/public-apps/search {"q","sort","pageSize","pageToken"}
+func (h *Handler) searchPublicApps(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Q         string `json:"q"`
+		Sort      string `json:"sort"`
+		PageSize  *int   `json:"pageSize"`
+		PageToken string `json:"pageToken"`
+	}
+	if !decodeLookupBody(w, r, &in) {
+		return
+	}
+	s := publicAppSearch{Q: in.Q, Sort: in.Sort, PageToken: in.PageToken}
+	if in.PageSize != nil {
+		s.PageSize = strconv.Itoa(*in.PageSize)
+	}
+	h.servePublicApps(w, r, s)
+}
+
+func (h *Handler) servePublicApps(w http.ResponseWriter, r *http.Request, s publicAppSearch) {
+	p, err := pagingFrom(s.PageSize, s.PageToken)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	sortBy := r.URL.Query().Get("sort")
+	sortBy := s.Sort
 	if sortBy != "" && sortBy != "popular" && sortBy != "new" {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "sort must be popular or new"))
 		return
@@ -539,7 +589,7 @@ func (h *Handler) listPublicApps(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	q := strings.ToLower(strings.TrimSpace(s.Q))
 	hits := make([]store.CatalogApp, 0, len(all))
 	for i := range all {
 		c := &all[i]

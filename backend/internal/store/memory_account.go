@@ -33,6 +33,7 @@ func (m *Memory) DeactivateUser(_ context.Context, uid string) error {
 			delete(m.catalog, id)
 		}
 	}
+	m.dropDevices(uid)
 	return nil
 }
 
@@ -42,6 +43,37 @@ func (m *Memory) UserDeleted(_ context.Context, uid string) (bool, error) {
 	defer m.mu.Unlock()
 	_, ok := m.deleted[uid]
 	return ok || m.purged[uid], nil
+}
+
+// SeeUser implements Accounts.
+func (m *Memory) SeeUser(_ context.Context, uid string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.deleted[uid]; ok || m.purged[uid] {
+		return true, nil
+	}
+	if _, ok := m.firstSeen[uid]; !ok {
+		if m.firstSeen == nil {
+			m.firstSeen = map[string]time.Time{}
+		}
+		at := m.now().UTC() // the oldest app / device, like the Firestore one
+		for _, a := range m.users[uid] {
+			at = earlier(at, a.app.CreatedAt)
+		}
+		for _, d := range m.devices[uid] {
+			at = earlier(at, d.CreatedAt)
+		}
+		m.firstSeen[uid] = at
+	}
+	return false, nil
+}
+
+// UserFirstSeen implements Accounts.
+func (m *Memory) UserFirstSeen(_ context.Context, uid string) (time.Time, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	at, ok := m.firstSeen[uid]
+	return at, ok, nil
 }
 
 // DeletedAccounts implements AccountPurger.
@@ -68,6 +100,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 	}
 	for appID := range m.users[uid] {
 		m.purgeMatching(appID, uid, &res)
+		m.purgeFollows(appID, uid, &res) // #270
 		c, listed := m.catalog[appID]
 		if listed && c.OwnerUID == uid {
 			delete(m.catalog, appID)
@@ -81,6 +114,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 		if owned && !m.othersIn(appID, uid) {
 			delete(m.public, appID)
 			delete(m.members, appID)
+			delete(m.follows, appID)
 			m.dropMarks("pub/" + appID + "/")
 		} else if p != nil {
 			m.scrubPublic(appID, uid, &res)
@@ -125,6 +159,8 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 	}
 	res.Blocks += len(m.blocks[uid])
 	delete(m.blocks, uid)
+	res.Devices += m.dropDevices(uid)
+	res.NotifyConsents += m.dropConsents(uid)
 	m.dropMatchQuota(uid)
 	for appID, o := range m.owners {
 		if p := m.public[appID]; o == uid && (p == nil || p.app == nil || p.app.OwnerUID != uid) { // a kept mirror keeps its owner
@@ -146,6 +182,8 @@ func (m *Memory) MarkAccountPurged(_ context.Context, uid string) error {
 		return ErrNotDeleted
 	}
 	delete(m.deleted, uid)
+	delete(m.firstSeen, uid) // the tombstone keeps status and purgedAt only
+	delete(m.ageOK, uid)
 	if m.purged == nil {
 		m.purged = map[string]bool{}
 	}

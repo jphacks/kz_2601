@@ -36,6 +36,20 @@ final class PromptTipsUITests: XCTestCase {
         attach("tips-2-inserted")
     }
 
+    /// 「直し方」の下に「動かない所も話しかけて直せる」の一文がある。
+    func testFixRequestSentenceUnderFixCategory() {
+        let link = app.buttons["voice.tips"]
+        XCTAssertTrue(link.waitForExistence(timeout: 15))
+        link.tap()
+        let sentence = app.descendants(matching: .any)["tips.fixRequest"].firstMatch
+        XCTAssertTrue(app.descendants(matching: .any)["tips.category.tabs"].waitForExistence(timeout: 5))
+        for _ in 0..<12 where !(sentence.exists && sentence.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(sentence.exists, "頼み方のコツに「動かないから直して」の一文が無い")
+        attach("tips-fix-request")
+    }
+
     func testTipFromSettingsGoesIntoInput() {
         let gear = app.buttons["voice.settings"]
         XCTAssertTrue(gear.waitForExistence(timeout: 15))

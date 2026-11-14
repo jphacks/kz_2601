@@ -16,7 +16,8 @@ apps_public/{appId}/members/{uid}   # {displayName?, via: share|legacy, invitedB
 | records | shared の entity の records の全操作(一覧・取得・作成・更新・削除・全件削除)で `entityOf` が参加者か確かめ、違えば **403 `forbidden` / `details.reason: not_member`**。`GET /entities/{e}`(定義)は DSL に入っているので絞らない。public の entity は確かめない |
 | 更新の権限(#252 / PR #378 と合わせる) | `entity.edit: "members"` の「参加者なら誰でも更新」の参加者はこの表の参加者。参加者でなければ `ownRecord` に届く前に 403 になるので、#378 の「同じ appId を開いた全員」は shared ではこの表に絞られる(public の `edit: members` は従来どおり全員) |
 | 退出・外す | `DELETE /apps/{appId}/members/me` で退出(冪等)。`DELETE /apps/{appId}/members/{uid}` は作成者だけ。作成者は抜けられない(400)。外された人の木のコピーと過去の投稿は残る。作成者が出したリンクは取り消すまで有効なので、再参加させたくなければ `DELETE /shares/{token}` も行う |
-| 一覧 | `GET /apps/{appId}/members`(参加者だけ)。作成者を先頭に参加順。`{uid, displayName, role: owner / member, via?, joinedAt?, you}` |
+| 一覧 | `GET /apps/{appId}/members`(参加者だけ)。作成者を先頭に参加順。`{uid, displayName, role: owner / member, admin, via?, joinedAt?, you}`。最上位に呼び出した人の `role` と `admin` |
+| 管理者(#272) | 作成者は常に管理者(外せない)。管理者は `PATCH /apps/{appId}/members/{uid}` `{"admin": true / false}` で参加者を管理者にする / 外す(`me` で自分がやめる)。`members/{uid}.admin` に持つ。管理者でない参加者は 403 `admins_only`。権限の使い道は [DSL §3.13](../../dsl/README.md) |
 | GET /events | 参加者でなければ shared の entity の records を購読しない(何も漏らさない・エラーにもしない) |
 | GET /dsl | appId を開けば DSL のインストール(seed)は従来どおり起きる。レコードは参加しないと読めない |
 | 探す | 誰でも見られるので、共有が shared だけのアプリは**新しい appId の独立コピー**(追加した人が作成者)。public も含むアプリは元 appId に参加するが、shared の entity は参加者でないので 403 |

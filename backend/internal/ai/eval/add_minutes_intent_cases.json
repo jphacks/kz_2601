@@ -1,0 +1,7 @@
+[
+  {"id": "amx_garbage_prep", "kind": "create", "group": "addminutes-intent", "transcript": "ゴミ出しの曜日と時刻を登録したら、その15分前を準備する時刻として一覧に出して", "note": "#747 prep = addMinutes(time, -15)・time は timePicker の HH:mm(string)", "expect": {"computed": true, "unreachable": 0}, "pendingExpect": {"addMinutes": true}},
+  {"id": "amx_flight_airport", "kind": "create", "group": "addminutes-intent", "transcript": "飛行機の出発の日時を入れたら、2時間前の空港に着いておくべき日時を出してほしい", "note": "#747 日付つき: depart_at datetime → arrive_by datetime computed addMinutes(depart_at, -120)。string / date にしない", "expect": {"computed": true}, "pendingExpect": {"addMinutes": true}},
+  {"id": "amx_medicine_next", "kind": "create", "group": "addminutes-intent", "transcript": "痛み止めを飲んだ時刻を記録したら、次に飲める時刻(4時間後)を表示して", "note": "#747 next = addMinutes(taken, 240)", "expect": {"computed": true}, "pendingExpect": {"addMinutes": true}},
+  {"id": "amx_simmer_off", "kind": "create", "group": "addminutes-intent", "transcript": "料理で煮込み始めた時刻と煮込む分数を入れたら、火を止める時刻を出したい", "note": "#747 off = addMinutes(start, simmer_min)・分は数値 field", "expect": {"computed": true}, "pendingExpect": {"addMinutes": true}},
+  {"id": "amx_days_not_minutes", "kind": "create", "group": "addminutes-intent", "transcript": "レポートの提出日を入れたら、その3日前の日付を「始める日」として出して", "note": "#747 日の単位は addDays(date, -3)。分の計算ではないので addMinutes を使わない", "expect": {"computed": true}, "pendingExpect": {"addMinutes": false}}
+]

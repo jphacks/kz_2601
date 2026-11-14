@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// 「1 つ前に戻す」/「やり直す」の入口(#209)。仕組みは `AppRuntime.undo()` / `redo()`。
+/// 「元に戻す」/「やり直す」の入口(呼び名は「元に戻す」にそろえる・M8)(#209)。仕組みは `AppRuntime.undo()` / `redo()`。
 enum UndoCopy {
     static let undo: LocalizedStringKey = "元に戻す"
-    static let undoPrevious: LocalizedStringKey = "1つ前に戻す"
     static let redo: LocalizedStringKey = "やり直す"
 }
 
@@ -36,7 +35,7 @@ struct SummaryBannerActionButton: View {
     }
 }
 
-/// 音声シート(作ったアプリの修正チャット)の上部に置く「1 つ前に戻す」。戻せる版が無い・戻している最中は押せない。
+/// 音声シート(作ったアプリの修正チャット)の上部に置く「元に戻す」。戻せる版が無い・戻している最中は押せない。
 /// 戻した直後(シートを開き直した時)は「やり直す」も並べる。
 struct UndoHeaderButtons: View {
     @Environment(AppRuntime.self) private var rt
@@ -44,7 +43,7 @@ struct UndoHeaderButtons: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
             Button { let v = rt.document.version; Task { await rt.undo(expectedVersion: v) } } label: {
-                Label(UndoCopy.undoPrevious, systemImage: "arrow.uturn.backward")
+                Label(UndoCopy.undo, systemImage: "arrow.uturn.backward")
                     .modifier(HeaderCapsule())
             }
             .disabled(!rt.canUndo || rt.isMorphing)

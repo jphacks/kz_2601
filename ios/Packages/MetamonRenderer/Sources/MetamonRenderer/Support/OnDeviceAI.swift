@@ -4,7 +4,7 @@ import MetamonDSL
 import FoundationModels
 #endif
 
-/// `aiButton`(#78)のオンデバイス AI。Apple Intelligence の Foundation Models(iOS 26+)だけで動き、データは端末外に出ない。
+/// `aiButton`(#78)のオンデバイス AI。Apple Intelligence の Foundation Models(iOS 26+)で動き、データは端末外に出ない(使えない端末のオンライン版は AIOnlineTask.swift)。
 /// FoundationModels に触るのはこのファイルだけ(iOS 17 でもビルド・起動できるよう `canImport` + `#available` で囲う)。
 
 // MARK: - 可用性
@@ -21,13 +21,13 @@ enum AIAvailability: Equatable, Sendable {
         case appleIntelligenceNotEnabled
         /// モデルのダウンロード・準備中
         case modelNotReady
-        /// iOS 26 未満(FoundationModels が無い)
+        /// iOS 26 / macOS 26 未満(FoundationModels が無い)
         case osTooOld
         /// SDK が返した未知の理由
         case other
     }
 
-    static let title = "この端末では AI を使えません"
+    static var title: String { L("この端末では AI を使えません") }
 
     var isAvailable: Bool { self == .available }
 
@@ -35,11 +35,19 @@ enum AIAvailability: Equatable, Sendable {
     var message: String? {
         guard case .unavailable(let reason) = self else { return nil }
         switch reason {
-        case .deviceNotEligible: return "Apple Intelligence に対応していない端末です"
-        case .appleIntelligenceNotEnabled: return "設定 > Apple Intelligence と Siri でオンにしてください"
-        case .modelNotReady: return "AI モデルを準備中です。しばらくしてから再度お試しください"
-        case .osTooOld: return "iOS 26 以降が必要です"
-        case .other: return "Apple Intelligence を利用できません"
+        case .deviceNotEligible: return L("Apple Intelligence に対応していない端末です")
+        #if os(macOS)
+        case .appleIntelligenceNotEnabled: return L("システム設定 > Apple Intelligence と Siri でオンにしてください")
+        #else
+        case .appleIntelligenceNotEnabled: return L("設定 > Apple Intelligence と Siri でオンにしてください")
+        #endif
+        case .modelNotReady: return L("AI モデルを準備中です。しばらくしてから再度お試しください")
+        #if os(macOS)
+        case .osTooOld: return L("macOS 26 以降が必要です")
+        #else
+        case .osTooOld: return L("iOS 26 以降が必要です")
+        #endif
+        case .other: return L("Apple Intelligence を利用できません")
         }
     }
 
@@ -101,6 +109,8 @@ enum AIRequestBuilder {
     static let maxInputCharacters = 3000
     /// entity 入力の既定件数。
     static let defaultLimit = 20
+    /// entity 入力の件数の上限(DSL schema の aiButton.limit maximum)。
+    static let maxLimit = 50
 
     enum BuildError: LocalizedError, Equatable {
         case unknownTask
@@ -109,9 +119,9 @@ enum AIRequestBuilder {
 
         var errorDescription: String? {
             switch self {
-            case .unknownTask: "この AI ボタンの設定が正しくありません"
-            case .emptyInput: "先に入力してください"
-            case .noOptions: "分類の候補がありません"
+            case .unknownTask: L("この AI ボタンの設定が正しくありません")
+            case .emptyInput: L("先に入力してください")
+            case .noOptions: L("分類の候補がありません")
             }
         }
     }
@@ -136,8 +146,8 @@ enum AIRequestBuilder {
         var prompt: String
         if let template = c.prompt, !template.isEmpty {
             prompt = expand(template, input: input, entity: entity, values: values)
-            // プレースホルダが無いテンプレは「指示」とみなして入力を後ろに付ける
-            if !template.contains("{{") { prompt += "\n\n" + input }
+            // 本文がテンプレに入っていなければ後ろに付ける(オンライン版は常に本文を別に送るのと揃える)
+            if !embedsInput(template, c, sourceEntity: sourceEntity) { prompt += "\n\n" + input }
         } else {
             prompt = input
         }
@@ -163,30 +173,39 @@ enum AIRequestBuilder {
                           sourceEntity: Entity?, records: [Record]) -> String {
         if let source = sourceEntity {
             let recent = records.sorted { ($0.updatedAt ?? $0.createdAt ?? "") > ($1.updatedAt ?? $1.createdAt ?? "") }
-                .prefix(Swift.max(c.limit ?? defaultLimit, 1))
+                .prefix(Swift.min(Swift.max(c.limit ?? defaultLimit, 1), maxLimit))
             return recent.map { r in
                 "- " + describe(source.storedFields.filter { $0.id != c.output }, value: { r.data[$0] ?? .null }, separator: " / ")
             }.joined(separator: "\n")
         }
         if let input = c.input {
+            guard entity.field(input)?.encrypted != true else { return "" } // #233 backend も断る
             return FieldCoding.display(values[input] ?? .null, field: entity.field(input))
         }
         return describe(entity.storedFields.filter { $0.id != c.output }, value: { values[$0] ?? .null }, separator: "\n")
     }
 
-    /// `{{input}}` → 本文、`{{fieldId}}` → フォームの値。
-    static func expand(_ template: String, input: String, entity: Entity, values: [String: JSONValue]) -> String {
-        var out = template.replacingOccurrences(of: "{{input}}", with: input)
-        for f in entity.fields {
-            out = out.replacingOccurrences(of: "{{\(f.id)}}", with: FieldCoding.display(values[f.id] ?? .null, field: f))
-        }
-        return out
+    /// テンプレが本文を含むか: `{{input}}`、または input field 自身の `{{fieldId}}`(entity 入力でない時)。
+    static func embedsInput(_ template: String, _ c: Component, sourceEntity: Entity?) -> Bool {
+        let ids = AIPlaceholder.ids(in: template)
+        if ids.contains("input") { return true }
+        if sourceEntity == nil, let id = c.input, ids.contains(id) { return true }
+        return false
     }
 
-    /// 「名前: 値」を並べる(写真・位置・空は落とす)。
+    /// `{{input}}` → 本文、`{{fieldId}}` → フォームの値。
+    static func expand(_ template: String, input: String, entity: Entity, values: [String: JSONValue]) -> String {
+        AIPlaceholder.replace(template) { id in
+            if id == "input" { return input }
+            guard let f = entity.fields.first(where: { $0.id == id }), !f.encrypted else { return nil }
+            return FieldCoding.display(values[f.id] ?? .null, field: f)
+        }
+    }
+
+    /// 「名前: 値」を並べる(写真・位置・空・暗号化して保存する項目(#233・AI に渡さない)は落とす)。
     static func describe(_ fields: [Field], value: (String) -> JSONValue, separator: String) -> String {
         fields.compactMap { f -> String? in
-            guard f.type != .photo, f.type != .video, f.type != .audio, f.type != .location else { return nil }
+            guard f.type != .photo, f.type != .video, f.type != .audio, f.type != .location, !f.encrypted else { return nil }
             let s = FieldCoding.display(value(f.id), field: f)
             return s.isEmpty ? nil : "\(f.name): \(s)"
         }.joined(separator: separator)
@@ -211,8 +230,8 @@ enum OnDeviceAIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable(let a): a.message ?? AIAvailability.title
-        case .invalidResponse: "AI の答えを読み取れませんでした。もう一度お試しください"
-        case .failed(let detail, _): "AI の処理に失敗しました(\(detail))"
+        case .invalidResponse: L("AI の答えを読み取れませんでした。もう一度お試しください")
+        case .failed(let detail, _): L("AI の処理に失敗しました(\(detail))")
         }
     }
 
@@ -289,5 +308,28 @@ enum OnDeviceAI {
         }
         #endif
         throw OnDeviceAIError.unavailable(.unavailable(.osTooOld))
+    }
+}
+
+/// aiButton.prompt の `{{id}}`。括弧の内側の空白は許す(Go の `placeholderRe` と同じ: `\{\{\s*([A-Za-z0-9_-]+)\s*\}\}`、RE2 の \s は ASCII の空白)。
+enum AIPlaceholder {
+    private static let regex = try! NSRegularExpression(pattern: #"\{\{[\t\n\f\r ]*([A-Za-z0-9_-]+)[\t\n\f\r ]*\}\}"#)
+
+    static func ids(in template: String) -> Set<String> {
+        let ns = template as NSString
+        return Set(regex.matches(in: template, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) })
+    }
+
+    /// 1 回の走査で置き換える(置換後の文字は再展開しない)。`value` が nil の id は文字のまま残す。
+    static func replace(_ template: String, _ value: (String) -> String?) -> String {
+        let ns = template as NSString
+        var out = ""
+        var last = 0
+        for m in regex.matches(in: template, range: NSRange(location: 0, length: ns.length)) {
+            guard let v = value(ns.substring(with: m.range(at: 1))) else { continue }
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last)) + v
+            last = m.range.location + m.range.length
+        }
+        return out + ns.substring(from: last)
     }
 }

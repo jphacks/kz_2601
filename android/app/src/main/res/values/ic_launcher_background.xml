@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- iOS の AppIcon の地の色 -->
+    <color name="ic_launcher_background">#335267</color>
+</resources>

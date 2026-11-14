@@ -16,11 +16,12 @@ enum MockPublicData {
         let removeFields = transcript.contains("消して") || transcript.hasPrefix("Remove")
         let json = dsl(scope: makePrivate ? nil : "public", withPersonalFields: !removeFields)
         let doc = AppDocument(appId: appId, version: version, dsl: try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8)))
-        if makePrivate { return MorphResult(document: doc, summary: "予約を自分だけの記録にしました(モック)", mode: "patch") }
-        if removeFields { return MorphResult(document: doc, summary: "「お名前」「電話番号」の欄を消しました(モック)", mode: "patch") }
+        let envelope = DocumentEnvelope.make(appId: appId, version: version, dsl: Data(json.utf8))
+        if makePrivate { return MorphResult(document: doc, summary: "予約を自分だけの記録にしました(モック)", mode: "patch", envelope: envelope) }
+        if removeFields { return MorphResult(document: doc, summary: "「お名前」「電話番号」の欄を消しました(モック)", mode: "patch", envelope: envelope) }
         let summary = "「美容室の予約」を用意しました。予約は、このアプリを開いた人なら誰でも見られます(みんなに公開)。"
             + "「お名前」「電話番号」のような個人の情報も公開されます。ほかの人に見られてよいか確かめてください。(モック)"
-        return MorphResult(document: doc, summary: summary, mode: "full", publicPersonalData: fields)
+        return MorphResult(document: doc, summary: summary, mode: "full", publicPersonalData: fields, envelope: envelope)
     }
 
     /// チャット: 依頼に電話番号があり、まだ確かめていなければ 1 回だけ `confirmPublic` の question。

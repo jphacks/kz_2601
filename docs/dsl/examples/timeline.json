@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "ひとことタイムライン",
+    "description": "みんなで短い投稿を共有し、フォローした人の投稿だけのタイムラインも見られる。投稿を開くと、書いた人をフォロー / フォロー解除できる(#270)",
+    "icon": "text.bubble",
+    "theme": { "primaryColor": "#1565C0" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "following", "title": "フォロー中", "icon": "person.2" },
+      { "screen": "everyone", "title": "みんな", "icon": "globe" },
+      { "screen": "mine", "title": "自分", "icon": "person.crop.circle" }
+    ]
+  },
+  "initialScreen": "following",
+  "entities": [
+    {
+      "id": "posts",
+      "name": "投稿",
+      "titleField": "body",
+      "scope": "public",
+      "marks": [{ "id": "like", "icon": "heart", "label": "いいね" }],
+      "fields": [
+        { "id": "body", "name": "ひとこと", "type": "string", "required": true },
+        { "id": "photo", "name": "写真", "type": "photo" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "following",
+      "title": "フォロー中",
+      "toolbar": [
+        { "label": "投稿", "icon": "plus", "action": { "type": "navigate", "screen": "post_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "section", "id": "timeline", "area": "A1:F12", "title": "フォローした人の投稿",
+          "children": [
+            { "type": "list", "entity": "posts",
+              "item": { "title": "body", "subtitle": "$author", "trailing": "$createdAt", "image": "photo", "mark": "like" },
+              "filter": { "field": "$author", "op": "eq", "value": { "myFollows": true } },
+              "sort": { "field": "$createdAt", "direction": "desc" },
+              "emptyText": "「みんな」の投稿を開いて、気になる人をフォローしましょう",
+              "onItemTap": { "type": "navigate", "screen": "post_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "everyone",
+      "title": "みんなの投稿",
+      "components": [
+        {
+          "type": "section", "id": "all", "area": "A1:F12", "title": "新着",
+          "children": [
+            { "type": "list", "entity": "posts",
+              "item": { "title": "body", "subtitle": "$author", "trailing": "$createdAt", "image": "photo", "mark": "like" },
+              "sort": { "field": "$createdAt", "direction": "desc" }, "emptyText": "まだ投稿がありません",
+              "onItemTap": { "type": "navigate", "screen": "post_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mine",
+      "title": "自分の投稿",
+      "components": [
+        { "type": "stat", "id": "count", "area": "A1:F2", "label": "投稿した数", "entity": "posts", "aggregate": "count",
+          "filter": { "field": "$author", "op": "eq", "value": { "me": true } } },
+        {
+          "type": "section", "id": "list", "area": "A3:F12", "title": "自分の投稿",
+          "children": [
+            { "type": "list", "entity": "posts",
+              "item": { "title": "body", "trailing": "$createdAt", "image": "photo", "mark": "like" },
+              "filter": { "field": "$author", "op": "eq", "value": { "me": true } },
+              "sort": { "field": "$createdAt", "direction": "desc" }, "emptyText": "右上の + から投稿できます",
+              "onItemTap": { "type": "navigate", "screen": "post_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post_form",
+      "title": "投稿",
+      "entity": "posts",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "posts" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F8", "title": "内容",
+          "children": [
+            { "type": "textEditor", "field": "body", "placeholder": "いま何してる?" },
+            { "type": "photoField", "field": "photo", "label": "写真" }
+          ]
+        },
+        { "type": "button", "id": "follow", "area": "A9:C10", "label": "フォローする", "icon": "person.badge.plus",
+          "action": { "type": "follow", "entity": "posts" } },
+        { "type": "button", "id": "unfollow", "area": "D9:F10", "label": "フォロー中", "icon": "person.badge.minus", "style": "secondary",
+          "action": { "type": "unfollow", "entity": "posts", "confirmMessage": "この人のフォローを外しますか?" } },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "posts", "confirmMessage": "この投稿を削除しますか?" } }
+      ]
+    }
+  ]
+}

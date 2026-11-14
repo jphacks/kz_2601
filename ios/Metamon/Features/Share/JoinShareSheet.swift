@@ -36,7 +36,7 @@ struct JoinShareSheet: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     Text("「\(join.preview.name)」に参加しますか?")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(.title2, design: .rounded).weight(.bold))
                         .accessibilityIdentifier("join.title")
                     if !join.preview.description.isEmpty {
                         Text(join.preview.description)
@@ -61,15 +61,18 @@ struct JoinShareSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(busy)
+        .appLimitSheets() // #630 参加で持てるアプリの数に達したら、この上で置き換える
     }
 
     private var whatYouSee: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Label("参加すると", systemImage: "person.2.fill")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             point("eye", "参加している人が付けた記録が見られます")
             point("square.and.pencil", "あなたが付けた記録も、参加している人に見えます")
             point("list.bullet", "参加している人の一覧に、下の名前で出ます")
+            point("bell", "他の人の行動で届く通知を受け取ります。設定でオフにできます")
             point("rectangle.portrait.and.arrow.right", "共有シートから、いつでも抜けられます")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -85,16 +88,20 @@ struct JoinShareSheet: View {
         }
     }
 
+    /// 表示名に表示できない言葉があった(#321)
+    private var nameRejected: Bool { error == AppRuntime.displayNameRejected }
+
     private var nameField: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("表示名(任意)").font(.subheadline.weight(.semibold))
             TextField("例: 父、たろう", text: $name)
                 .submitLabel(.done)
                 .textInputAutocapitalization(.never)
-                .metamonInputField()
+                .metamonInputField(flagged: nameRejected)
                 .accessibilityIdentifier("join.name")
                 .onChange(of: name) { _, new in
                     if new.count > SharedDisplayName.maxLength { name = String(new.prefix(SharedDisplayName.maxLength)) }
+                    if nameRejected { error = nil } // 直し始めたら警告を消す
                 }
             Text("空欄のままなら、名前なしで一覧に出ます")
                 .font(.caption)

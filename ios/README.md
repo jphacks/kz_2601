@@ -77,12 +77,101 @@ xcrun devicectl device process launch --device 150ACFA5-8AF6-569A-8EBD-47283A3D1
 
 審査で危ない機能(HealthKit・背面の位置の記録・近くの端末との共有・カメラの撮影・探す・共有リンク・リリース申請)をバイナリから外した版は `./scripts/build-review.sh build|archive` で作る(scheme `Metamon-Review` / 構成 Review)。詳細は [docs/ios/review-build.md](../docs/ios/review-build.md)。
 
+## サードパーティのライセンス(#306)
+
+設定の「ライセンス」に出す一覧は `Metamon/Resources/ThirdPartyLicenses.json`。手で書かず、依存(`Packages/MetamonServices/Package.resolved`)や `LICENSE` を変えたら作り直す:
+
+```sh
+python3 scripts/third-party-licenses.py --source-packages <DerivedData>/SourcePackages   # 生成(Xcode で一度ビルドしてチェックアウトを作ってから)
+python3 scripts/third-party-licenses.py --check                                           # 検査(scripts-ci の licenses-check と同じ)
+```
+
+ライセンスの種類が判定できない・本文が無い依存があると止まる(推測で埋めない)。
+
 ## テスト
 
 ```sh
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO  # 3 パッケージ一括
-(cd Packages/MetamonDSL && swift test)   # DSL のみ、macOS で数秒
+(cd Packages/MetamonDSL && swift test)   # DSL のみ、macOS で数秒(英語の文言のテストだけ落ちる。下の xcodebuild 版なら通る)
+scripts/mac-package-test.sh MetamonDSL   # パッケージ 1 つを macOS の xcodebuild test で(mac-ci と同じ。Renderer / Services も可)
 ```
+
+`swift test` は文字列カタログ(.xcstrings)を訳さないので `EnglishCopyTests` が落ちる。macOS のテストを `xcodebuild` で回す時、
+repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。
+その時は repo と `MAC_DERIVED_DATA` を保護の外に置く。
+
+## Mac のアプリ(MetamonMac・#929)
+
+3 つのパッケージを iOS と共有し、殻は `MetamonMac/`、iOS と共有するランタイムの部品は `Shared/`。ターゲットは `project.yml` の `MetamonMac`(アプリ)・`MetamonMacWidget`(ウィジェット)・`MetamonMacTests`・`MetamonMacUITests`。macOS 14 以上・Apple シリコンと Intel の両方。
+
+### ビルド・起動
+
+```sh
+cd ios
+./scripts/sync-firebase-plist.sh                 # 任意。無ければモックで動く(下の「Firebase の plist が無い時」)
+METAMON_TEAM_ID=<TEAM_ID> xcodegen generate      # iOS と同じプロジェクトに Mac のターゲットも入る
+
+# 署名なしで通るか(mac-ci の「MetamonMac をビルド」と同じ)
+xcodebuild build -project Metamon.xcodeproj -scheme MetamonMac -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath DerivedData-mac CODE_SIGNING_ALLOWED=NO
+
+# 起動して使う(自動署名。アプリ名は Tailor It.app)
+xcodebuild build -project Metamon.xcodeproj -scheme MetamonMac -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath DerivedData-mac -allowProvisioningUpdates
+open "DerivedData-mac/Build/Products/Debug/Tailor It.app"
+```
+
+- Xcode からなら scheme `MetamonMac` を選んで Run(⌘R)。
+- Firebase のログインは Keychain の entitlement を使うので、つないで使う時は署名した版で起動する(iOS のシミュレータと同じ理由)。署名なしはビルドとテストだけに使う。
+- `PRODUCT_NAME` は `Tailor It`、Swift のモジュール名は `Metamon` のまま(`@testable import Metamon`)。Bundle ID は iOS と同じ `jp.kz2601.metamon`。
+
+### 構成(scheme)
+
+iOS の [ビルド構成と接続先](#ビルド構成と接続先292) と同じ 4 つ。違いは scheme の名前だけ。
+
+| 構成 | scheme | ai / appconfig | メモ |
+|---|---|---|---|
+| Debug | `MetamonMac` | stg | 開発・CI。開発用メニュー(`METAMON_STG`)が入る。App Check はデバッグ用のトークン |
+| Staging | `MetamonMac-Staging` | stg | 手元に入れる検証版。開発用メニューが入る |
+| Release | `MetamonMac`(Archive) | prod | 配布 |
+| Review | `MetamonMac-Review` | prod | 審査用。共有のリンク・プッシュ・近くの人に送るの受ける側の通信を外した `MetamonMac/MetamonMac-Review.entitlements`。作り方は [docs/ios/review-build.md](../docs/ios/review-build.md) |
+
+Staging / Release / Review の App Check は DeviceCheck(Mac は App Attest が使えない・`MacServices.swift` の `MacFirebase`)。
+
+### Firebase の plist が無い時
+
+`MacServices.make` は、Firebase が初期化できて ai の URL がある時だけ本物につなぐ(`isLive = true`)。どちらかが無い・環境変数 `METAMON_MOCK=1` の時はモック。
+
+| | 本物(`isLive`) | モック |
+|---|---|---|
+| ログイン | 未ログインなら起動時に匿名でログイン(`MacAccount.start`)。Apple でのサインインは設定の「アカウント」から | 固定のユーザー。サインインの入口は出ない(`MacAccount.isLive` が false) |
+| AI | ai サービス | `MockAIClient`(同梱の DSL の例を返す) |
+| 作ったアプリの記録 | appconfig の URL があればサーバー | 端末だけ(`MacRecordVault`) |
+
+### ウィジェット(MetamonMacWidget)
+
+本体に埋め込まれる(`Contents/PlugIns/`)ので、本体をビルドすれば一緒に入る。確かめ方:
+
+1. 署名した版の本体を起動し、作ったアプリで記録を 1 つ足す(本体が App Group に `WidgetSnapshot` を書く)。
+2. デスクトップを右クリック →「ウィジェットを編集」で「Tailor It」を置く(小・中・大)。
+3. 押すと `tailorit://widget?app=<appId>` で本体のそのアプリが開く。
+
+同梱の例はウィジェットに書かない(ウインドウを閉じると記録が消えるため)。仕組みは [docs/mac/system-integration.md「ウィジェット」](../docs/mac/system-integration.md#ウィジェット)。
+
+### テスト
+
+```sh
+# 単体テスト(mac-ci の「テスト MetamonMacTests」と同じ)
+xcodebuild test -project Metamon.xcodeproj -scheme MetamonMac -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath DerivedData-mac CODE_SIGNING_ALLOWED=NO
+
+# キーボード操作の UI テスト(scheme では skipped。手元で 1 つだけ回す)
+xcodebuild test -scheme MetamonMac -destination 'platform=macOS' -only-testing:MetamonMacUITests
+```
+
+- UI テストは初回に「システム設定 > プライバシーとセキュリティ > アクセシビリティ / オートメーション」で Xcode(かターミナル)の許可が要る(`MetamonMacUITests/KeyboardShellUITests.swift` の頭)。
+- 見た目の比較(`MacSnapshotTests`)の回し方は [docs/mac/system-integration.md「テスト」](../docs/mac/system-integration.md#テストui-テスト見た目の比較)。
+- repo か DerivedData が `~/Desktop` などの下にあるとテストが読めずに落ちる。上の [テスト](#テスト) の段落を見る。
 
 ## コンポーネントを足す(3 行)
 1. `Packages/MetamonRenderer/Sources/MetamonRenderer/Components/Leaves/FooLeaf.swift` に `struct FooLeaf: View`

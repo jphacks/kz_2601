@@ -16,22 +16,17 @@ const casesDir = "../../internal/ai/eval"
 // means a wrong path or lost files, not fewer features.
 const minCaseFiles = 31
 
-// TestCaseFilesValid validates every internal/ai/eval/*cases.json (#566), so a
-// new case file is checked without editing this test. A name containing
-// "chat" (chat_cases.json, <feature>_chat_cases.json) holds ChatCase for
-// -chat; every other file holds Case for /generate.
+// TestCaseFilesValid validates every JSON file under internal/ai/eval (#566)
+// the way -check-all does, so a new file is checked without editing this
+// test: generate cases, chat cases (-chat) and DSL edit bases, each with its
+// own loader (checkall.go), edit bases included.
 func TestCaseFilesValid(t *testing.T) {
-	files, err := filepath.Glob(filepath.Join(casesDir, "*cases.json"))
+	counts, err := checkAll(casesDir, "../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) < minCaseFiles {
-		t.Fatalf("found %d case files in %s, want at least %d", len(files), casesDir, minCaseFiles)
-	}
-	for _, f := range files {
-		if err := checkCasesFile(f, strings.Contains(filepath.Base(f), "chat")); err != nil {
-			t.Error(err)
-		}
+	if n := counts[shapeGenerate] + counts[shapeChat]; n < minCaseFiles {
+		t.Fatalf("found %d case files in %s, want at least %d", n, casesDir, minCaseFiles)
 	}
 }
 

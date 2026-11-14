@@ -1,0 +1,202 @@
+package extapi
+
+import (
+	"errors"
+	"net/url"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestRegistry(t *testing.T) {
+	for _, id := range []string{FakeFree, FakePaid, FakeOAuth} {
+		p, ok := Lookup(id)
+		if !ok || !p.Fake {
+			t.Fatalf("%s not registered as a fake", id)
+		}
+	}
+	if p, _ := Lookup(FakeOAuth); !p.NeedsOAuth || p.EnvName() != "FAKE_OAUTH" || p.FeatureKey() != "externalCall.fakeOauth" {
+		t.Fatalf("%+v %s", p, p.EnvName())
+	}
+	if envName("googleCalendar") != "GOOGLE_CALENDAR" || envName("deepl") != "DEEPL" {
+		t.Fatal("envName")
+	}
+	// the review build never lists OAuth providers or fakes (決定 6)
+	for _, f := range ReviewBuildFeatures() {
+		p, _ := Lookup(strings.TrimPrefix(f, "externalCall."))
+		if p.NeedsOAuth || p.Fake {
+			t.Fatalf("review build lists %s", f)
+		}
+	}
+	ids := []string{}
+	for _, p := range Providers() {
+		ids = append(ids, p.ID)
+		if p.NeedsOAuth && (p.NameJa == "" || p.NameEn == "") {
+			t.Errorf("%s: an OAuth provider without its name", p.ID)
+		}
+	}
+	if !slices.IsSorted(ids) {
+		t.Fatalf("not sorted: %v", ids)
+	}
+}
+
+func TestRegisterRefusesBadDefinitions(t *testing.T) {
+	ok := Provider{ID: "okProvider", Billing: BillingFree, Ops: []OpSpec{{Name: "get"}}, New: func(Secrets) (map[string]Operation, error) { return nil, nil }}
+	bad := []func(p *Provider){
+		func(p *Provider) { p.ID = "Bad" },
+		func(p *Provider) { p.Billing = "" },
+		func(p *Provider) { p.Ops = nil },
+		func(p *Provider) { p.Ops = []OpSpec{{Name: "get"}, {Name: "get"}} },
+		func(p *Provider) { p.NeedsOAuth = true },
+		func(p *Provider) { // OAuth without a name for the 「つないだサービス」 list
+			p.NeedsOAuth = true
+			p.NewOAuth = func(Secrets) (OAuthClient, error) { return fakeOAuthClient{}, nil }
+			p.NameJa = "名前"
+		},
+		func(p *Provider) { p.Hosts = []string{"http://example.com"} },
+		func(p *Provider) { p.Hosts = []string{"https://example.com/path"} },
+		func(p *Provider) { p.ID = FakeFree }, // duplicate
+	}
+	for i, f := range bad {
+		p := ok
+		f(&p)
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("case %d registered", i)
+				}
+			}()
+			register(p)
+		}()
+	}
+}
+
+func TestConfigFromEnv(t *testing.T) {
+	env := map[string]string{
+		"EXT_FAKE_FREE_ENABLED":        "1",
+		"EXT_FAKE_PAID_API_KEY":        "k",
+		"EXT_COST_USD_FAKE_PAID_ECHO":  "0.25",
+		"COIN_RESERVE_EXT_FAKE_PAID":   "40",
+		"EXT_TIMEOUT":                  "5s",
+		"EXT_OAUTH_CALLBACK_BASE":      "https://runner.example/",
+		"APP_ENV":                      "production",
+		"EXT_FAKE_OAUTH_CLIENT_SECRET": "s",
+	}
+	c, err := ConfigFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.Enabled[FakeFree] || c.Enabled[FakePaid] || c.Secrets[FakePaid].APIKey != "k" || c.Secrets[FakeOAuth].ClientSecret != "s" ||
+		c.CostUSD[FakePaid+".echo"] != 0.25 || c.Reserve[FakePaid] != 40 || c.Timeout.String() != "5s" ||
+		c.CallbackBase != "https://runner.example" || !c.Production || c.AppReturnURL != "tailorit://connected" {
+		t.Fatalf("%+v", c)
+	}
+	for k, v := range map[string]string{"EXT_COST_USD_FAKE_PAID_ECHO": "-1", "COIN_RESERVE_EXT_FAKE_PAID": "x", "EXT_TIMEOUT": "2m",
+		"EXT_MAX_CONCURRENT": "0", "EXT_OAUTH_CALLBACK_BASE": "http://runner.example"} {
+		if _, err := ConfigFromEnv(func(key string) string {
+			if key == k {
+				return v
+			}
+			return ""
+		}); err == nil {
+			t.Errorf("%s=%s accepted", k, v)
+		}
+	}
+	// default: everything off
+	c, _ = ConfigFromEnv(func(string) string { return "" })
+	for id, on := range c.Enabled {
+		if on {
+			t.Fatalf("%s on by default", id)
+		}
+	}
+}
+
+func TestAllowedURL(t *testing.T) {
+	hosts := []string{"https://api.example.com"}
+	for raw, want := range map[string]bool{
+		"https://api.example.com/v1/x":      true,
+		"http://api.example.com/v1/x":       false,
+		"https://evil.example.com/":         false,
+		"https://u:p@api.example.com/":      false,
+		"https://api.example.com:8443/":     false,
+		"https://api.example.com.evil.com/": false,
+	} {
+		u, _ := url.Parse(raw)
+		if AllowedURL(hosts, u) != want {
+			t.Errorf("%s: want %v", raw, want)
+		}
+	}
+	if _, err := ReadBody(strings.NewReader(strings.Repeat("x", MaxBody+1))); err == nil {
+		t.Fatal("body over 1 MB read")
+	}
+}
+
+// Only a read op without OAuth may be cached.
+func TestCacheTTLOnlyForKeyReads(t *testing.T) {
+	newOps := func(Secrets) (map[string]Operation, error) { return nil, nil }
+	oauth := func(Secrets) (OAuthClient, error) { return fakeOAuthClient{}, nil }
+	for _, p := range []Provider{
+		{ID: "cacheWrite", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "put", Write: true, CacheTTL: time.Minute}}},
+		{ID: "cacheOauth", Billing: BillingFree, New: newOps, NeedsOAuth: true, NewOAuth: oauth, Ops: []OpSpec{{Name: "get", CacheTTL: time.Minute}}},
+		{ID: "cacheNeg", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTL: -time.Minute}}},
+		{ID: "cacheForOnly", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTLFor: func(map[string]string, time.Time) time.Duration { return time.Minute }}}},
+	} {
+		if p.check() == nil {
+			t.Errorf("%s: accepted", p.ID)
+		}
+	}
+	ok := Provider{ID: "cacheRead", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTL: time.Minute}}}
+	if err := ok.check(); err != nil {
+		t.Fatal(err)
+	}
+	if cacheKey("p", "o", map[string]string{"b": "2", "a": "1"}) != cacheKey("p", "o", map[string]string{"a": "1", "b": "2"}) {
+		t.Fatal("cache key depends on map order")
+	}
+}
+
+// Values holding the old separators ("\x00", "=") once met on one key; the
+// length prefixes keep them apart.
+func TestCacheKeyUnambiguous(t *testing.T) {
+	for _, c := range [][2]map[string]string{
+		{{"a": "1\x00b=2"}, {"a": "1", "b": "2"}},
+		{{"a": "x=y"}, {"a=x": "y"}},
+		{{"a": ""}, {}},
+	} {
+		if cacheKey("p", "o", c[0]) == cacheKey("p", "o", c[1]) {
+			t.Errorf("%v and %v share a key", c[0], c[1])
+		}
+	}
+	if cacheKey("p\x00o", "x", nil) == cacheKey("p", "o\x00x", nil) {
+		t.Error("provider/op share a key")
+	}
+}
+
+// CheckArgs: the op's names only, no URL, then the op's own Check; every
+// refusal is ErrUnknown (400 bad_request).
+func TestCheckArgs(t *testing.T) {
+	p := Provider{ID: "argsTest", Ops: []OpSpec{{Name: "get", Args: []string{"code"}, Check: func(a map[string]string) error {
+		if a["code"] == "bad" {
+			return errors.New("bad code")
+		}
+		return nil
+	}}}}
+	for _, c := range []struct {
+		op   string
+		args map[string]string
+		ok   bool
+	}{
+		{"get", map[string]string{"code": "ok"}, true},
+		{"get", nil, true},
+		{"nope", nil, false},
+		{"get", map[string]string{"other": "x"}, false},
+		{"get", map[string]string{"code": "bad"}, false},
+		{"get", map[string]string{"code": "https://example.com/x"}, false},
+		{"get", map[string]string{"code": strings.Repeat("a", MaxArgLen+1)}, false},
+	} {
+		_, err := p.CheckArgs(c.op, c.args)
+		if (err == nil) != c.ok || (err != nil && !errors.Is(err, ErrUnknown)) {
+			t.Errorf("%s %v: err %v", c.op, c.args, err)
+		}
+	}
+}

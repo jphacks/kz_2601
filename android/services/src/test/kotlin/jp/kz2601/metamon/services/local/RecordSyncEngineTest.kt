@@ -1,0 +1,253 @@
+package jp.kz2601.metamon.services.local
+
+import jp.kz2601.metamon.dsl.records.LocalVideoStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+import java.nio.file.Files
+import kotlin.coroutines.EmptyCoroutineContext
+
+class RecordSyncEngineTest {
+    private val client = FakeRecordsClient()
+    private val net = ManualConnectivity(online = false)
+
+    private fun TestScope.engine(scope: CoroutineScope = backgroundScope, videos: LocalVideoStore? = null): RecordSyncEngine {
+        val store = RecordStore(null, EmptyCoroutineContext)
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        return RecordSyncEngine(store, queue, client, net, scope, videos = videos).also { it.start() }
+    }
+
+    /** 動画を 2 本置いた置き場と、そのうち 1 本を持つ記録の値 */
+    private fun videoStore(): Pair<LocalVideoStore, File> {
+        val dir = Files.createTempDirectory("videos").toFile()
+        val store = LocalVideoStore(dir)
+        listOf("v1", "v2").forEach { id -> File(dir, "$id.mp4").writeText(id) }
+        return store to dir
+    }
+
+    private fun videoData(id: String) = JsonObject(mapOf("title" to JsonPrimitive("a"), "clip" to JsonPrimitive("video:$id|data:image/jpeg;base64,AA")))
+
+    @Test
+    fun deletingRecordRemovesOnlyItsVideos() = runTest {
+        net.set(true)
+        val (videos, dir) = videoStore()
+        val e = engine(videos = videos)
+        e.write("app", "todo", null, videoData("v1"))
+        runCurrent()
+        e.delete("app", "todo", "srv-1")
+        runCurrent()
+        assertFalse("消した記録の動画は消える", videos.exists("v1"))
+        assertTrue("ほかの動画は残る", videos.exists("v2"))
+        dir.deleteRecursively()
+    }
+
+    @Test
+    fun undoneDeleteKeepsVideosAndGraceEndRemovesThem() = runTest {
+        net.set(true)
+        val (videos, dir) = videoStore()
+        val e = engine(videos = videos)
+        e.write("app", "todo", null, videoData("v1"))
+        runCurrent()
+        val (_, ticket) = e.deleteUndoably("app", "todo", "srv-1", graceMillis = 5_000)
+        advanceTimeBy(3_000)
+        e.undoDelete(ticket)
+        runCurrent()
+        assertTrue("取り消したら消さない", videos.exists("v1"))
+
+        e.deleteUndoably("app", "todo", "srv-1", graceMillis = 5_000)
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertFalse("取り消し期間が過ぎたら消す", videos.exists("v1"))
+        assertTrue(videos.exists("v2"))
+        dir.deleteRecursively()
+    }
+
+    private fun data(v: String) = JsonObject(mapOf("title" to JsonPrimitive(v)))
+
+    @Test
+    fun offlineWriteIsSentWhenBackOnline() = runTest {
+        val e = engine()
+        client.offline = true
+        val (list, id) = e.write("app", "todo", null, data("a"))
+        runCurrent()
+        assertTrue(id.startsWith("local-"))
+        assertEquals(listOf(id), list.map { it.id }) // 圏外でもすぐ一覧に出る
+        assertTrue(e.store.rows("app", "todo").single().unsent)
+        assertTrue(client.calls.isEmpty()) // オフラインの間は送らない
+        assertEquals(RecordSyncEngine.Status.Offline(1), e.status.value)
+
+        client.offline = false
+        net.set(true)
+        runCurrent()
+        assertEquals(listOf("create"), client.calls.map { it.kind })
+        assertEquals(listOf("srv-1"), e.cached("app", "todo").map { it.id })
+        assertEquals(RecordSyncEngine.Status.Synced, e.status.value)
+    }
+
+    @Test
+    fun undoBeforeGraceSendsNothing() = runTest {
+        net.set(true)
+        val e = engine()
+        e.write("app", "todo", null, data("a"))
+        runCurrent()
+        client.calls.clear()
+
+        val (list, ticket) = e.deleteUndoably("app", "todo", "srv-1", graceMillis = 5_000)
+        assertTrue(list.isEmpty()) // 隠すだけ
+        advanceTimeBy(3_000)
+        val back = e.undoDelete(ticket)
+        runCurrent()
+        assertEquals(listOf("srv-1"), back?.map { it.id })
+        assertTrue(client.calls.isEmpty())
+        assertEquals(PendingOp.NONE, e.store.row("app", "todo", "srv-1")?.pendingOp)
+    }
+
+    @Test
+    fun deleteIsSentAfterGrace() = runTest {
+        net.set(true)
+        val e = engine()
+        e.write("app", "todo", null, data("a"))
+        runCurrent()
+        client.calls.clear()
+
+        val (_, ticket) = e.deleteUndoably("app", "todo", "srv-1", graceMillis = 5_000)
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals(listOf("delete"), client.calls.map { it.kind })
+        assertNull(e.undoDelete(ticket)) // もう送った
+        assertNull(e.store.row("app", "todo", "srv-1"))
+    }
+
+    @Test
+    fun undoableDeleteOfUnsentCreateFollowsTheServerId() = runTest {
+        val e = engine()
+        client.offline = true
+        val (_, tempId) = e.write("app", "todo", null, data("a"))
+        val (_, ticket) = e.deleteUndoably("app", "todo", tempId, graceMillis = 5_000)
+        // 待つ間に復帰して作成が送られる → 仮 id がサーバー id に替わっても隠したまま
+        client.offline = false
+        net.set(true)
+        runCurrent()
+        assertTrue(e.cached("app", "todo").isEmpty())
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals(listOf("create", "delete"), client.calls.map { it.kind })
+        assertEquals("srv-1", client.calls[1].id)
+        assertNull(e.undoDelete(ticket))
+    }
+
+    @Test
+    fun backgroundCommitsPendingDeletesImmediately() = runTest {
+        net.set(true)
+        val e = engine()
+        e.write("app", "todo", null, data("a"))
+        runCurrent()
+        client.calls.clear()
+        e.deleteUndoably("app", "todo", "srv-1", graceMillis = 60_000)
+        e.setForeground(false)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(listOf("delete"), client.calls.map { it.kind })
+        assertTrue(e.pendingDeletions.isEmpty())
+    }
+
+    @Test
+    fun offlineDeleteOfSyncedRecordWaitsForReconnect() = runTest {
+        net.set(true)
+        val e = engine()
+        e.write("app", "todo", null, data("a"))
+        runCurrent()
+        net.set(false)
+        client.offline = true
+        client.calls.clear()
+        assertTrue(e.delete("app", "todo", "srv-1").isEmpty())
+        runCurrent()
+        assertEquals(PendingOp.DELETE, e.store.row("app", "todo", "srv-1")?.pendingOp)
+        assertTrue(client.calls.isEmpty())
+        client.offline = false
+        net.set(true)
+        runCurrent()
+        assertEquals(listOf("delete"), client.calls.map { it.kind })
+    }
+
+    @Test
+    fun pullKeepsUnsentRows() = runTest {
+        val e = engine()
+        client.offline = true
+        val (_, tempId) = e.write("app", "todo", null, data("mine"))
+        client.offline = false
+        client.server += jp.kz2601.metamon.services.Record(id = "srv-x", data = data("theirs"), createdAt = "2020-01-01T00:00:00Z")
+        val list = e.pull("app", "todo")
+        assertEquals(listOf(tempId, "srv-x"), list.map { it.id })
+    }
+
+    @Test
+    fun wipeDropsEverything() = runTest {
+        val e = engine()
+        e.write("app", "todo", null, data("a"))
+        e.deleteUndoably("app", "todo", "whatever", graceMillis = 5_000)
+        e.wipe()
+        runCurrent()
+        assertEquals(0, e.queue.count())
+        assertTrue(e.cached("app", "todo").isEmpty())
+        assertTrue(e.pendingDeletions.isEmpty())
+        assertNotNull(e.status.value)
+    }
+
+    /** 書く途中で wipe された行は、次の人の DB・送信待ちに残さない(位置の記録の点が wipe を跨いだ時・#869)。 */
+    @Test
+    fun writeThatStraddlesAWipeLeavesNoRow() = runTest {
+        val dir = Files.createTempDirectory("records").toFile()
+        val io = StandardTestDispatcher(testScheduler) // ファイルの読み書きで中断させ、その間に wipe を入れる
+        val store = RecordStore(dir, io)
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val e = RecordSyncEngine(store, queue, client, net, backgroundScope)
+        val write = launch { e.write("app", "track", null, data("point")) } // ファイルを読む所で止まる
+        val wipe = launch { e.wipe() }
+        write.join()
+        wipe.join()
+        assertEquals(0, e.queue.count())
+        assertTrue(e.cached("app", "track").isEmpty())
+        dir.deleteRecursively()
+    }
+
+    /** wipe の消す途中に始まった書き込みも、次の人の DB・送信待ちに残さない(列を空にした後に積まれる競合・#1128)。 */
+    @Test
+    fun writeThatStartsDuringAWipeLeavesNoRow() = runTest {
+        val dir = Files.createTempDirectory("records").toFile()
+        val io = StandardTestDispatcher(testScheduler) // wipe をファイルの読み書きで止め、その間に書く
+        val store = RecordStore(dir, io)
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val e = RecordSyncEngine(store, queue, client, net, backgroundScope)
+        val wipe = launch { e.wipe() } // 世代を上げ、ローカル DB を消す所で止まる
+        val write = launch { e.write("app", "track", null, data("point")) } // その間に始まる
+        wipe.join()
+        write.join()
+        assertEquals(0, e.queue.count())
+        assertTrue(e.cached("app", "track").isEmpty())
+        dir.deleteRecursively()
+    }
+
+    /** wipe が終わってからの書き込みは残して送る。 */
+    @Test
+    fun writeAfterAWipeIsKept() = runTest {
+        val e = engine()
+        e.wipe()
+        e.write("app", "todo", null, data("b"))
+        assertEquals(1, e.queue.count())
+        assertEquals(1, e.cached("app", "todo").size)
+    }
+}

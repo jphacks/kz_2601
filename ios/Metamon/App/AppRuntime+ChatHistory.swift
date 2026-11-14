@@ -4,7 +4,7 @@ import MetamonServices
 /// アプリごとのチャット履歴(#210)。保存・文脈は `ChatHistory.swift`。
 /// - `chatHistory` = 閉じた会話(反映・切替で閉じたもの)と反映の区切り。今の会話(`chatBubbles`)は含まない
 /// - 端末には `chatHistory + 今の会話` を保存する(吹き出しが増えるたび)。読み直すと全部が閉じた会話になる
-/// - 「最初から」で全部消す。アプリ削除・アカウント削除でも消す
+/// - 「最初から」は今の会話だけ消す。これまでの会話も消す時は確認する(M9)。アプリ削除・アカウント削除でも消す
 extension AppRuntime {
     /// 閉じた会話があるか。生成後のシートは、これがあれば今の会話が無くても吹き出しの画面を出す
     var hasChatHistory: Bool { !chatHistory.isEmpty }
@@ -31,8 +31,26 @@ extension AppRuntime {
         persistChatHistory()
     }
 
-    /// 「最初から」: 今の会話も、このアプリの履歴も消す。
+    /// 「最初から」のボタン(M9)。これまでの会話(閉じた会話・反映の区切り)があれば、消してよいかを確認する。
+    /// 無ければ今の会話だけ消す(確認なし)。
+    func requestRestartChat() {
+        if hasChatHistory {
+            showRestartConfirm = true
+        } else {
+            restartLiveChat()
+        }
+    }
+
+    /// 今の会話だけ消す。これまでの区切りは残す(M9)。
+    func restartLiveChat() {
+        showRestartConfirm = false
+        resetChat(archive: false)
+        persistChatHistory()
+    }
+
+    /// 「最初から」の確認で「これまでの会話も消す」: 今の会話も、このアプリの履歴も消す(戻せない)。
     func restartChat() {
+        showRestartConfirm = false
         resetChat()
         chatHistory = []
         chatHistoryStore.remove(appId: document.appId)

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="held_body">Your conversation is still here. With Tailor It Pro you can continue right away. You can also create for free again tomorrow.</string>
+    <string name="held_close">Close</string>
+    <string name="held_continue">Continue building</string>
+    <string name="held_headline">You\'ve used today\'s free creations (%1$d)</string>
+    <string name="held_paid_cancel">Discard</string>
+    <string name="held_paid_headline">“%1$s” requires Tailor It Pro</string>
+    <string name="held_paid_without">Build without this feature</string>
+    <string name="paywall_close_paid_feature">If you close this, it won\'t be made this way.</string>
+</resources>

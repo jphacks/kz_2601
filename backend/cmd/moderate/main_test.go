@@ -21,7 +21,7 @@ func TestRun(t *testing.T) {
 	}
 	do := func(args ...string) (string, error) {
 		var b strings.Builder
-		err := run(ctx, m, args, &b)
+		err := run(ctx, m, args, &b, false)
 		return b.String(), err
 	}
 

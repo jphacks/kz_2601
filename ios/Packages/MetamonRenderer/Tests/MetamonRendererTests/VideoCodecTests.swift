@@ -1,6 +1,5 @@
 import XCTest
 import AVFoundation
-import UIKit
 import MetamonDSL
 @testable import MetamonRenderer
 

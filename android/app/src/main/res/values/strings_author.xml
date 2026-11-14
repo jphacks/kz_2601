@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定の「投稿に表示する名前」(#875)。文言は iOS の AuthorNameSettingsSection から写す -->
+<resources>
+    <string name="settings_author_name_footer">みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Google アカウントの名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。</string>
+    <string name="settings_author_name_header">投稿に表示する名前</string>
+    <string name="settings_author_name_placeholder">匿名</string>
+</resources>

@@ -43,9 +43,19 @@ type Memory struct {
 	// marks
 	marks map[string]bool // record/mark/uid keys (memory_marks.go)
 
+	// follows (#270, memory_follow.go): appId -> follower uid -> followed uids
+	follows map[string]map[string][]string
+
 	// account deletion
 	deleted map[string]time.Time // uid -> deletedAt of DELETE /v1/me (memory_account.go)
 	purged  map[string]bool      // uids erased by PurgeAccount + MarkAccountPurged
+	// uid -> users/{uid}.firstSeenAt (SeeUser, #339 account age)
+	firstSeen map[string]time.Time
+
+	// devices and consent (#269, memory_device.go)
+	devices      map[string]map[string]*Device        // users/{uid}/devices/{installationId}
+	deviceTokens map[string]deviceRef                 // device_tokens/{tokenKey}
+	consents     map[string]map[string]*NotifyConsent // users/{uid}/notifyConsent/{appId}
 
 	// feedback
 	feedback map[string]*Feedback // feedback/{id} (memory_feedback.go)
@@ -58,6 +68,24 @@ type Memory struct {
 	// matching (#507, memory_matching.go)
 	matchPairs map[string]map[string]*MatchPair // apps_public/{appId}/match_pairs/{pairId}
 	matchQuota map[string]int                   // uid/day -> interests sent
+	ageOK      map[string]time.Time             // users/{uid}.ageConfirmedAt
+
+	// runner outbox (#341, memory_outbox.go)
+	outbox map[string]map[string]*OutboxEvent // env -> eventId
+
+	// runner done marks (#341, memory_runner.go): env/key
+	runnerDone map[string]bool
+
+	// runner schedules and per-app state (#342, memory_schedule.go)
+	schedules  map[string]map[string]*Schedule // env -> id
+	runnerApps map[string]*RunnerApp           // env/key
+
+	// runner stops (#346, memory_stop.go)
+	stops   map[string]map[string]*Stop // env -> id
+	stopLog map[string][]StopEvent      // env -> entries, oldest first
+
+	// runner rule statuses (#347, memory_rule_status.go)
+	ruleStatus map[string]map[string]*RuleStatus // env -> id
 }
 
 // NewMemory returns an empty store.
@@ -122,6 +150,10 @@ func cloneVersion(v *Version) *Version {
 func cloneRecord(r *Record) *Record {
 	cp := *r
 	cp.Data = cloneData(r.Data)
+	if r.Origin != nil {
+		o := *r.Origin
+		cp.Origin = &o
+	}
 	if r.MarkCounts != nil {
 		cp.MarkCounts = make(map[string]int, len(r.MarkCounts))
 		for k, v := range r.MarkCounts {
@@ -224,6 +256,18 @@ func (m *Memory) ReorderApps(_ context.Context, uid string, ids []string) error 
 	return nil
 }
 
+// SetAppGlance implements Store.
+func (m *Memory) SetAppGlance(_ context.Context, uid, appID, glance string) (*App, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a := m.get(uid, appID)
+	if a == nil {
+		return nil, ErrNotFound
+	}
+	a.app.GlanceStat = glance
+	return a.snapshot(), nil
+}
+
 // CommitVersion implements Store.
 func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (*Version, error) {
 	m.mu.Lock()
@@ -235,8 +279,26 @@ func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (
 	if c.BaseVersion != a.app.CurrentVersion {
 		return nil, &ConflictError{Current: a.app.CurrentVersion}
 	}
+	if c.HeldLimit > 0 && a.app.CurrentVersion <= HeldVersion {
+		if held := m.heldLocked(uid, appID); held >= c.HeldLimit {
+			return nil, &HeldLimitError{Held: held, Limit: c.HeldLimit}
+		}
+	}
 	now := m.now().UTC()
 	n := a.app.CurrentVersion + 1
+	events, err := commitEvents(c, n, now)
+	if err != nil {
+		return nil, err
+	}
+	for _, ev := range events {
+		if _, dup := m.outbox[ev.Env][ev.EventID]; dup {
+			return nil, ErrAlreadyExists
+		}
+	}
+	m.storeOutboxLocked(events)
+	if c.Publish != nil {
+		m.publishOnCommit(uid, appID, c, n, now)
+	}
 	v := &Version{AppID: appID, Version: n, ParentVersion: c.BaseVersion, DSL: cloneRaw(c.DSL), Patch: c.Patch, Source: c.Source, CreatedAt: now}
 	a.versions[n] = v
 	a.app.CurrentVersion = n
@@ -299,6 +361,37 @@ func (m *Memory) PublishApp(_ context.Context, uid, appID string, raw json.RawMe
 	}
 	p.app.Name, p.app.Version, p.app.DSL, p.app.UpdatedAt = name, version, cloneRaw(raw), now
 	return true, nil
+}
+
+// publishOnCommit is CommitVersion's apps_public part (see CommitPublish).
+// m.mu is held.
+func (m *Memory) publishOnCommit(uid, appID string, c Commit, version int, now time.Time) {
+	if m.owners == nil {
+		m.owners = map[string]string{}
+	}
+	owner, known := m.owners[appID]
+	if !known && c.Publish.Claim {
+		m.owners[appID], owner = uid, uid
+	}
+	p := m.public[appID]
+	mirror := p != nil && p.app != nil
+	mirrorOwner := ""
+	if mirror {
+		mirrorOwner = p.app.OwnerUID
+	}
+	switch decidePublish(c.Publish, uid, owner, mirrorOwner, mirror) {
+	case publishCreate:
+		if p == nil {
+			p = &memPublic{records: map[string]map[string]*Record{}}
+			m.public[appID] = p
+		}
+		p.app = &PublicApp{ID: appID, OwnerUID: uid, Name: c.Name, Version: version, DSL: cloneRaw(c.DSL), CreatedAt: now, UpdatedAt: now}
+	case publishUpdate:
+		if c.Name != "" {
+			p.app.Name = c.Name
+		}
+		p.app.Version, p.app.DSL, p.app.UpdatedAt = version, cloneRaw(c.DSL), now
+	}
 }
 
 // GetPublicApp implements Store.

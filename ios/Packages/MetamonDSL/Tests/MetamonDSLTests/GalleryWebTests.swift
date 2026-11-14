@@ -4,6 +4,10 @@ import XCTest
 /// `docs/dsl/examples/gallery-web.json`(webView + LINE/Slack/Discord 共有 + カスタムスキーム)が Swift 側でもフルにデコードできること、
 /// および `ShareTarget` / `ExternalURLPolicy` の純粋ロジック。
 final class GalleryWebTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     private func gallery() throws -> AppDSL { try ExamplesFixture.load("gallery-web") }
 
     func testWebViewAndPresetsDecode() throws {

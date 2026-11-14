@@ -68,6 +68,7 @@ func Relax(raw []byte) (json.RawMessage, error) {
 			root = inlined
 		}
 	}
+	dropServerRules(root)
 	relaxSchema(root)
 	compact(root)
 	return json.Marshal(root)
@@ -75,8 +76,9 @@ func Relax(raw []byte) (json.RawMessage, error) {
 
 // compact shrinks the grammar Claude has to compile: the 15-way Leaf anyOf
 // (expanded once per reference) exceeds the API's grammar size limit. Leaf
-// and Component become one flattened object (type enum + every property
-// optional) and PatchValue becomes primitives | flat node | arrays. Per-type
+// becomes one flattened object (type enum + every property optional),
+// Component becomes Container | Leaf, and PatchValue becomes primitives |
+// flat node | arrays. Per-type
 // required props and combinations are enforced afterwards by dsl.Parse.
 func compact(root map[string]any) {
 	defs, _ := root["$defs"].(map[string]any)
@@ -91,19 +93,19 @@ func compact(root map[string]any) {
 	leafFlat["description"] = "Leaf component. `type` decides which other properties apply (see catalog); do not set unrelated properties."
 	defs["Leaf"] = leafFlat
 
+	// The flat Container+Leaf union is only the PatchNode input below; the
+	// schema's Component is Container | Leaf so Leaf's ~100 properties are
+	// written once, not twice.
 	compFlat := mergeObjects(defs, append([]string{"Container"}, leafNames...))
-	compFlat["properties"].(map[string]any)["children"] = map[string]any{
-		"type": "array", "items": map[string]any{"$ref": "#/$defs/Leaf"},
-		"description": "vstack/hstack/section only. Children stack vertically/horizontally and must not carry `area`.",
-	}
-	compFlat["description"] = "Screen-level component: a container (vstack/hstack/section with children) or a leaf."
-	defs["Component"] = compFlat
-	delete(defs, "Container")
+	compFlat["properties"].(map[string]any)["children"] = childrenSchema()
+	component := splitComponent(defs)
+	defs["Component"] = component
 	for _, n := range leafNames {
 		delete(defs, n)
 	}
 
 	if _, ok := defs["PatchValue"]; ok {
+		defs["Component"] = compFlat
 		node := mergeObjects(defs, []string{"AppMeta", "Tab", "Theme", "Notification", "Entity", "Field", "Screen", "ToolbarButton", "Action", "Component", "ListItem", "Sort", "Filter"})
 		node["description"] = "A DSL sub-document (entity, field, screen, component, action, tab, notification, ...). Set only the properties of that node kind."
 		defs["PatchNode"] = node
@@ -116,8 +118,35 @@ func compact(root map[string]any) {
 				map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/PatchNode"}},
 			},
 		}
+		defs["Component"] = component
 	}
 	pruneDefs(root)
+}
+
+// childrenSchema is Container.children in the generation schemas.
+func childrenSchema() map[string]any {
+	return map[string]any{
+		"type": "array", "items": map[string]any{"$ref": "#/$defs/Leaf"},
+		"description": "Leaf children, stacked in order. `area` on children only for the in-container grid (card/section/vstack, all children or none).",
+	}
+}
+
+// splitComponent makes Component = Container | Leaf (a 2-way anyOf, not the
+// 15-way one compact removes). A restriction that disallows every container
+// leaves Component = Leaf.
+func splitComponent(defs map[string]any) map[string]any {
+	desc := "Screen-level component: a container (Container, with Leaf children) or a Leaf."
+	container, _ := defs["Container"].(map[string]any)
+	props, _ := container["properties"].(map[string]any)
+	tp, _ := props["type"].(map[string]any)
+	if en, _ := tp["enum"].([]any); len(en) == 0 {
+		delete(defs, "Container")
+		return map[string]any{"description": desc, "anyOf": []any{map[string]any{"$ref": "#/$defs/Leaf"}}}
+	}
+	props["children"] = childrenSchema()
+	return map[string]any{"description": desc, "anyOf": []any{
+		map[string]any{"$ref": "#/$defs/Container"}, map[string]any{"$ref": "#/$defs/Leaf"},
+	}}
 }
 
 // refNames lists the $defs names referenced by a schema's anyOf.
@@ -187,6 +216,12 @@ func mergeProp(a, b map[string]any) map[string]any {
 	if a == nil {
 		return cp
 	}
+	if merged, ok := mergeRefs(a, cp); ok {
+		return merged
+	}
+	if alts, ok := typeAlternatives(a, cp); ok {
+		return map[string]any{"anyOf": alts}
+	}
 	ae, aok := a["enum"].([]any)
 	be, bok := cp["enum"].([]any)
 	if aok && bok {
@@ -208,6 +243,40 @@ func mergeProp(a, b map[string]any) map[string]any {
 		}
 	}
 	return a
+}
+
+// typeAlternatives: when one side is an object / array and the other
+// a different shape (Notification.near object vs placeSearch near string),
+// neither may win: both stay as anyOf alternatives (a merged anyOf grows).
+// ok=false leaves the scalar merge to mergeProp.
+func typeAlternatives(a, b map[string]any) ([]any, bool) {
+	shape := func(m map[string]any) string {
+		if ref, ok := m["$ref"].(string); ok {
+			return ref
+		}
+		t, _ := m["type"].(string)
+		return t
+	}
+	structured := func(s string) bool { return s == "object" || s == "array" }
+	var alts []any
+	if prev, ok := a["anyOf"].([]any); ok && len(a) == 1 {
+		alts = append(alts, prev...)
+	} else {
+		alts = []any{a}
+	}
+	bs := shape(b)
+	for i, v := range alts {
+		m, _ := v.(map[string]any)
+		s := shape(m)
+		if s == bs || (!structured(s) && !structured(bs)) {
+			if len(alts) == 1 {
+				return nil, false // same shape or two scalars: the usual merge
+			}
+			alts[i] = mergeProp(m, b) // keep merging into the matching alternative
+			return alts, true
+		}
+	}
+	return append(alts, b), true
 }
 
 func sortedKeys(m map[string]any) []string {
@@ -320,4 +389,46 @@ func stripAreas(raw []byte) ([]byte, bool) {
 		return nil, false
 	}
 	return out, changed
+}
+
+// serverRuleDefs are the server-rule $defs (#340). They stay out of the
+// generation schema (size limit; RuleCreateRecord.values is an open map that
+// structured outputs reject): the AI writes rules in a separate pass with its
+// own schema (server_rules_pass.go, #343). dsl.Parse still accepts serverRules.
+var serverRuleDefs = []string{"ServerRule", "RuleTrigger", "RuleAction", "RuleNotify", "RuleRecipient", "RuleCreateRecord", "RuleUpdateRecord", "RuleIncrement"}
+
+func dropServerRules(root map[string]any) {
+	if props, _ := root["properties"].(map[string]any); props != nil {
+		delete(props, "serverRules")
+	}
+	if defs, _ := root["$defs"].(map[string]any); defs != nil {
+		for _, name := range serverRuleDefs {
+			delete(defs, name)
+		}
+	}
+}
+
+// mergeRefs: one property name over different defs (saveTo is AISaveTo on
+// aiButton and AIChatSaveTo on aiChat) becomes anyOf of the refs, so the
+// flattened leaf accepts each part's shape. ok is false when b is not a
+// plain $ref or a already accepts it.
+func mergeRefs(a, b map[string]any) (map[string]any, bool) {
+	br, isRef := b["$ref"].(string)
+	if !isRef || len(b) != 1 || len(a) != 1 {
+		return nil, false
+	}
+	var refs []any
+	if ar, ok := a["$ref"].(string); ok {
+		refs = []any{map[string]any{"$ref": ar}}
+	} else if alts, ok := a["anyOf"].([]any); ok {
+		refs = alts
+	} else {
+		return nil, false
+	}
+	for _, r := range refs {
+		if m, _ := r.(map[string]any); m["$ref"] == br {
+			return nil, false
+		}
+	}
+	return map[string]any{"anyOf": append(refs, map[string]any{"$ref": br})}, true
 }

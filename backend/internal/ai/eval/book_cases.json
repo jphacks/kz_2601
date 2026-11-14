@@ -1,0 +1,6 @@
+[
+  {"id": "book_lending_isbn", "kind": "create", "group": "book", "transcript": "友達に貸した本を記録したい。本のバーコードを読んだら書名と著者が自動で入るようにして", "note": "NG_2312 LenBow。qrScanner + lookupBook(書名・著者)", "expect": {"lookupBook": true, "has": ["qrScanner"]}},
+  {"id": "book_reading_log", "kind": "create", "group": "book", "transcript": "読んだ本の記録アプリ。ISBN を入れたら書名・出版社・出版日を埋めて、感想と星の評価を付けたい", "note": "読書記録。lookupBook(出版日は date)", "expect": {"lookupBook": true}},
+  {"id": "book_plain", "kind": "create", "group": "book", "transcript": "読みたい本のリストを作りたい。書名とメモだけでいい", "note": "ISBN を頼まれていないので lookupBook は付けない", "expect": {"lookupBook": false}},
+  {"id": "book_plain_add", "kind": "edit", "base": "book_plain", "group": "book", "transcript": "ISBN から本の情報を入れられるようにして", "note": "既存の本の entity に isbn を add してフォームに lookupBook のボタン", "expect": {"patch": true, "lookupBook": true}}
+]

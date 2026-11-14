@@ -69,13 +69,16 @@ struct MatchListLeaf: View {
                         accessory: accessory(item, box: box))
                     .contentShape(Rectangle())
                     .onTapGesture { open(profile) }
+                    .macHelp(c.onItemTap != nil ? L("クリックで開きます") : nil)
                     .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
                     .accessibilityAction { open(profile) }
+                    .accessibilityActions { ModerationAccessibilityActions(rt: rt, entity: entity.id, record: profile) }
             } else {
                 missingProfileRow(item, box: box)
             }
         }
         .contextMenu {
+            ComponentTalkMenuItem(component: c, ctx: ctx) // 行のメニューが先に出るので、ここにも置く(#1323)
             if box == .matches {
                 Button(L("つながりを解除"), systemImage: "person.crop.circle.badge.xmark", role: .destructive) { unmatching = item }
             }

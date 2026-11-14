@@ -107,6 +107,7 @@ struct ListRow: View {
         }
         .buttonStyle(.plain)
         .padding(-8)
+        .macIconButtonHelp(st.mine ? L("\(mark.label)を外す") : L("\(mark.label)を付ける"))
         .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
     }
 
@@ -137,6 +138,7 @@ struct ListRow: View {
         }
         .buttonStyle(.plain)
         .padding(-8)
+        .macIconButtonHelp(on ? L("チェックを外す") : L("チェックする"))
         .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
     }
 
@@ -210,7 +212,7 @@ struct ListRow: View {
         .accessibilityValue(accessibilityValueText)
         .accessibilityActions {
             if let onToggle {
-                Button(checked ? "チェックを外す" : "チェックする", action: onToggle)
+                Button(checked ? L("チェックを外す") : L("チェックする"), action: onToggle)
             }
             if let audio = trailingAudio.flatMap(AudioValue.init) {
                 Button(L("録音を再生")) { AudioPlayback.shared.toggle(audio) }

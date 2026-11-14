@@ -39,11 +39,17 @@
 // file without the API, and every run ends with the pass rate per group.
 //
 //	go run ./cmd/ai-eval -check -cases internal/ai/eval/m0disc_cases.json  # no API calls
+//	go run ./cmd/ai-eval -check-all internal/ai/eval  # every file, loader by shape (checkall.go), no API calls
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
 //	go run ./cmd/ai-eval -compare-before 'raw/*-before-*.json' -compare-after 'raw/*-after-*.json'  # no API calls
 //	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
+//	go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # pass rate of saved runs, no API calls
+//	go run ./cmd/ai-eval -score '<raw>/*.json' -min-pass 0.9 -thresholds th.json -report md -report-out r.md  # gate + PR table (gate.go, #371)
+//
+// Past JPHACKS works (coverage.go): jphacks_coverage_cases.json /
+// jphacks_coverage_pending_cases.json; `pendingExpect` holds keys an open PR adds.
 package main
 
 import (
@@ -74,6 +80,19 @@ type Case struct {
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
 	Needs      []string       `json:"needs,omitempty"` // audit_cases: human checklist only, not checked
+	// PendingExpect: expect keys an open PR adds (jphacks_coverage_pending_cases.json).
+	// A key is checked once expectKeys knows it; until then it is skipped (coverage.go).
+	PendingExpect map[string]any `json:"pendingExpect,omitempty"`
+	// TextImage turns on Service.TextImage (AI_TEXT_IMAGE=1) for this case:
+	// with it off, aiButton inputPhoto is not generated (clientRestriction).
+	TextImage bool `json:"textImage,omitempty"`
+}
+
+// caseSwitches applies the case's server switches to svc; call the result to restore them.
+func caseSwitches(svc *ai.Service, c Case) func() {
+	prev := svc.TextImage
+	svc.TextImage = c.TextImage
+	return func() { svc.TextImage = prev }
 }
 
 type Metrics struct {
@@ -121,32 +140,38 @@ func (m *Metrics) HasCalc() bool {
 }
 
 type Record struct {
-	ID            string          `json:"id"`
-	Kind          string          `json:"kind"`
-	Group         string          `json:"group"`
-	Transcript    string          `json:"transcript"`
-	Locale        string          `json:"locale,omitempty"`
-	Repeat        int             `json:"repeat,omitempty"`
-	OK            bool            `json:"ok"`
-	Error         string          `json:"error,omitempty"`
-	Mode          string          `json:"mode,omitempty"`
-	Attempts      int             `json:"attempts"`
-	Regenerations int             `json:"regenerations"`
-	AreaFallback  bool            `json:"areaFallback"`
-	Downgraded    bool            `json:"downgradedToFull,omitempty"`
-	ClaudeMs      int64           `json:"claudeMs"`
-	TotalMs       int64           `json:"totalMs"`
-	FirstEventMs  int64           `json:"firstEventMs,omitempty"` // -stream: time to the app/summary event
-	FirstEvent    string          `json:"firstEvent,omitempty"`   // -stream: its provisional summary
-	OutputChars   int             `json:"outputChars,omitempty"`
-	Usage         ai.Usage        `json:"usage"`
-	Summary       string          `json:"summary,omitempty"`
-	LastProblems  []string        `json:"lastProblems,omitempty"`
-	LintRetried   bool            `json:"lintRetried,omitempty"`
-	Omissions     []string        `json:"omissions,omitempty"` // #257: the server appended a note for these
-	Metrics       *Metrics        `json:"metrics,omitempty"`
-	ExpectMisses  []string        `json:"expectMisses,omitempty"`
-	LogicPass     *ai.LogicMeta   `json:"logicPass,omitempty"`
+	ID            string              `json:"id"`
+	Kind          string              `json:"kind"`
+	Group         string              `json:"group"`
+	Transcript    string              `json:"transcript"`
+	Locale        string              `json:"locale,omitempty"`
+	Checked       bool                `json:"checked,omitempty"` // the case had an expect (-score counts only these)
+	Repeat        int                 `json:"repeat,omitempty"`
+	OK            bool                `json:"ok"`
+	Error         string              `json:"error,omitempty"`
+	Mode          string              `json:"mode,omitempty"`
+	Attempts      int                 `json:"attempts"`
+	Regenerations int                 `json:"regenerations"`
+	AreaFallback  bool                `json:"areaFallback"`
+	Downgraded    bool                `json:"downgradedToFull,omitempty"`
+	ClaudeMs      int64               `json:"claudeMs"`
+	TotalMs       int64               `json:"totalMs"`
+	FirstEventMs  int64               `json:"firstEventMs,omitempty"` // -stream: time to the app/summary event
+	FirstEvent    string              `json:"firstEvent,omitempty"`   // -stream: its provisional summary
+	OutputChars   int                 `json:"outputChars,omitempty"`
+	Usage         ai.Usage            `json:"usage"`
+	Summary       string              `json:"summary,omitempty"`
+	LastProblems  []string            `json:"lastProblems,omitempty"`
+	LintRetried   bool                `json:"lintRetried,omitempty"`
+	Omissions     []string            `json:"omissions,omitempty"` // #257: the server appended a note for these
+	Metrics       *Metrics            `json:"metrics,omitempty"`
+	ExpectMisses  []string            `json:"expectMisses,omitempty"`
+	LogicPass     *ai.LogicMeta       `json:"logicPass,omitempty"`
+	ServerRules   *ai.ServerRulesMeta `json:"serverRules,omitempty"` // #343
+	// -server-rules: the main call's serverNeed and what started the pass
+	// (model|regex|both; "" = the pass did not run)
+	ServerNeed    string          `json:"serverNeed,omitempty"`
+	ServerTrigger string          `json:"serverTrigger,omitempty"`
 	Patch         []dsl.PatchOp   `json:"patch,omitempty"`
 	DSL           json.RawMessage `json:"dsl,omitempty"`
 }
@@ -197,17 +222,58 @@ func main() {
 	cmpAfter := flag.String("compare-after", "", "glob of raw run files = after")
 	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
 	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
+	serverRules := flag.Bool("server-rules", false, "enable the server-rules call when the request asks for an automatic action (same as AI_SERVER_RULES=1, #343)")
+	onDemand := flag.Bool("on-demand-rules", true, "send the JPHACKS product recipes only when keywords or the selector call pick them, as cmd/ai does (-on-demand-rules=false = AI_ON_DEMAND_RULES=0)")
+	recipeModel := flag.String("recipe-model", "", "model of the recipe selector call (empty = ai.DefaultRecipeModel, same as AI_RECIPE_MODEL)")
 	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
-	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types) and exit (no API calls, #281)")
+	score := flag.String("score", "", "glob of raw run files: prints the pass rate per group from the saved runs (the latest record of each id) and exits (no API calls)")
+	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types; generate / chat / DSL base detected from its shape) and exit (no API calls, #281)")
+	checkAllDir := flag.String("check-all", "", "validate every JSON file under this dir (internal/ai/eval) with the loader its shape needs; unknown shapes fail (no API calls)")
+	minPass := flag.Float64("min-pass", 0, "-score / generate run: exit 1 when the total pass rate (pass / checked) is below this rate, 0..1 (0 = no gate, #371)")
+	thresholds := flag.String("thresholds", "", "-score / generate run: JSON file {\"group\": 0.9, \"total\": 0.8}; exit 1 when a group is below its rate or has no checked case (#371)")
+	report := flag.String("report", "", "-score / generate run: md = write the pass rate per group, the minimums and the failed cases as a Markdown table (for a PR comment, #371)")
+	reportOut := flag.String("report-out", "", "-report md: file to write the report to (empty = stdout, replacing the plain table)")
 	flag.Parse()
+	if err := validateReportFormat(*report); err != nil {
+		log.Fatal(err)
+	}
+	g, err := loadGate(*minPass, *thresholds)
+	if err != nil {
+		log.Fatal(err)
+	}
+	output := evalOutput{Format: *report, Out: *reportOut, Gate: g}
+	if output.active() && (*checkAllDir != "" || *check || *chat || *cmpBefore != "" || *cmpAfter != "") {
+		log.Fatal("-min-pass / -thresholds / -report work with -score and generate runs only")
+	}
+	if *checkAllDir != "" {
+		counts, err := checkAll(*checkAllDir, ".")
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("ok %s: %d generate, %d chat, %d dsl\n", *checkAllDir, counts[shapeGenerate], counts[shapeChat], counts[shapeDSL])
+		return
+	}
+	if *check {
+		if _, err := checkFile(*casesPath, "."); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("ok %s\n", *casesPath)
+		return
+	}
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
 	}
 
+	if *score != "" {
+		if err := scoreRuns(*score, output); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if *cmpBefore != "" || *cmpAfter != "" {
 		if err := compare(*cmpBefore, *cmpAfter); err != nil {
 			log.Fatal(err)
@@ -216,10 +282,6 @@ func main() {
 	}
 	if err := checkCasesFile(*casesPath, *chat); err != nil {
 		log.Fatal(err)
-	}
-	if *check {
-		fmt.Printf("ok %s\n", *casesPath)
-		return
 	}
 
 	if *envFile != "" {
@@ -239,11 +301,14 @@ func main() {
 	}
 	store := appconfigclient.NewMemory()
 	svc := &ai.Service{
-		Claude:      ai.NewClient(apiKey, *model, *effort),
-		Store:       store,
-		Model:       *model,
-		CallTimeout: *timeout,
-		LogicPass:   *logicPass,
+		Claude:          ai.NewClient(apiKey, *model, *effort),
+		Store:           store,
+		Model:           *model,
+		CallTimeout:     *timeout,
+		LogicPass:       *logicPass,
+		ServerRulesPass: *serverRules,
+		OnDemandRules:   *onDemand,
+		RecipeModel:     *recipeModel,
 	}
 	ctx := context.Background()
 	if *chat {
@@ -264,6 +329,11 @@ func main() {
 	var cases []Case
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		log.Fatal(err)
+	}
+	for i := range cases {
+		if waiting := mergePendingExpect(&cases[i]); len(waiting) > 0 && (len(filter) == 0 || filter[cases[i].ID]) {
+			log.Printf("[%s] not checked until the PR is merged: %v", cases[i].ID, waiting)
+		}
 	}
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
 	created := map[string]json.RawMessage{} // case id -> resulting DSL (create or edit)
@@ -299,8 +369,11 @@ func main() {
 	for _, c := range cases {
 		hasExpect[c.ID] = len(c.Expect) > 0
 	}
-	printPassByGroup(passByGroup(run.Cases, hasExpect))
+	gateErr := output.emit(os.Stdout, run.Cases, hasExpect, path, func() { printPassByGroup(passByGroup(run.Cases, hasExpect)) })
 	fmt.Printf("\nwrote %s\n", path)
+	if gateErr != nil {
+		log.Fatal(gateErr)
+	}
 }
 
 func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory, c Case, forceLocale, effort string, stream bool, created map[string]json.RawMessage) Record {
@@ -339,8 +412,9 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 			log.Fatalf("[%s] seed: %v", c.ID, err)
 		}
 	}
+	defer caseSwitches(svc, c)()
 	log.Printf("[%s] %s effort=%s locale=%s stream=%v %q", c.ID, c.Kind, effort, loc, stream, c.Transcript)
-	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc)}
+	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc), Checked: len(c.Expect) > 0}
 	started := time.Now()
 	req := ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode, Locale: loc}
 	var res *ai.Result
@@ -380,6 +454,14 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.LintRetried = res.Meta.LintRetried
 	rec.Omissions = res.Meta.Omissions
 	rec.LogicPass = res.Meta.LogicPass
+	rec.ServerRules = res.Meta.ServerRules
+	rec.ServerNeed = res.Meta.ServerNeed
+	if rec.ServerRules != nil {
+		rec.ServerTrigger = rec.ServerRules.Trigger
+	}
+	if svc.ServerRulesPass {
+		log.Printf("[%s] serverNeed=%q trigger=%q", c.ID, rec.ServerNeed, rec.ServerTrigger)
+	}
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
@@ -392,24 +474,49 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkPhotoAI(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkCountWhere(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}
 		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMarks(c.Expect, app)...) // #255: marks.go
+		// #270: follow.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFollows(c.Expect, app)...)
 		// #423: live_activity.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
+		// addToCalendar: calendar_add.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkCalendarAdd(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkBookLookup(c.Expect, app)...) // book_lookup.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkQR(c.Expect, app)...)         // #422: qr.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAudio(c.Expect, app)...)      // #420: audio.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIGenerate(c.Expect, app)...) // #417: aigen.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMasterTappable(c.Expect, app)...)
+		// text.highlight: text_highlight.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkTextHighlight(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkPlaceSearch(c.Expect, app)...) // place_search.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatSpeak(c.Expect, app)...) // ai_chat.go
+		// aiChat saveTo: ai_chat_save_to.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatSaveTo(c.Expect, app)...)
+		// aiChat inputEntity: ai_chat_input.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatInput(c.Expect, app)...)
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
-		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)     // #266: repeat.go
-		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...) // #265: notify_when.go
-		rec.ExpectMisses = append(rec.ExpectMisses, checkFlashcards(c.Expect, app)...) // #264: flashcards.go
+		// rowWindow: row_window.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRowWindow(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAddressed(c.Expect, app)...)   // #271: addressed.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...)  // #265: notify_when.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyNear(c.Expect, app)...)  // notify_near.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFlashcards(c.Expect, app)...)  // #264: flashcards.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFeed(c.Expect, app)...)        // #348: feed.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkServerRules(c.Expect, app)...) // #343: server_rules.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAlarm(c.Expect, app)...)       // alarm.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAddMinutes(c.Expect, app)...)  // add_minutes.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkUnique(c.Expect, app)...)      // unique.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
@@ -636,6 +743,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			for _, w := range ws {
 				if !strings.Contains(summary, fmt.Sprint(w)) {
 					miss = append(miss, fmt.Sprintf("summaryHas: %q", w))
+				}
+			}
+		case "summaryNot": // the summary must not say this (-server-rules: no 代替 for push)
+			ws, _ := v.([]any)
+			for _, w := range ws {
+				if strings.Contains(summary, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("summaryNot: %q", w))
 				}
 			}
 		}

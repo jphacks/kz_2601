@@ -32,6 +32,12 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
     private struct NameBody: Encodable { var name: String }
     private struct OrderBody: Encodable { var ids: [String] }
+    private struct GlanceBody: Encodable { var glanceStat: String }
+    private struct PatchBody: Encodable {
+        struct Source: Encodable { var kind = "manual"; var mode = "patch"; var summary: String }
+        var patch: [JSONPatchOp]
+        var source: Source
+    }
     private struct RecordBody: Encodable { var data: [String: JSONValue] }
     private struct CreateBody: Encodable {
         var data: [String: JSONValue]
@@ -84,6 +90,13 @@ public struct HTTPAppConfigClient: AppConfigClient {
         AppListCache.shared.store(AppListEdit.applyingOrder(ids, to: AppListCache.shared.load()))
     }
 
+    /// `PATCH /v1/apps/{appId}`(glanceStat・link-10)。オフライン用の一覧キャッシュも書き換える。
+    public func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary {
+        let app = try JSONDecoder().decode(AppSummary.self, from: try await request("PATCH", "v1/apps/\(appId)", body: GlanceBody(glanceStat: glanceStat)))
+        AppListCache.shared.store(AppListCache.shared.load().map { $0.id == appId ? app : $0 })
+        return app
+    }
+
     // MARK: - DSL
 
     public func fetchDocument(appId: String) async throws -> AppDocument {
@@ -109,6 +122,14 @@ public struct HTTPAppConfigClient: AppConfigClient {
         return try store(appId: appId, envelope: data)
     }
 
+    /// 手で動かした配置(#1442)。`source.kind=manual` の版として積む(履歴・元に戻すは声の編集と同じ)。
+    public func patchDSL(appId: String, baseVersion: Int, patch: [JSONPatchOp], summary: String) async throws -> AppDocument {
+        let data = try await HTTP.send("PATCH", baseURL: baseURL, path: "v1/apps/\(appId)/dsl",
+                                       body: PatchBody(patch: patch, source: .init(summary: summary)), token: token,
+                                       headers: ["If-Match": Self.etag(baseVersion)])
+        return try store(appId: appId, envelope: data)
+    }
+
     /// backend の `etag(v)` と同じ `"7"` 形式。
     static func etag(_ version: Int) -> String { "\"\(version)\"" }
 
@@ -120,6 +141,7 @@ public struct HTTPAppConfigClient: AppConfigClient {
 
     // MARK: - Records
 
+    /// filter なし(pageSize / pageToken だけで利用者の値を含まない)なので GET のまま。絞り込みは `POST .../records/query`。
     public func list(appId: String, entity: String) async throws -> [Record] {
         var items: [Record] = []
         var token: String?

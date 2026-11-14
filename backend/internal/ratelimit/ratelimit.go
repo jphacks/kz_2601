@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 	"time"
 
@@ -44,6 +45,15 @@ type Limits struct {
 	PerIP int
 	// Global is the cost breaker across every caller of this environment.
 	Global int
+	// WaivedHourly caps, per uid and hour, the requests a handler gives back
+	// with Waive (waive_cap.go). Past it the request keeps its charge.
+	WaivedHourly int
+	// WaivedIPHourly is the same per client address (every tier).
+	WaivedIPHourly int
+	// UnchangedDaily caps, per uid and day, the generate requests refunded
+	// because the edit changed nothing (ReportUnchanged, unchanged_cap.go).
+	// Past it the request keeps its charge. 0 = never refunded.
+	UnchangedDaily int
 }
 
 // Weights are the units one request costs.
@@ -52,12 +62,22 @@ type Weights struct {
 	Edit   int // POST /v1/generate, mode edit
 	Chat   int // POST /v1/chat, one turn
 	Text   int // POST /v1/text, one aiButton generate (#417)
+	// TextTask is POST /v1/text with a transform task (summarize, rewrite...):
+	// a longer answer (up to 1000 tokens) than generate.
+	TextTask int
+	// TextLong is POST /v1/text with length long (any task) or task chat
+	// (aiChat, up to 16 KB of turns): the cost of about three short calls.
+	TextLong int
+	// TextImage is POST /v1/text with a photo (aiButton inputPhoto, any task):
+	// a ≤ 1024 px image is about 1500 input tokens. The larger of this and the
+	// task / length weight is charged.
+	TextImage int
 }
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
-	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000}
-	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1}
+	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30, WaivedIPHourly: 120, UnchangedDaily: 5}
+	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3, TextImage: 3}
 )
 
 // JST is the day boundary (00:00 Asia/Tokyo). A fixed zone avoids needing
@@ -76,7 +96,16 @@ type Counter struct {
 	ID    string
 	Scope string
 	Limit int
+	// Shards > 1 spreads the counter over that many documents (Firestore;
+	// Memory ignores it). Only the environment-wide global counter uses it
+	// (GlobalShards); see firestore_shard.go.
+	Shards int
 }
+
+// GlobalShards is the number of documents the global counter is spread over
+// (docs/backend/rate-limit.md "global の分割"). Changing it mid-day only moves
+// new charges; documents beyond it are no longer read, so keep it fixed.
+const GlobalShards = 10
 
 // Usage is what a Store reports back from Consume.
 type Usage struct {
@@ -84,6 +113,10 @@ type Usage struct {
 	Counts []int
 	// Blocked is the index of the first counter that would overflow, or -1.
 	Blocked int
+	// Charged is the counters Refund must use to take this charge back, when
+	// they differ from the ones passed to Consume (a sharded counter names
+	// the shard document it was charged to). nil = the same counters.
+	Charged []Counter
 }
 
 // Store charges weight to every counter atomically, or to none of them when
@@ -93,6 +126,13 @@ type Store interface {
 	// Refund takes weight back from every counter atomically (#548). A count
 	// never goes below 0 and a missing (or expired) counter is left missing.
 	Refund(ctx context.Context, counters []Counter, weight int, expireAt time.Time) error
+}
+
+// Peeker is a Store that can read counts without charging. A weight-0 request
+// (generate mode=undo) uses it to report the real remaining units in the
+// response headers instead of the full limit.
+type Peeker interface {
+	Peek(ctx context.Context, counters []Counter) ([]int, error)
 }
 
 // refunded is the count after giving weight back (never below 0).
@@ -118,6 +158,11 @@ func evaluate(counters []Counter, counts []int, weight int) Usage {
 type Config struct {
 	Limits  Limits
 	Weights Weights
+	// PlatformLimits overrides the per-user daily limit by OS (#2133):
+	// normalised X-Client-Platform -> tier -> units. A missing entry keeps
+	// Limits. The user counter is the same on every OS, so a lower OS limit
+	// counts what the user already spent elsewhere.
+	PlatformLimits map[string]map[Tier]int
 	// Env prefixes counter ids: staging and production share one Firestore.
 	Env string
 	// Location sets the day boundary; nil = JST.
@@ -135,6 +180,10 @@ type Decision struct {
 	Used      int
 	Remaining int
 	ResetAt   time.Time
+	// Unmetered: the user's remaining units are not known (the user limit is 0
+	// = not counted, or a weight-0 request could not read today's count). The
+	// X-RateLimit-* headers are left out so the client keeps what it last saw.
+	Unmetered bool
 
 	// charge is what Allow wrote, so Refund can take it back (zero when nothing was charged).
 	charge charge
@@ -193,30 +242,23 @@ func (l *Limiter) tier(ctx context.Context, id auth.Identity) Tier {
 	}
 }
 
-func (l *Limiter) userLimit(t Tier) int {
-	switch t {
-	case TierAnonymous:
-		return l.cfg.Limits.Anonymous
-	case TierPro:
-		return l.cfg.Limits.Pro
-	default:
-		return l.cfg.Limits.SignedIn
-	}
-}
-
 // Allow charges weight units for id (and its client ip) and reports whether
 // the request may run. weight <= 0 is always allowed and charges nothing.
+// No per-OS override applies (AllowPlatform).
 func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight int) (Decision, error) {
+	return l.AllowPlatform(ctx, id, ip, "", weight)
+}
+
+// AllowPlatform is Allow with the user limit of platform (a normalised
+// X-Client-Platform; Config.PlatformDailyLimit).
+func (l *Limiter) AllowPlatform(ctx context.Context, id auth.Identity, ip, platform string, weight int) (Decision, error) {
 	now := l.cfg.Now().In(l.cfg.Location)
 	day := now.Format("2006-01-02")
 	y, m, d := now.Date()
 	reset := time.Date(y, m, d+1, 0, 0, 0, 0, l.cfg.Location)
 	tier := l.tier(ctx, id)
-	limit := l.userLimit(tier)
-	dec := Decision{Allowed: true, Tier: tier, Limit: limit, Remaining: limit, ResetAt: reset}
-	if weight <= 0 {
-		return dec, nil
-	}
+	limit := l.cfg.PlatformDailyLimit(tier, platform)
+	dec := Decision{Allowed: true, Tier: tier, Limit: limit, Remaining: limit, ResetAt: reset, Unmetered: limit <= 0}
 
 	prefix := l.cfg.Env
 	if prefix == "" {
@@ -226,11 +268,17 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 	if limit > 0 {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_uid_%s", prefix, day, docSafe(id.UID)), Scope: ScopeUser, Limit: limit})
 	}
+	if weight <= 0 {
+		if limit > 0 {
+			l.peekUser(ctx, counters[0], &dec)
+		}
+		return dec, nil
+	}
 	if tier == TierAnonymous && l.cfg.Limits.PerIP > 0 && ip != "" {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_ip_%s", prefix, day, ipKey(ip)), Scope: ScopeIP, Limit: l.cfg.Limits.PerIP})
 	}
 	if l.cfg.Limits.Global > 0 {
-		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_global", prefix, day), Scope: ScopeGlobal, Limit: l.cfg.Limits.Global})
+		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_global", prefix, day), Scope: ScopeGlobal, Limit: l.cfg.Limits.Global, Shards: GlobalShards})
 	}
 	if len(counters) == 0 {
 		return dec, nil
@@ -257,12 +305,34 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 		dec.Remaining = max(0, c.Limit-dec.Used)
 		return dec, nil
 	}
-	dec.charge = charge{store: store, counters: counters, weight: weight, expireAt: expireAt}
+	charged := counters
+	if usage.Charged != nil {
+		charged = usage.Charged
+	}
+	dec.charge = charge{store: store, counters: charged, weight: weight, expireAt: expireAt}
 	if counters[0].Scope == ScopeUser {
 		dec.Used = usage.Counts[0]
 		dec.Remaining = max(0, limit-dec.Used)
 	}
 	return dec, nil
+}
+
+// peekUser fills dec with today's count of the user counter without charging
+// (weight 0). When the count cannot be read the decision becomes Unmetered.
+func (l *Limiter) peekUser(ctx context.Context, c Counter, dec *Decision) {
+	p, ok := l.store.(Peeker)
+	if !ok {
+		dec.Unmetered = true
+		return
+	}
+	counts, err := p.Peek(ctx, []Counter{c})
+	if err != nil || len(counts) != 1 {
+		l.log.WarnContext(ctx, "ratelimit: peek failed; no remaining header", slog.Any("error", err))
+		dec.Unmetered = true
+		return
+	}
+	dec.Used = counts[0]
+	dec.Remaining = max(0, c.Limit-dec.Used)
 }
 
 // Refund gives back up to units of what Allow charged for dec (#548), to the
@@ -282,15 +352,25 @@ func docSafe(s string) string {
 	return strings.ReplaceAll(s, "/", "_")
 }
 
+// IPKey is ipKey for other per-address counts (feeds).
+func IPKey(ip string) string {
+	if ip == "" {
+		return ""
+	}
+	return ipKey(ip)
+}
+
 // ipKey hashes the address (no raw IPs at rest). IPv6 is grouped by /64:
 // one device/home usually owns a whole /64 and can rotate inside it.
+// The /64 is taken from the parsed address, so "::" compression and other
+// spellings of one prefix share a key; IPv4-mapped IPv6 counts as IPv4.
 func ipKey(ip string) string {
-	if strings.Contains(ip, ":") {
-		parts := strings.Split(ip, ":")
-		if len(parts) > 4 {
-			parts = parts[:4]
+	if a := net.ParseIP(ip); a != nil {
+		if v4 := a.To4(); v4 != nil {
+			ip = v4.String()
+		} else {
+			ip = a.Mask(net.CIDRMask(64, 128)).String() + "/64"
 		}
-		ip = strings.Join(parts, ":") + "::/64"
 	}
 	sum := sha256.Sum256([]byte(ip))
 	return hex.EncodeToString(sum[:8])

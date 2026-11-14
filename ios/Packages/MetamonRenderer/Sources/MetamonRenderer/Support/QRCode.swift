@@ -1,18 +1,22 @@
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import MetamonDSL
 
 /// `qrCode`(#422)の画像。CoreImage `CIQRCodeGenerator`(誤り訂正 M)の 1 モジュール = 1px を整数倍に拡大し、
 /// 補間なしで白地に描く(ぼけない)。周りに 4 モジュールの余白(読み取りに要る quiet zone)。
-enum QRCodeImage {
+public enum QRCodeImage {
     static let quietZone = 4
     /// 保存・共有する画像の目安の辺(px)
     static let exportSide = 1024
 
     private static let context = CIContext(options: [.useSoftwareRenderer: false])
-    private static let cache: NSCache<NSString, UIImage> = {
-        let c = NSCache<NSString, UIImage>()
+    private static let cache: NSCache<NSString, PlatformImage> = {
+        let c = NSCache<NSString, PlatformImage>()
         c.countLimit = 32
         return c
     }()
@@ -28,22 +32,20 @@ enum QRCodeImage {
     }
 
     /// 1 モジュール `scale` px(余白込み)の白地・黒の QR 画像。`scale` nil = 辺が `exportSide` 前後になる倍率。
-    static func image(for text: String, scale: Int? = nil) -> UIImage? {
+    /// Mac の共有シート(#974)でも使う
+    public static func image(for text: String, scale: Int? = nil) -> PlatformImage? {
         let key = "\(scale ?? 0)|\(text)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         guard let cg = modules(for: text) else { return nil }
         let side = cg.width + quietZone * 2
         let s = max(1, scale ?? exportSide / side)
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        format.opaque = true
         let px = CGFloat(side * s)
-        let img = UIGraphicsImageRenderer(size: CGSize(width: px, height: px), format: format).image { ctx in
-            UIColor.white.setFill()
+        let img = PlatformGraphics.image(size: CGSize(width: px, height: px), scale: 1, opaque: true) { ctx in
+            PlatformColor.white.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: px, height: px))
-            ctx.cgContext.interpolationQuality = .none
+            ctx.interpolationQuality = .none
             let inset = CGFloat(quietZone * s)
-            UIImage(cgImage: cg).draw(in: CGRect(x: inset, y: inset, width: CGFloat(cg.width * s), height: CGFloat(cg.height * s)))
+            PlatformImage(cgImage: cg).drawUpright(in: CGRect(x: inset, y: inset, width: CGFloat(cg.width * s), height: CGFloat(cg.height * s)))
         }
         cache.setObject(img, forKey: key)
         return img
@@ -76,8 +78,9 @@ enum QRCodeContent {
     /// 保存値はそのまま(日時・数値を整形しない)、computed は評価。
     @MainActor
     private static func fieldText(_ id: String, form: FormDraft, row: ExprEvaluator.Row?, evaluator: () -> ExprEvaluator) -> String {
-        if form.entity.field(id)?.computed != nil, let row {
-            return evaluator().fieldValue(id, row: row)?.text ?? ""
+        if let f = form.entity.field(id), f.computed != nil, let row {
+            let v = evaluator().fieldValue(id, row: row)
+            return f.type == .datetime ? v?.json(for: f).displayString ?? "" : v?.text ?? "" // datetime は RFC3339(時刻を落とさない)
         }
         return (form.values[id] ?? .null).displayString
     }

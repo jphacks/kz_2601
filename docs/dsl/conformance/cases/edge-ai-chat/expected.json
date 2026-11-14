@@ -1,0 +1,56 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "coach",
+          "props" : {
+            "entity" : "talk",
+            "inputEntity" : "meal",
+            "limit" : 5,
+            "saveTo" : {
+              "entity" : "meal"
+            },
+            "textField" : "body",
+            "turns" : [
+              {
+                "recordId" : "a1",
+                "role" : "user",
+                "text" : "朝はパンでした"
+              },
+              {
+                "recordId" : "a2",
+                "role" : "assistant",
+                "text" : "パン 1 枚で約 160 kcal です"
+              },
+              {
+                "recordId" : "a3",
+                "role" : "user",
+                "text" : "昼はうどん"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "aiChat"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "話して記録",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

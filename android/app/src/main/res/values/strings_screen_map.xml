@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 画面マップ(#897・iOS の ScreenMapSheet) -->
+<resources>
+    <string name="screen_map_badge_form">フォーム</string>
+    <string name="screen_map_badge_initial">最初の画面</string>
+    <string name="screen_map_badge_screen">画面</string>
+    <string name="screen_map_badge_tab">タブ</string>
+    <string name="screen_map_card_hint">タップで選択</string>
+    <string name="screen_map_hint">画面をタップすると、その画面を開けます</string>
+    <string name="screen_map_incoming">ここへ来られる</string>
+    <string name="screen_map_legend_push">画面を進む</string>
+    <string name="screen_map_legend_sheet">シートで開く</string>
+    <string name="screen_map_none">なし</string>
+    <string name="screen_map_open">この画面を開く</string>
+    <string name="screen_map_outgoing">ここから行ける</string>
+    <string name="screen_map_separator">、</string>
+    <string name="screen_map_subtitle">「%1$s」の画面のつながり</string>
+    <string name="screen_map_suffix_full">(全画面)</string>
+    <string name="screen_map_suffix_sheet">(シート)</string>
+    <string name="screen_map_trigger_after_save">保存したあと</string>
+    <string name="screen_map_trigger_button">ボタン「%1$s」</string>
+    <string name="screen_map_trigger_date_tap">日付のタップ</string>
+    <string name="screen_map_trigger_item_tap">一覧の行</string>
+    <string name="screen_map_trigger_other">部品のタップ</string>
+    <string name="screen_map_trigger_toolbar">上部の「%1$s」</string>
+    <string name="screen_map_unreachable">どこからも行けません</string>
+    <string name="screen_map_unreachable_header">どこからも行けない画面</string>
+</resources>

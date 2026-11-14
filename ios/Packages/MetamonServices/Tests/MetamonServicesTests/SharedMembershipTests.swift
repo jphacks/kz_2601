@@ -115,4 +115,39 @@ final class SharedMembershipTests: XCTestCase {
         let own = try JSONDecoder().decode(InstalledApp.self, from: Data(#"{"id":"a","name":"n","joined":true,"mine":true}"#.utf8))
         XCTAssertTrue(own.mine)
     }
+
+    // MARK: - #272 #273
+
+    func testMembersDecodeAdmins() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"""
+        {"items":[{"uid":"o","displayName":"","role":"owner","admin":true,"you":false},
+                  {"uid":"m1","displayName":"店長","role":"member","admin":true,"you":true},
+                  {"uid":"m2","displayName":"バイト","role":"member","admin":false,"you":false}],
+         "role":"member","admin":true}
+        """#)])
+        let list = try await client.members(appId: "app1")
+        XCTAssertTrue(list.isAdmin)
+        XCTAssertEqual(list.items.map(\.isAdmin), [true, true, false])
+        // admin を返さない古いサーバーでは作成者だけが管理者
+        let old = try JSONDecoder().decode(SharedMemberList.self, from: Data(#"{"items":[],"role":"member"}"#.utf8))
+        XCTAssertFalse(old.isAdmin)
+    }
+
+    func testSetAdminSendsPatch() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"{"uid":"m2","admin":true}"#)])
+        try await client.setAdmin(appId: "app1", uid: "m2", admin: true)
+        XCTAssertEqual(lastRequest?.httpMethod, "PATCH")
+        XCTAssertEqual(lastRequest?.url?.path, "/v1/apps/app1/members/m2")
+        XCTAssertEqual(bodyJSON(lastRequest)?["admin"] as? Bool, true)
+    }
+
+    func testRecordWriteDenial() {
+        let admins = APIError.server(status: 403, code: "forbidden", message: "", details: ["reason": .string("admins_only"), "field": .string("confirmed")])
+        XCTAssertEqual(RecordWriteDenial(admins), .adminsOnly(field: "confirmed"))
+        let dup = APIError.server(status: 409, code: "duplicate_record", message: "", details: ["reason": .string("duplicate"), "fields": .array([.string("day"), .string("slot")])])
+        XCTAssertEqual(RecordWriteDenial(dup), .duplicate(fields: ["day", "slot"]))
+        XCTAssertNil(RecordWriteDenial(APIError.server(status: 403, code: "forbidden", message: "not the author")), "#249 の「作った人だけ」とは混ぜない")
+        XCTAssertNil(RecordWriteDenial(APIError.server(status: 409, code: "version_conflict", message: "")))
+        XCTAssertNil(SharedAccessDenial(admins), "参加の 403 とも混ぜない")
+    }
 }

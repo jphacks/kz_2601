@@ -1,0 +1,23 @@
+{
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "Tailor It に送る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It に送る"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

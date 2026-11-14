@@ -7,11 +7,47 @@ set -eu
 PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
 PB=/usr/libexec/PlistBuddy
 
+# 審査用ビルドで消すキー(1 行 1 つ・名前順)。Info.plist と訳(*.lproj/InfoPlist.strings)の両方をこの一覧で消す。
 # HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour・UWB の距離 #425)/ モーション(healthStat の歩数計・sensorValue の気圧計)/ 共有リンクの URL スキーム
-for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealthClinicalHealthRecordsShareUsageDescription \
-           NSLocationAlwaysUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription \
-           NSLocalNetworkUsageDescription NSBonjourServices NSNearbyInteractionUsageDescription NSMotionUsageDescription CFBundleURLTypes; do
+# / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)/ 集中モード中か(#1990・まだ使う機能が無い)
+# / Bluetooth の心拍ベルト(#2237。使う部品がまだ無い。コードも APP_STORE_REVIEW で外す)
+# / 端末のカレンダー・リマインダーを読む(#1987。使う部品がまだ無い。説明文が無いと LiveDeviceCalendar は許可を求めず restricted を返す)
+# / HomeKit の家・部屋・機器を読む(#2245。使う部品がまだ無い。説明文が無いと LiveDeviceHome は許可を求めず restricted を返す)
+# / NFC タグの読み書き(#2233。使う部品がまだ無い。説明文が無いと LiveNFCTagSession は isAvailable = false を返す)
+# / 交通系 IC カードを読む(#2246。使う部品がまだ無い。説明文かシステムコードの申告が無いと LiveFeliCaTransitReader は isAvailable = false を返す)
+# / 端末の連絡先の一覧を読む(#2218。同じく部品がまだ無い。LiveDeviceContacts も説明文が無ければ restricted)
+REVIEW_REMOVED_KEYS="
+CFBundleURLTypes
+com.apple.developer.nfc.readersession.felica.systemcodes
+NFCReaderUsageDescription
+NSAlarmKitUsageDescription
+NSBluetoothAlwaysUsageDescription
+NSBonjourServices
+NSCalendarsFullAccessUsageDescription
+NSContactsUsageDescription
+NSFocusStatusUsageDescription
+NSHealthClinicalHealthRecordsShareUsageDescription
+NSHealthShareUsageDescription
+NSHealthUpdateUsageDescription
+NSHomeKitUsageDescription
+NSLocalNetworkUsageDescription
+NSLocationAlwaysAndWhenInUseUsageDescription
+NSLocationAlwaysUsageDescription
+NSMotionUsageDescription
+NSNearbyInteractionUsageDescription
+NSRemindersFullAccessUsageDescription
+"
+
+for key in $REVIEW_REMOVED_KEYS; do
   "$PB" -c "Delete :$key" "$PLIST" 2>/dev/null || true
+done
+
+# 訳(InfoPlist.xcstrings -> *.lproj/InfoPlist.strings)に残る説明も同じ一覧で消す
+for strings in "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"/*.lproj/InfoPlist.strings; do
+  [ -f "$strings" ] || continue
+  for key in $REVIEW_REMOVED_KEYS; do
+    "$PB" -c "Delete :$key" "$strings" 2>/dev/null || true
+  done
 done
 
 # UIBackgroundModes から location だけ外す(fetch = 裏の定期同期は残す)
@@ -22,7 +58,8 @@ done
 
 # 残す権限の説明は、外した機能に触れず、「アプリを生成」と言わない文に差し替える(#468・docs/store/wording.md「記録帳」)
 "$PB" -c "Set :NSCameraUsageDescription 記録帳で QR コードを読み取るために、カメラを使用します。" "$PLIST"
-"$PB" -c "Set :NSMicrophoneUsageDescription 話した内容から記録帳を用意・変更するために、マイクを使用します。" "$PLIST"
+"$PB" -c "Set :NSMicrophoneUsageDescription 話した内容から記録帳を用意・変更したり、記録帳の欄に話した内容を端末の中で文字にして入れたりするために、マイクを使用します。" "$PLIST"
+"$PB" -c "Set :NSSpeechRecognitionUsageDescription 音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。" "$PLIST"
 "$PB" -c "Set :NSLocationWhenInUseUsageDescription 記録帳で、ボタンを押した時の現在地を記録・地図に表示したり、案内を開始した時に目的地まで道案内したりするために使います。" "$PLIST"
 "$PB" -c "Set :NSPhotoLibraryUsageDescription 記録帳に写真や動画を添えるために、写真ライブラリを使用します。" "$PLIST"
 "$PB" -c "Set :NSPhotoLibraryAddUsageDescription 記録帳の画像(QR コードなど)を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"

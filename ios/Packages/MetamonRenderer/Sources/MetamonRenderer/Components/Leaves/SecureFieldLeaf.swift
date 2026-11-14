@@ -20,6 +20,7 @@ struct SecureFieldLeaf: View {
                         .singleLineSubmit()
                         .focused($focused)
                         .keyboardAnchor(c, $focused)
+                        .macFormTabStop(c, $focused)
                 }
                 .renderInputChrome(focused: focused)
             }

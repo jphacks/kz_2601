@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 初回のチュートリアル(#900)。文言は iOS(FirstRunTutorial・TutorialView・Localizable.xcstrings)に合わせる。「こう話すと直せます」は strings_feedback.xml -->
+<resources>
+    <string name="onboarding_create_body">マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。</string>
+    <string name="onboarding_create_note">声を文字にする準備が終わる前でも、文字ならすぐに作れます。</string>
+    <string name="onboarding_create_title">話すと、アプリができる</string>
+    <string name="onboarding_next">次へ</string>
+    <string name="onboarding_page">%1$d / %2$d</string>
+    <string name="onboarding_replay">使い方を見る</string>
+    <string name="onboarding_skip">スキップ</string>
+    <string name="onboarding_start">はじめる</string>
+</resources>

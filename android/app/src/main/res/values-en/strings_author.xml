@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_author_name_footer">When you post in a shared app, others see this name. If empty, you are shown as \"Anonymous\". Your Google account name and email address are never shown. Changing it does not change the name on earlier posts.</string>
+    <string name="settings_author_name_header">Name shown on your posts</string>
+    <string name="settings_author_name_placeholder">Anonymous</string>
+</resources>

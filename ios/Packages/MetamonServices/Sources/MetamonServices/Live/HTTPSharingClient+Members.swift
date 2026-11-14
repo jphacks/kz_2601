@@ -5,6 +5,7 @@ import Foundation
 /// members API(docs/backend/openapi-appconfig.yaml `members` タグ・#254)。
 extension HTTPSharingClient: MembershipClient {
     private struct ImportBody: Encodable { var displayName: String }
+    private struct AdminBody: Encodable { var admin: Bool }
     private struct DSLScopes: Decodable {
         struct Body: Decodable { var entities: [Entity]? }
         struct Entity: Decodable { var scope: String? }
@@ -12,13 +13,13 @@ extension HTTPSharingClient: MembershipClient {
     }
 
     public func previewShare(token: String) async throws -> ShareLinkPreview {
-        try JSONDecoder().decode(ShareLinkPreview.self, from: try await send("GET", "v1/shares/\(token)"))
+        try JSONDecoder().decode(ShareLinkPreview.self, from: try await send("GET", try Self.sharePath(token)))
     }
 
     public func importShare(token: String, displayName: String) async throws -> InstalledApp {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let body: ImportBody? = name.isEmpty ? nil : ImportBody(displayName: String(name.prefix(64)))
-        return try JSONDecoder().decode(InstalledApp.self, from: try await send("POST", "v1/shares/\(token)/import", body: body))
+        return try JSONDecoder().decode(InstalledApp.self, from: try await send("POST", try Self.sharePath(token) + "/import", body: body))
     }
 
     public func hasMembersOnlyData(appId: String) async throws -> Bool {
@@ -37,6 +38,11 @@ extension HTTPSharingClient: MembershipClient {
 
     public func leave(appId: String) async throws {
         _ = try await send("DELETE", "v1/apps/\(appId)/members/me")
+    }
+
+    public func setAdmin(appId: String, uid: String, admin: Bool) async throws {
+        let escaped = uid.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_."))) ?? uid
+        _ = try await send("PATCH", "v1/apps/\(appId)/members/\(escaped)", body: AdminBody(admin: admin))
     }
 
     private func send(_ method: String, _ path: String, body: (any Encodable)? = nil) async throws -> Data {

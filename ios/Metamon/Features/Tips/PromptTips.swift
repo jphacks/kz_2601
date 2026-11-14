@@ -6,6 +6,7 @@ import MetamonDSL
 /// - 同じ文を ai-eval のケース `backend/internal/ai/eval/tips_cases.json`(`tip_<id>` / `tip_<id>_en`)で確かめる。
 ///   ずれは `PromptTipsTests` が落とす
 /// - 審査用の版(#245)で外した機能の例は `requires` で隠す
+/// - Mac と共有する(#967)。iOS の版の判定(`Availability.current` / `.review`)は PromptTips+Availability.swift
 enum PromptTips {
     /// 例が使う機能のうち、版によって無いもの。
     enum Feature: CaseIterable {
@@ -56,21 +57,10 @@ enum PromptTips {
             if has(.locationTracker) { set.insert(.locationTracking) }
             return Availability(features: set)
         }
-
-        static var current: Availability {
-            from(allowedComponents: ClientCapabilities.allowedComponents,
-                 disabledFeatures: ClientCapabilities.disabledFeatures,
-                 sharing: FirstRunTutorial.sharingAvailable)
-        }
-
-        static var review: Availability {
-            from(allowedComponents: ClientCapabilities.reviewAllowedComponents,
-                 disabledFeatures: ClientCapabilities.reviewDisabledFeatures, sharing: false)
-        }
     }
 
     /// 版で使えない例を除いたカテゴリ。例が 0 になったカテゴリは出さない。
-    static func categories(for availability: Availability = .current) -> [Category] {
+    static func categories(for availability: Availability) -> [Category] {
         all.compactMap { category in
             var c = category
             c.tips = category.tips.filter { $0.requires.isSubset(of: availability.features) }
@@ -138,4 +128,7 @@ enum PromptTips {
     static let introKey = "できた画面に向かって、こう話すと思いどおりに直せます。例をタップすると入力欄に入るので、言葉を足してから送ってください。"
     static var title: String { L10n.tr(String.LocalizationValue(titleKey)) }
     static var intro: String { L10n.tr(String.LocalizationValue(introKey)) }
+    /// 「直し方」の下に出す一文: 動かない所も話しかけて直せる(テスターの声。直し方の例・失敗のトーストと同じ文・`FixRequest`)
+    static let fixRequestKey = "うまく動かない所があったら「〇〇が動かないから直して」と話しかけると直せます"
+    static var fixRequest: String { L10n.tr(String.LocalizationValue(fixRequestKey)) }
 }

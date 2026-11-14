@@ -142,3 +142,30 @@ func TestStoreUpdateAppMeta(t *testing.T) {
 		}
 	})
 }
+
+// SetAppGlance stores the list card's stat, "" removes it, updatedAt stays (link-10).
+func TestStoreSetAppGlance(t *testing.T) {
+	bothStores(t, func(t *testing.T, s Store, sfx string) {
+		ctx := context.Background()
+		uid, id := "gl"+sfx, "GL1"+sfx
+		if _, _, err := s.EnsureApp(ctx, uid, id, json.RawMessage(`{}`), id); err != nil {
+			t.Fatal(err)
+		}
+		before, err := s.GetApp(ctx, uid, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range []string{"total", "-", ""} {
+			a, err := s.SetAppGlance(ctx, uid, id, v)
+			if err != nil || a.GlanceStat != v {
+				t.Fatalf("set %q: %+v %v", v, a, err)
+			}
+			if g, err := s.GetApp(ctx, uid, id); err != nil || g.GlanceStat != v || !g.UpdatedAt.Equal(before.UpdatedAt) {
+				t.Fatalf("get after %q: %+v %v", v, g, err)
+			}
+		}
+		if _, err := s.SetAppGlance(ctx, uid, "GL-missing"+sfx, "x"); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("missing app: %v", err)
+		}
+	})
+}

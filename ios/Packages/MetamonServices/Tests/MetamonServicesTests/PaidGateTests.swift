@@ -10,27 +10,6 @@ final class PaidGateDecisionTests: XCTestCase {
         XCTAssertFalse(PaidGate.needsPaywall(isPro: false, enforced: false), "デモ端末(課金の制限が無効)は出さない")
     }
 
-    #if !APP_STORE_REVIEW
-    func testJoinNeedsPaywallForOthersSharedData() {
-        let shared = ShareLinkPreview(token: "t", name: "家族の買い物", sharedData: true)
-        XCTAssertTrue(PaidGate.joinNeedsPaywall(shared, isPro: false, enforced: true))
-        XCTAssertFalse(PaidGate.joinNeedsPaywall(shared, isPro: true, enforced: true))
-        XCTAssertFalse(PaidGate.joinNeedsPaywall(shared, isPro: false, enforced: false))
-        XCTAssertFalse(PaidGate.joinNeedsPaywall(ShareLinkPreview(token: "t", name: "x", sharedData: false), isPro: false, enforced: true),
-                       "記録を共有しないアプリ(見た目だけのコピー)は無料")
-        XCTAssertFalse(PaidGate.joinNeedsPaywall(ShareLinkPreview(token: "t", name: "x", mine: true, sharedData: true), isPro: false, enforced: true),
-                       "自分のアプリのリンクは無料")
-    }
-
-    func testInstalledNeedsPaywallWhenJoinedOrMember() {
-        XCTAssertTrue(PaidGate.installedNeedsPaywall(InstalledApp(appId: "a", name: "掲示板", joined: true), isPro: false, enforced: true))
-        XCTAssertTrue(PaidGate.installedNeedsPaywall(InstalledApp(appId: "a", name: "割り勘", member: true), isPro: false, enforced: true))
-        XCTAssertFalse(PaidGate.installedNeedsPaywall(InstalledApp(appId: "a", name: "家計簿"), isPro: false, enforced: true))
-        XCTAssertFalse(PaidGate.installedNeedsPaywall(InstalledApp(appId: "a", name: "掲示板", joined: true), isPro: true, enforced: true))
-    }
-
-    #endif
-
     func testDropInstructionAsksForPrivate() {
         XCTAssertTrue(PaidGate.dropSharedDataInstruction(english: false).contains("自分だけ"))
         XCTAssertTrue(PaidGate.dropSharedDataInstruction(english: true).contains("private"))

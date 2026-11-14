@@ -562,6 +562,42 @@
       "timeZone": "Pacific/Apia",
       "expr": {"op": "day", "args": ["2011-12-30"]},
       "expected": {"type": "nil"}
+    },
+    {
+      "name": "addDays/huge",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, 1e+300]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addDays/huge-negative",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, -1e+300]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addDays/max",
+      "expr": {"op": "addDays", "args": ["2026-10-28", 100000]},
+      "expected": {"type": "date", "value": "2300-08-13T00:00:00+09:00", "text": "2300-08-13"}
+    },
+    {"name": "addDays/over-max", "expr": {"op": "addDays", "args": ["2026-10-28", 100001]}, "expected": {"type": "nil"}},
+    {
+      "name": "addDays/over-max-negative",
+      "expr": {"op": "addDays", "args": ["2026-10-28", -100001]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addDays/rounds-to-max",
+      "expr": {"op": "addDays", "args": ["2026-10-28", 100000.4]},
+      "expected": {"type": "date", "value": "2300-08-13T00:00:00+09:00", "text": "2300-08-13"}
+    },
+    {
+      "name": "addDays/minus-100-years",
+      "expr": {"op": "addDays", "args": ["2026-10-28", -36525]},
+      "expected": {"type": "date", "value": "1926-10-28T00:00:00+09:00", "text": "1926-10-28"}
+    },
+    {
+      "name": "addDays/infinite",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, {"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "nil"}
     }
   ]
 }

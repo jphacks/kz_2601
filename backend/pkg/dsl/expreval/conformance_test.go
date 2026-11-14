@@ -185,6 +185,8 @@ func TestConformanceCoverage(t *testing.T) {
 			walk(*e.Else)
 		case dsl.ExprRef:
 			seen["ref"] = true
+		case dsl.ExprSetting:
+			seen["setting"] = true
 		}
 	}
 	for _, path := range files {
@@ -200,7 +202,7 @@ func TestConformanceCoverage(t *testing.T) {
 			walk(c.Expr)
 		}
 	}
-	want := []string{"if", "ref"}
+	want := []string{"if", "ref", "setting"}
 	for op := range dsl.Ops {
 		want = append(want, "op:"+op)
 	}

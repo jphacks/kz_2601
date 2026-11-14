@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="play_bracket_add_entrants">Add entrants</string>
+    <string name="play_bracket_bye">Bye</string>
+    <string name="play_bracket_champion">Champion: %1$s</string>
+    <string name="play_bracket_final">Final</string>
+    <plurals name="play_bracket_late">
+        <item quantity="one">%1$d entrant added after the start is not in this bracket</item>
+        <item quantity="other">%1$d entrants added after the start are not in this bracket</item>
+    </plurals>
+    <string name="play_bracket_locked">Undo the later round\'s result first</string>
+    <string name="play_bracket_lost">Lost</string>
+    <string name="play_bracket_make_winner">make the winner</string>
+    <string name="play_bracket_match">%1$s, match %2$d</string>
+    <string name="play_bracket_need_two">The bracket appears once there are 2 or more entrants</string>
+    <string name="play_bracket_quarterfinal">Quarterfinal</string>
+    <string name="play_bracket_round">Round %1$d</string>
+    <string name="play_bracket_semifinal">Semifinal</string>
+    <string name="play_bracket_slot">%1$s (vs %2$s)</string>
+    <string name="play_bracket_tbd">TBD</string>
+    <string name="play_bracket_won">Won</string>
+    <string name="play_flashcards_again">Again</string>
+    <string name="play_flashcards_back">Back</string>
+    <string name="play_flashcards_done">All done</string>
+    <string name="play_flashcards_empty">No cards yet</string>
+    <string name="play_flashcards_empty_unlearned">No cards left to learn</string>
+    <string name="play_flashcards_flip">flip</string>
+    <string name="play_flashcards_front">Front</string>
+    <string name="play_flashcards_learned">Got it</string>
+    <string name="play_flashcards_not_yet">Not yet</string>
+    <string name="play_flashcards_progress">%1$d / %2$d</string>
+    <string name="play_flashcards_progress_spoken">Card %1$d of %2$d</string>
+    <string name="play_random_default_label">Pick at random</string>
+    <string name="play_random_empty">No candidates yet</string>
+    <string name="play_random_hint">Press the button to pick one</string>
+    <string name="play_random_open">see details</string>
+    <string name="play_random_untitled">(Untitled)</string>
+    <string name="play_settlement_empty">No members yet</string>
+    <string name="play_settlement_none">All settled up</string>
+    <string name="play_settlement_title">Settle up</string>
+    <string name="play_settlement_transfer">%1$s pays %2$s %3$s</string>
+    <string name="play_timer_default_name">Timer</string>
+    <string name="play_timer_pause">Pause</string>
+    <string name="play_timer_reset">Reset</string>
+    <string name="play_timer_resume">Resume</string>
+    <string name="play_timer_start">Start</string>
+</resources>

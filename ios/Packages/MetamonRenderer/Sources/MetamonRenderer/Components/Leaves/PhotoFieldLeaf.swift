@@ -1,11 +1,16 @@
 import SwiftUI
 import PhotosUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// `photoField`(P0 カメラ): source(camera|library|both)に応じて実機カメラ / 写真選択 / 二択ダイアログ。
 /// 取得した画像は `PhotoCodec` で 800px 以下・JPEG q0.5 の "data:image/jpeg;base64,..." にして photo フィールドへ。
 /// カメラが無い端末(シミュレータ等)では自動で写真選択に落ちる(`PhotoSourcePolicy`)。
+/// `illustrate` なら端末内の Image Playground で作った絵も同じ形で入れる(`PhotoIllustrate`・使えない端末では出さない)。
 /// `analyze`(#418)があれば、撮った・選んだ直後に端末内で読み取って他の field のドラフトに入れる(`PhotoReader`)。
 struct PhotoFieldLeaf: View {
     let c: Component
@@ -16,10 +21,23 @@ struct PhotoFieldLeaf: View {
     @State private var showCamera = false
     @State private var showChooser = false
     @State private var showDenied = false
+    @State private var showIllustrate = false
     @State private var reading = false
     @State private var readStatus: ReadStatus?
     @State private var pose: BodyPose?
+    #if os(macOS)
+    /// ファイル・ドロップ・貼り付け(#1035)
+    @State private var showFileImporter = false
+    @State private var dropTargeted = false
+    @State private var importRejected: ImportRejection?
+    /// 連係カメラ(#1852)
+    @State private var continuity = ContinuityCameraAnchor()
+    #endif
     @Environment(\.openURL) private var openURL
+
+    #if os(macOS)
+    private enum ImportRejection: Equatable { case notImage, emptyPasteboard }
+    #endif
 
     private enum ReadStatus: Equatable {
         /// 読めなかった項目の名前(空 = 全部読めた)
@@ -39,14 +57,15 @@ struct PhotoFieldLeaf: View {
     private func content(form: FormDraft, field: String) -> some View {
         let value = form.values[field] ?? .null
         let decoded = PhotoCodec.image(from: value)
-        let hasPhoto = decoded != nil || (value.stringValue?.hasPrefix("http") ?? false)
+        let hasPhoto = decoded != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil
 
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {
                 if wantsPose, let pose, let decoded {
                     PosePhotoView(image: decoded, pose: pose, height: 200)
+                        .imageContextMenu(decoded, title: c.label ?? L("写真"))
                 } else {
-                    PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"))
+                    PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"), menuTitle: c.label ?? L("写真"))
                 }
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
@@ -77,14 +96,33 @@ struct PhotoFieldLeaf: View {
                 .accessibilityLabel(c.label ?? L("写真を撮る / 選ぶ"))
                 .accessibilityHint(sourceHint)
             }
+            #if os(macOS)
+            macImportControls(form: form, field: field)
+            #endif
+            if PhotoIllustrate.showsButton(requested: c.illustrate, available: PhotoIllustrate.isAvailable) {
+                Button { showIllustrate = true } label: {
+                    Label(L("イラストを作る"), systemImage: "wand.and.stars").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
+                .accessibilityHint(L("端末内の Image Playground でイラストを作ります"))
+            }
         }
+        #if os(macOS)
+        .modifier(MacPhotoImport(dropTargeted: $dropTargeted,
+                                 onDrop: { url in importFile(url, form: form, field: field) },
+                                 onPaste: { paste(form: form, field: field) }))
+        #endif
+        // illustrate: 端末内で作った絵を、選んだ写真と同じ形で入れる(クラウドでは作らない)
+        .modifier(IllustrateSheet(isPresented: $showIllustrate, concept: PhotoIllustrate.concept(entity: form.entity, values: form.values)) { url in
+            if let encoded = PhotoIllustrate.dataURL(fromFileAt: url) { setPhoto(encoded, form: form, field: field) }
+        })
         #if !APP_STORE_REVIEW
         .confirmationDialog(c.label ?? L("写真"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        .platformFullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
                 if let encoded = PhotoCodec.dataURL(from: image) { setPhoto(encoded, form: form, field: field) }
             }
@@ -104,17 +142,74 @@ struct PhotoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = PlatformSystem.cameraSettingsURL { openURL(url) }
             }
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         } message: {
-            Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
+            Text(PlatformSystem.cameraDeniedMessage)
         }
         #endif
         // 既存の写真(編集で開いた時)にも骨格を重ねる。値は書き換えない
         .task(id: value) { await detectPoseForOverlay(value) }
     }
+
+    // MARK: - Mac のファイル・ドロップ・貼り付け(#1035)
+
+    #if os(macOS)
+    @ViewBuilder
+    private func macImportControls(form: FormDraft, field: String) -> some View {
+        HStack(spacing: RenderTheme.Spacing.sm) {
+            Button { showFileImporter = true } label: {
+                Label(L("ファイルから選ぶ"), systemImage: "folder").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(RenderButtonStyle(kind: .secondary))
+            .help(L("画像のファイルを選びます。画像をここにドロップしても入れられます"))
+            .accessibilityHint(L("画像のファイルを選びます。画像をここにドロップしても入れられます"))
+            Button { paste(form: form, field: field) } label: {
+                Label(L("貼り付け"), systemImage: "doc.on.clipboard").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(RenderButtonStyle(kind: .secondary))
+            .help(L("コピーした画像を入れます(⌘V)"))
+            .accessibilityHint(L("コピーした画像を入れます"))
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: PhotoFileImport.contentTypes, allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            importFile(url, form: form, field: field)
+        }
+        // 連係カメラ(#1852): 近くの iPhone で撮る・書類をスキャン
+        Button { continuity.showMenu() } label: {
+            Label(L("iPhone から写真を撮る / 書類をスキャン"), systemImage: "iphone").frame(maxWidth: .infinity)
+        }
+        .buttonStyle(RenderButtonStyle(kind: .secondary))
+        .background(ContinuityCameraRequestor(anchor: continuity) { encoded in
+            importRejected = nil
+            setPhoto(encoded, form: form, field: field)
+        })
+        .help(L("近くの iPhone で撮った写真やスキャンした書類を入れます"))
+        .accessibilityHint(L("近くの iPhone で撮った写真やスキャンした書類を入れます"))
+        switch importRejected {
+        case .notImage:
+            Text(L("画像のファイルだけ入れられます")).font(.caption).foregroundStyle(.secondary)
+        case .emptyPasteboard:
+            Text(L("クリップボードに画像がありません")).font(.caption).foregroundStyle(.secondary)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private func importFile(_ url: URL, form: FormDraft, field: String) {
+        guard let encoded = PhotoFileImport.dataURL(fileAt: url) else { importRejected = .notImage; return }
+        importRejected = nil
+        setPhoto(encoded, form: form, field: field)
+    }
+
+    private func paste(form: FormDraft, field: String) {
+        guard let encoded = PhotoFileImport.dataURL() else { importRejected = .emptyPasteboard; return }
+        importRejected = nil
+        setPhoto(encoded, form: form, field: field)
+    }
+    #endif
 
     // MARK: - AI で読み取る(#418)
 
@@ -221,3 +316,29 @@ struct PhotoFieldLeaf: View {
         }
     }
 }
+
+#if os(macOS)
+/// photoField のドロップ(枠をアクセントの色で囲む・videoField と同じ見た目)と ⌘V(欄にフォーカスがある時)。
+private struct MacPhotoImport: ViewModifier {
+    @Binding var dropTargeted: Bool
+    let onDrop: (URL) -> Void
+    let onPaste: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .padding(dropTargeted ? 4 : 0)
+            .overlay {
+                if dropTargeted {
+                    RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                }
+            }
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first else { return false }
+                onDrop(url)
+                return true
+            } isTargeted: { dropTargeted = $0 }
+            .onPasteCommand(of: [.image, .png, .tiff, .jpeg]) { _ in onPaste() }
+    }
+}
+#endif

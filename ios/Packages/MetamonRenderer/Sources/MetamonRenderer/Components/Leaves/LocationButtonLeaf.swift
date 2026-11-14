@@ -3,12 +3,15 @@ import CoreLocation
 import MetamonDSL
 
 /// `locationButton`: CoreLocation で現在地を 1 回取得し、フォームの location field に "lat,lng" を保存する。
+/// `addressField` があれば、その座標を CLGeocoder で住所にして入れる(逆ジオコーディング)。
 /// 権限は `NSLocationWhenInUseUsageDescription`(Info.plist 設定済み)。シミュレータは Features > Location で位置を与える。
 struct LocationButtonLeaf: View {
     let c: Component
     let ctx: RenderContext
     @State private var busy = false
     @State private var error: String?
+    /// 直前に取った位置の精度(低ければ「おおよその位置」と出す #1344)
+    @State private var accuracy: LocationAccuracy = .precise
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
@@ -26,6 +29,10 @@ struct LocationButtonLeaf: View {
                 .disabled(busy)
                 if let s = (form.values[field] ?? .null).stringValue, !s.isEmpty {
                     Text("📍 \(s)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    if let note = accuracy.note {
+                        Text(note).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("locationButton.accuracy")
+                    }
                 } else if let error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
@@ -40,8 +47,16 @@ struct LocationButtonLeaf: View {
         defer { busy = false }
         do {
             let loc = try await OneShotLocation().request()
-            form.values[field] = .string(String(format: "%.6f,%.6f", loc.coordinate.latitude, loc.coordinate.longitude))
+            let coord = loc.coordinate
+            accuracy = LocationAccuracy.classify(loc.horizontalAccuracy)
+            form.values[field] = .string(String(format: "%.6f,%.6f", coord.latitude, coord.longitude))
             error = nil
+            // addressField: 住所にして入れる(端末から Apple に聞く)。取れなければ座標だけで、打った住所は消さない
+            if let af = c.addressField, !af.isEmpty, af != field, let address = await PlaceSearch.address(of: coord) {
+                form.values[af] = .string(address)
+            }
+        } catch is OneShotLocation.LocationError {
+            self.error = LocationPermissionCopy.notAllowed
         } catch {
             self.error = L("位置情報を取得できませんでした(\(error.localizedDescription))")
         }
@@ -56,7 +71,7 @@ final class OneShotLocation: NSObject, CLLocationManagerDelegate {
 
     enum LocationError: LocalizedError {
         case denied
-        var errorDescription: String? { L("位置情報の利用が許可されていません") }
+        var errorDescription: String? { LocationPermissionCopy.notAllowed }
     }
 
     func request() async throws -> CLLocation {

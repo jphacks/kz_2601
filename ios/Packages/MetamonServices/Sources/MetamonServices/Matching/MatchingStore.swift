@@ -153,9 +153,12 @@ public final class MatchingStore {
     }
 }
 
-/// 「18 歳以上です」の確認(#507)。初回だけ聞き、端末に覚える。年齢・生年月日は保存しない。
+/// 「18 歳以上です」の確認(#507)。端末に覚え、サーバー(`/v1/me/age-confirmation`)に送ったアカウントも覚える。
+/// 年齢・生年月日は保存しない。
 public struct MatchingAgeGate: Sendable {
     public static let key = "matching.ageConfirmed.v1"
+    /// サーバーに申告を送ったアカウントの uid
+    public static let sentKey = "matching.ageConfirmed.sentUid.v1"
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
@@ -166,7 +169,39 @@ public struct MatchingAgeGate: Sendable {
 
     public func confirm() { defaults.set(true, forKey: Self.key) }
 
-    /// サーバーが確認を求めた(400 age_unconfirmed)時に、次は聞き直す。
-    public func reset() { defaults.removeObject(forKey: Self.key) }
+    /// サーバーが確認を求めた(400 age_unconfirmed)時に、次は聞き直す。送った記録も消す。
+    public func reset() {
+        defaults.removeObject(forKey: Self.key)
+        forgetSent()
+    }
+
+    public func isSent(uid: String) -> Bool { !uid.isEmpty && defaults.string(forKey: Self.sentKey) == uid }
+
+    public func markSent(uid: String) { defaults.set(uid, forKey: Self.sentKey) }
+
+    /// サインアウト・アカウント削除の後片付け。
+    public func forgetSent() { defaults.removeObject(forKey: Self.sentKey) }
+
+    /// サーバーの申告を端末に合わせる。送り済みなら何もしない・端末で確認済みなら PUT・
+    /// どちらでもなければ GET(別の端末で申告済みなら端末にも覚える)。
+    /// - Returns: サーバーに申告がある。false = 本人に聞く
+    public func sync(uid: String, client: any MatchingClient) async throws -> Bool {
+        if isSent(uid: uid) { return true }
+        if isConfirmed {
+            try await client.confirmAge()
+        } else {
+            guard try await client.ageConfirmation() else { return false }
+            confirm()
+        }
+        markSent(uid: uid)
+        return true
+    }
+
+    /// 本人が「18 歳以上です」を押した: 端末に覚えて PUT する。
+    public func declare(uid: String, client: any MatchingClient) async throws {
+        confirm()
+        try await client.confirmAge()
+        markSent(uid: uid)
+    }
 }
 #endif

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- すれ違い通信(nearbyShare mode:passby・#1383)。iOS の Localizable.xcstrings と同じ文 -->
+<resources>
+    <plurals name="passby_met">
+        <item quantity="other">%1$sさんとすれ違いました(%2$s %3$d 件)</item>
+    </plurals>
+</resources>

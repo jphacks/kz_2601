@@ -1,4 +1,5 @@
 import Foundation
+import MetamonRenderer
 import MetamonServices
 
 /// 変身一覧のカード「…」→「削除」(#180)。
@@ -7,8 +8,22 @@ import MetamonServices
 /// 使用中のアプリを消す時は、残りのうち最新のアプリ(無ければ初期画面)に **先に** 切り替えてからサーバーを呼ぶ
 /// (消した後に同期のポーリング `GET /dsl` が走ると、サーバーが同じ appId を空のアプリとして作り直すため)。
 extension AppRuntime {
-    func deleteApp(_ app: AppSummary) async {
-        guard !appDeletion.hidden.contains(app.id) else { return } // 二度押し
+    /// アプリ・アカウントを削除できるか。生成中(作る・直す)は削除しない(生成の結果が消したアプリ・アカウントに書かれるのを防ぐ)。
+    var canDelete: Bool { !isMorphing }
+
+    /// 生成中に削除できない理由(削除ボタンに添える)
+    static var deleteBlockedReason: String {
+        L10n.pick(L10n.tr("アプリを作っている間は削除できません。"), review: L10n.tr("記録帳を用意している間は削除できません。"))
+    }
+
+    /// true = 消えた(持てるアプリの置き換え・#630 が続けるかを決める)
+    @discardableResult
+    func deleteApp(_ app: AppSummary) async -> Bool {
+        guard canDelete else { // 確認を出した後に生成が始まった
+            toast = Self.deleteBlockedReason
+            return false
+        }
+        guard !appDeletion.hidden.contains(app.id) else { return false } // 二度押し
         let fallback = AppDeletion.fallback(deleting: app.id, current: document.appId, apps: apps)
         do {
             try await appDeletion.run(app.id, delete: {
@@ -19,16 +34,21 @@ extension AppRuntime {
             })
         } catch {
             print("[Metamon] deleteApp failed: \(error)")
-            toast = L10n.tr("「\(app.name)」を削除できませんでした: \(error.localizedDescription)")
-            return
+            toast = ErrorCopy.failure(L10n.tr("「\(app.name)」を削除できませんでした"), error, context: "delete app")
+            return false
         }
         await recordSync.purge(appId: app.id)
-        await services.notifications.removeApp(app.id)  // そのアプリの通知(#228)
+        LiveActivities.enqueue { await LiveActivities.end(appId: app.id) } // ロック画面・Dynamic Island(#423)
+        await AppNotificationCleanup.removeApp(app.id, notifications: services.notifications) // 通知(#228)とタイマー
         DocumentCache.shared.remove(appId: app.id)
         AppThumbnailStore.shared.remove(appId: app.id)
+        AppGlanceStore.shared.forget(app.id)            // 一覧のひと目の数字(link-10)
         chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)
+        IntentHost.shared.appsMayHaveChanged()          // Siri の候補・コントロールの一覧(#1993)から外す
+        await spotlight.remove(appId: app.id)           // Spotlight(#1996)
         toast = L10n.tr("「\(app.name)」を削除しました")
         print("[Metamon] deleted app: \(app.id) fallback=\(String(describing: fallback))")
+        return true
     }
 
     /// 使用中のアプリ `appId` から離れる。切り替え先を読めなかった(オフライン等)ら初期画面へ。

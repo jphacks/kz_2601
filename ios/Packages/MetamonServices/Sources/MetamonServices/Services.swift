@@ -62,7 +62,7 @@ public enum APIError: LocalizedError {
         switch self {
         case .server(_, let code, let message, _): return message.isEmpty ? code : message
         case .http(let status, let body): return "HTTP \(status): \(body.prefix(200))"
-        case .invalidURL: return "URL が不正です"
+        case .invalidURL: return L("URL が不正です")
         }
     }
 
@@ -164,6 +164,14 @@ public enum FailureKind: Equatable, Sendable {
     case appCheckFailed
     /// 運営が AI の生成を一時停止中(#511・503 `ai_paused`)。混雑(busy)・今日の上限(rateLimited)とは別の文言
     case aiPaused
+    /// 無料プランの一時停止(#317・503 `free_plan_paused`)。`resumeAt` = 再開の時刻。もう一度では解けない
+    case freePlanPaused(resumeAt: Date?)
+    /// プランの上限(#317・403 `plan_limit_reached`)。作成者なら Pro への導線、参加者なら作った人に知らせる案内
+    case planLimit(PlanLimit)
+    /// 持てるアプリの数の上限(#630・402 `app_limit_reached`)。どれかと置き換えるか枠を買えば、同じ操作をやり直せる
+    case appLimit(AppLimit)
+    /// 運営がアプリの自動の動きを止めている(#346・403 `app_stopped`)
+    case appStopped
     /// 混雑・一時障害(429 / 500 / 502 / 503)。`retryAfter` はサーバー指示の待ち秒
     case busy(retryAfter: TimeInterval?)
     /// 今日の上限に達した(#280・429 `rate_limited`)。「もう一度」では解けないので再試行させない
@@ -193,11 +201,17 @@ public enum FailureKind: Equatable, Sendable {
             if let info = api.rateLimit { return .rateLimited(info) }
             if api.isAppCheckFailure { return .appCheckFailed }
             if api.isAIPaused { return .aiPaused }
+            if api.isFreePlanPaused { return .freePlanPaused(resumeAt: api.resumeAt) }
+            if let limit = PlanLimit(api) { return .planLimit(limit) }
+            if let limit = AppLimit(api) { return .appLimit(limit) }
+            if api.isAppStopped { return .appStopped }
             switch api.status {
             case 401: return .sessionExpired
             case 409: return .conflict
             case 429, 500, 502, 503: return .busy(retryAfter: api.retryAfter)
             case 504: return .timeout
+            // 402 は支払い・上限の断り。言い直しでは直らないので「言い方を変えて」(rejected)にしない
+            case 402: return .other(api.errorDescription ?? "\(api)")
             case .some(400..<500): return .rejected(api.errorDescription ?? "\(api)")
             case .some(500...): return .busy(retryAfter: api.retryAfter)
             default: return .other(api.errorDescription ?? "\(api)")

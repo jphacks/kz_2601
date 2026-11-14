@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="renderer_audio_delete">Delete</string>
+    <string name="renderer_audio_delete_a11y">Delete %1$s</string>
+    <string name="renderer_audio_dictation_failed">Couldn\'t turn your voice into text. Please try again</string>
+    <string name="renderer_audio_dictation_not_heard">Couldn\'t catch that. Please speak clearly and try again</string>
+    <string name="renderer_audio_dictation_not_ready">The voice model is getting ready. Please try again in a moment</string>
+    <string name="renderer_audio_mic_denied">Can\'t use the microphone. Allow microphone access for Tailor It in Settings</string>
+    <string name="renderer_audio_not_on_device">Not on this device</string>
+    <string name="renderer_audio_play">Play recording</string>
+    <string name="renderer_audio_record">Record</string>
+    <string name="renderer_audio_record_failed">Couldn\'t record. Please try again.</string>
+    <string name="renderer_audio_recorder_hint">Up to %1$s · Your earphone button also starts and stops</string>
+    <string name="renderer_audio_recorder_title">Recording</string>
+    <string name="renderer_audio_recording_a11y">Recording %1$s</string>
+    <string name="renderer_audio_rerecord">Record again</string>
+    <string name="renderer_audio_speak">Read aloud</string>
+    <string name="renderer_audio_speak_empty">Nothing to read yet</string>
+    <string name="renderer_audio_stop">Stop</string>
+    <string name="renderer_audio_stop_speaking">Stop</string>
+    <string name="renderer_audio_transcribe_get_model">Get the voice model</string>
+    <string name="renderer_audio_transcribe_listening">Listening… Tap to finish</string>
+    <string name="renderer_audio_transcribe_mic">Dictate</string>
+    <string name="renderer_audio_transcribe_no_host">Dictation isn\'t available on this screen</string>
+    <string name="renderer_audio_transcribe_placeholder">Tap the mic and speak. Your words appear here</string>
+    <string name="renderer_audio_transcribe_preparing">Preparing the voice model…</string>
+    <string name="renderer_audio_transcribe_unavailable">Dictation isn\'t available on this device. Please type instead</string>
+    <string name="renderer_audio_transcribe_working">Turning it into text…</string>
+</resources>

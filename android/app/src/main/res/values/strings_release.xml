@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 単体アプリとしてのリリース申請(#1254)。文言は iOS の ReleaseRequestSheet / AppCardActions から写す -->
+<resources>
+    <string name="release_badge_a11y">リリース申請: %1$s</string>
+    <string name="release_close">閉じる</string>
+    <string name="release_contact_placeholder">連絡先(任意) メールや SNS など</string>
+    <string name="release_failed">申請できませんでした</string>
+    <string name="release_intro">Tailor It の外でも使える 1 つのアプリとして公開してほしい、と運営に申請します。みんなに需要があると判断したら、運営がリリース作業を行います。</string>
+    <string name="release_menu">%1$sのメニュー</string>
+    <string name="release_menu_request">単体アプリとしてリリースを申請</string>
+    <string name="release_menu_share">シェア・公開</string>
+    <string name="release_note">今のバージョンの画面構成が一緒に送られます(記録の中身は送られません)</string>
+    <string name="release_purpose_placeholder">用途の一言(必須) 例: 毎朝の体調記録に使っています</string>
+    <string name="release_purpose_quote">「%1$s」</string>
+    <string name="release_purpose_question">どんな用途で使っていますか?</string>
+    <string name="release_received">受け付けました</string>
+    <string name="release_requested">申請済みです</string>
+    <string name="release_send">申請する</string>
+    <string name="release_status_declined">見送り</string>
+    <string name="release_status_now">いまの状況</string>
+    <string name="release_status_planned">リリース予定</string>
+    <string name="release_status_received">受付</string>
+    <string name="release_status_reviewing">検討中</string>
+    <string name="release_status_updates">状況が変わると変身一覧のカードに表示されます</string>
+    <string name="release_title">「%1$s」を単体アプリに</string>
+</resources>

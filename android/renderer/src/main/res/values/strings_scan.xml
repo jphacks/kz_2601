@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- カメラで読む部品(qrScanner・#866)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_scan_qr">QRを読み取る</string>
+    <string name="renderer_scan_unavailable">この端末では読めません</string>
+    <string name="renderer_scan_manual">読み取る内容を手入力</string>
+</resources>

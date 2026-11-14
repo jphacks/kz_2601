@@ -64,8 +64,11 @@ type Feedback struct {
 	DSL            json.RawMessage `json:"dsl,omitempty"`        // structure only (no records)
 	Screenshot     []byte          `json:"-"`                    // JPEG
 	Device         *FeedbackDevice `json:"device,omitempty"`
-	Day            string          `json:"day"` // yyyy-mm-dd (JST) of createdAt, for the daily limit
-	CreatedAt      time.Time       `json:"createdAt"`
+	// Listed is what Attachments returned at create time. ListFeedback fills
+	// it (it leaves the bodies out); the loop's ingest reads it (#368).
+	Listed    []string  `json:"-"`
+	Day       string    `json:"day"` // yyyy-mm-dd (JST) of createdAt, for the daily limit
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Attachments lists what the document holds ("screenshot", "dsl", "device").

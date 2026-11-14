@@ -21,16 +21,24 @@ security:
 tags:
   - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
+  - { name: automations, description: '作成者向けの「自動の動き」の見える化(#347)。features/automations.md' }
+  - { name: calls, description: '共有のアプリの参加者どうしの音声・ビデオ通話(#447)。中継は LiveKit Cloud。`CALLS_ENABLED`(既定 off)の後ろ。features/calls.md' }
+  - { name: coins, description: 'コイン(#630・docs/decisions/630-token-billing.md)。残高・履歴・パック(消耗型)の購入の検証。`COIN_BILLING_MODE`(off / log / enforce・既定 off)の後ろ' }
   - { name: dsl }
   - { name: entities }
-  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
+  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引・Google Play の購入をサーバーで検証して保存する。features/pro.md・android/play-billing.md' }
+  - { name: ext, description: '外の API(#1493)。決まった provider と op だけを runner 経由で呼ぶ・利用者ごとの OAuth のつなぎ。features/external-apis.md' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
+  - { name: feeds, description: '外部の公開データの読み取り(#348)。許可リストの出どころだけ。features/external-feeds.md' }
+  - { name: lookup, description: 'ISBN から本の情報を引く(DSL の lookupBook)。鍵の要らない決まった出どころだけ。features/book-lookup.md' }
   - { name: matching, description: '仲間探しのアプリの相互承認(#507)。features/matching.md' }
   - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
+  - { name: notifications, description: 'プッシュ通知の端末と受け取りの同意(#269・#339)・「あなたの声で直りました」のお知らせ(#374)。features/notifications.md・features/feedback-loop.md' }
   - { name: records }
   - { name: release, description: 'リリース申請(#76)。features/release.md' }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
+  - { name: usage, description: '今の使用量と上限(#317・#630)。生成・チャットの今日の残り・アプリの数・アプリごとの記録と写真。rate-limit.md の「今の使用量」' }
   - { name: versions }
 
 paths:
@@ -70,6 +78,7 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '422': { $ref: '#/components/responses/InvalidDSL' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -84,12 +93,14 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [apps]
-      summary: メタ更新 (名前・status)
+      summary: メタ更新 (名前・status・一覧に出す数字)
       description: |
         `name`(変身一覧の「名前を変える」・#277)は前後の空白を除いて 1〜40 文字。名前は `dsl.app.name` にも書き込み、
         **新しい version として積む**(`source.kind=manual`・`mode=patch`・`patch=[{op:add,path:/app/name}]`)。
         DSL の書き込みは毎回 `dsl.app.name` をアプリの名前に写すので、メタだけ変えると次の音声編集で元に戻るため。
         同じ名前なら version は進めない。`status` だけの時は version を進めない。
+        `glanceStat`(アプリの一覧のカードに出す数字・link-10)は DSL の部品の id・`"-"`(出さない)・`""`(既定 = 初期画面の先頭の stat)。
+        形だけ確かめる(DSL に無い id は端末が既定に戻す)。version も `updatedAt` も変えない。
       requestBody:
         content:
           application/json:
@@ -98,6 +109,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1, maxLength: 40 }
                 status: { type: string, enum: [active, archived] }
+                glanceStat: { type: string, pattern: '^$|^-$|^[a-z][a-z0-9_-]{0,39}$' }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AppSummary' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -165,6 +177,27 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
+
+  /apps/{appId}/automations:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [automations]
+      summary: 自動の動き(serverRules)の一覧と直近の結果(作成者だけ)
+      description: |
+        呼び出した人の DSL(最新の版)の `serverRules` を順に返す。各ルールの説明(`DescribeServerRule`)・最後に動いた時刻・直近の結果(利用者向けの決まった語)・運営の停止中かどうか。
+        アプリ全体の運営の停止・通知の停止と、今日の実行の数(アプリの実行の上限・日本時間の 0 時で戻る)も返す。
+        runner がルールごとに上書きする小さな文書(`runner/{env}/rule_status/{hash}`・30 日の TTL)を読む。outbox は読まない。
+        作成者(`app_owners`)以外は 403(参加者も)。レコードの値・通知の本文・他人の uid・停止の理由・通報の数は返さない。
+        共有・公開のデータで動いた結果と、作成者本人の private のデータで動いた結果のうち新しい方を返す(他の人の private のデータで動いた結果は返さない)。
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Automations' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: 作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/events:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -215,6 +248,7 @@ paths:
             Cache-Control: { schema: { type: string }, description: 'no-cache' }
           content: { application/json: { schema: { $ref: '#/components/schemas/DSLEnvelope' } } }
         '304': { description: Not Modified }
+        '402': { $ref: '#/components/responses/AppLimitReached' }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [dsl]
@@ -225,6 +259,11 @@ paths:
         2. サーバーは `dsl.ApplyPatch(現行DSL, patch)` = 適用 → JSON Schema → 意味検証。失敗は 422 に全問題を列挙 (現行 DSL は無変更)。
         3. 成功時は `versions/{n+1}` に **フルスナップショット `dsl` と `patch` の両方**を保存。
         Patch の `value` は `docs/dsl/dsl.schema.json#/$defs/PatchValue` (プリミティブ or DSL 部分文書) に限る。ops 上限 50。
+
+        **iOS の手で動かす編集モード(#1442)** もこの経路で保存する(新しい版になり、声の編集と同じく restore で戻せる)。
+        `application/json` で `source: {kind: manual, mode: patch, summary}` を付け、patch は
+        `test /screens/{i}/id` → 動かした部品ごとに `test` + `replace .../components/{j}/area` → 消した部品を後ろから `test` + `remove`。
+        重なり・範囲外は通常の検証(`Validate()`)が 422 で断る。
       parameters:
         - in: header
           name: If-Match
@@ -258,6 +297,7 @@ paths:
         '409': { $ref: '#/components/responses/VersionConflict' }
         '412': { description: 'If-Match ヘッダ欠落', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { $ref: '#/components/responses/InvalidDSL' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
     put:
       tags: [dsl]
       summary: 'DSL 全体を置き換えて新バージョン作成 — 初回生成 / create モード / フォールバック用 (確定)'
@@ -290,12 +330,16 @@ paths:
         '409': { $ref: '#/components/responses/VersionConflict' }
         '412': { description: 'If-Match ヘッダ欠落', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { $ref: '#/components/responses/InvalidDSL' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}/versions:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
     get:
       tags: [versions]
       summary: バージョン履歴 (新しい順・DSL 本体は含まない)
+      description: |
+        restore で作られた版は `source.kind=restore` と `source.restoredFrom`(中身の元の版番号)を持つ。
+        「元に戻す」を続けて押す時は、restore の版を `restoredFrom` に読み替えてその親へ戻る(#1774)。
       parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
       responses:
         '200':
@@ -333,6 +377,7 @@ paths:
           headers: { ETag: { $ref: '#/components/headers/ETag' } }
           content: { application/json: { schema: { $ref: '#/components/schemas/RestoreResult' } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}/entities:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -379,22 +424,26 @@ paths:
       tags: [records]
       summary: レコード一覧
       description: |
+        **filter つきの呼び出しは kept for older iOS builds**。新しい呼び出しは filter(`filterValue` に uid などが入る)を本文で送る `POST .../records/query`(利用者の値を URL に載せない)。filter なしのページ送り(`pageSize`/`pageToken`/sort だけ)は GET のままでよい。
         既定は `createdAt desc`。`sort`/`filter` は DSL の List と同じ語彙。
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
+        `filterField=author&filterOp=in&filterValue=myFollows` で自分がフォローしている人の投稿だけ (`nin` = フォローしていない人の投稿・#270)。フォローは 1 文書なのでメモリで絞る (Firestore の `in` の 30 件の上限は関係しない)。
+        private entity でも `filterField=author` の `eq`/`neq` を受け付ける。レコードはすべて呼び出した人のものなので、`eq <自分>`/`neq <他人>` は全件、`neq <自分>`/`eq <他人>` は 0 件(新着の確認が全 entity に送るため・#1641)。entity が `author` という項目を持つ時はその項目で絞る。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
-        呼び出した人がブロックしたユーザー(`/me/blocks`)の投稿は一覧から除く(#321)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
+        ブロックの関係にある人(呼び出した人がブロックした・呼び出した人をブロックした・`/me/blocks`)の投稿は一覧から除き、id を指定しても 404(#321)。仲間探しのプロフィール・連絡先の entity は、18 歳以上の申告(`/me/age-confirmation`)が無い人には自分の分だけ返す(#507)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
+        運営がアプリのサーバー機能を強制停止している間(#346・`moderate stop-app -force` / `stop-all -force`)は、サーバーのルールのきっかけになる作成・更新(POST / PATCH)が 403 `app_stopped`(details.level = `app` / `global`、期限つきなら details.until)。ルールに当たらない書き込み・読み出し・削除はそのまま。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
         - { in: query, name: sortField, schema: { type: string } }
         - { in: query, name: sortDir, schema: { type: string, enum: [asc, desc] } }
-        - { in: query, name: filterField, schema: { type: string } }
-        - { in: query, name: filterOp, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today] } }
-        - { in: query, name: filterValue, schema: { type: string } }
+        - { in: query, name: filterField, deprecated: true, schema: { type: string }, description: 'POST .../records/query の本文で送る' }
+        - { in: query, name: filterOp, deprecated: true, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin] }, description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)。POST .../records/query の本文で送る' }
+        - { in: query, name: filterValue, deprecated: true, schema: { type: string }, description: 'POST .../records/query の本文で送る' }
       responses:
-        '200':
+        '200': &recordsListOK
           description: OK
           content:
             application/json:
@@ -413,6 +462,8 @@ paths:
         `data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。
         entity.scope が public/shared なら誰でも作成でき、レスポンスの `author`(uid) と `authorName` はサーバーが付ける
         (`data` に author/authorName は入れられない。冪等 id は uid+clientId から導出するので他人の clientId と衝突しない)。
+        `editableBy: admins` の field に管理者でない人が既定値・空以外を入れると 403(`details.reason: admins_only`・`details.field`)。type member の値が参加者の uid でなければ 422。
+        entity の `unique` の値が他のレコードと同じなら 409 `duplicate_record`(`details.reason: duplicate`・`details.fields`)(#272 #273)。
       requestBody:
         required: true
         content:
@@ -430,13 +481,49 @@ paths:
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
+        '409': { $ref: '#/components/responses/DuplicateRecord' }
+        '402': { $ref: '#/components/responses/ProRequired' }
     delete:
       tags: [records]
       summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
-      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。
+      description: "public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。`deleteBy` が admins / authorOrAdmins の entity では管理者は全員の分を消す。`deleteBy: admins` で管理者でなければ 403 `admins_only`(#272)。"
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
+
+  /apps/{appId}/entities/{entityId}/records/query:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/EntityId' }]
+    post:
+      tags: [records]
+      summary: レコード一覧(GET .../records と同じ・filter / sort / ページは本文)
+      description: |
+        GET .../records と同じ一覧(読める人・shared の参加者だけ・ブロック・非公開・並べ替え・ページ送り・応答の形はすべて同じ)。
+        filter の値(`filterField=author` の uid など)を URL に載せないため、条件を JSON の本文で送る。本文の値はログに残さない。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い(`pageSize` は整数・他は文字列)・クエリ文字列付きは 400。
+        - `{}` は filter なし・既定の並び(`createdAt desc`)・既定のページサイズ。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                filterField: { type: string }
+                filterOp: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin], description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)' }
+                filterValue: { type: string }
+                sortField: { type: string }
+                sortDir: { type: string, enum: [asc, desc] }
+                pageSize: { type: integer, minimum: 1, description: 上限を超えた値は上限に丸める }
+                pageToken: { type: string, description: 前の応答の nextPageToken }
+            example: { filterField: author, filterOp: neq, filterValue: '<uid>', pageSize: 100 }
+      responses:
+        '200': *recordsListOK
+        '400': { description: filter / sort / pageSize / pageToken が不正・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 本文が 4 KiB を超える・1 entity のレコードが多すぎてメモリで並べられない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/entities/{entityId}/records/{recordId}:
     parameters:
@@ -452,7 +539,7 @@ paths:
     patch:
       tags: [records]
       summary: レコード部分更新 (data のキー単位でマージ)
-      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。
+      description: "public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。管理者は他人のレコードでも `editableBy: admins` の field だけは変えられ、管理者でない人がその field を変えると 403 `admins_only`。`unique` の値が他のレコードと同じになる変更は 409 `duplicate_record`(#272 #273)。"
       requestBody:
         required: true
         content:
@@ -466,10 +553,12 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
+        '409': { $ref: '#/components/responses/DuplicateRecord' }
+        '402': { $ref: '#/components/responses/ProRequired' }
     delete:
       tags: [records]
       summary: レコード削除
-      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。
+      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。entity の `deleteBy` が admins なら管理者だけ、authorOrAdmins なら作った人か管理者(それ以外は 403 `admins_only`・#272)。
       responses:
         '204': { description: Deleted }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -487,12 +576,57 @@ paths:
       description: public/shared の entity で、現行 DSL の entity.marks に宣言された印だけ。1 人 1 回 (2 回目は件数を増やさない)。他人のレコードにも付けられる (entity.edit は関係しない)。
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MarkState' } } } }
+        '402': { $ref: '#/components/responses/ProRequired' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [records]
       summary: 自分の印を外す (#255・冪等)
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MarkState' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/follows:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [records]
+      summary: 自分がフォローしている人 (#270)
+      description: |
+        共有アプリ (公開済みの DSL に public / shared の entity がある) の中で、呼び出した人がフォローしている人の uid (古い順)。
+        フォローはアプリごと・本人だけが見られる (フォローされた人には知らせず、フォロワーの一覧も無い)。
+        scope:shared だけのアプリは作成者と参加者だけ (それ以外は 403 `not_member`)。共有のデータが無いアプリは 404 `no_shared_data`。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uids]
+                properties:
+                  uids: { type: array, items: { type: string } }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /apps/{appId}/follows/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: フォローする人 (投稿の `author`) }
+    put:
+      tags: [records]
+      summary: フォローする (#270・冪等)
+      description: |
+        自分は 400 `follow_self`。scope:shared だけのアプリでは、相手も作成者か参加者でないと 404 `not_in_app`。
+        1 人がフォローできるのは 1 アプリ 500 人まで (超えると 403 `follows_full`)。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FollowState' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [records]
+      summary: フォローを外す (#270・冪等)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FollowState' } } } }
+        '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/share:
@@ -561,6 +695,8 @@ paths:
                 displayName: { type: string, maxLength: 64, description: '参加者一覧に出す名前(任意・scope:shared のアプリだけで使う)' }
       responses:
         '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '402': { $ref: '#/components/responses/AppLimitReached' }
+        '422': { $ref: '#/components/responses/TextNotAllowed' }
         '403': { description: 'リンクの発行者が参加者でない(inviter_left) / 参加者が上限(members_full)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/Unpublished' }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -591,6 +727,7 @@ paths:
         '400': { description: 入力不備 / 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { description: その appId の作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TextNotAllowed' }
     delete:
       tags: [sharing]
       summary: 非公開にする(掲載者のみ)
@@ -602,8 +739,10 @@ paths:
   /public-apps:
     get:
       tags: [sharing]
+      deprecated: true
       summary: 公開アプリを検索
       description: |
+        **kept for older iOS builds**。新しい呼び出しは同じ条件を本文で送る `POST /public-apps/search`(利用者が入力した値を URL に載せない)。
         名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
         運営が非公開にした掲載は掲載者本人にだけ返る(`hidden`・`hiddenReason` 付き)。ブロックしたユーザーの掲載は返らない(#321)。
       parameters:
@@ -612,7 +751,7 @@ paths:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
       responses:
-        '200':
+        '200': &publicAppsOK
           description: OK
           content:
             application/json:
@@ -622,6 +761,31 @@ paths:
                   items: { type: array, items: { $ref: '#/components/schemas/PublicApp' } }
                   nextPageToken: { type: string }
         '400': { description: sort が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /public-apps/search:
+    post:
+      tags: [sharing]
+      summary: 公開アプリを検索(GET /public-apps と同じ・条件は本文)
+      description: |
+        GET /public-apps と同じ検索。利用者が入力した検索語を URL に載せないため、条件を JSON の本文で送る。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                q: { type: string }
+                sort: { type: string, enum: [popular, new], default: popular }
+                pageSize: { type: integer, minimum: 1, description: 上限を超えた値は上限に丸める }
+                pageToken: { type: string, description: 前の応答の nextPageToken }
+            example: { q: 家計簿, sort: popular, pageSize: 50 }
+      responses:
+        '200': *publicAppsOK
+        '400': { description: sort / pageSize / pageToken が不正・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '413': { description: 本文が 4 KiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /public-apps/{id}/install:
     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
     post:
@@ -635,6 +799,7 @@ paths:
         installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '402': { $ref: '#/components/responses/AppLimitReached' }
         '403': { $ref: '#/components/responses/Unpublished' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -686,7 +851,7 @@ paths:
       tags: [moderation]
       summary: ユーザーをブロックする(#321)
       description: |
-        以後、そのユーザーの共有アプリの投稿(GET records)と「探す」の掲載が自分に返らない(相手には知らせない)。
+        以後、そのユーザーの共有アプリの投稿(GET records)と「探す」の掲載が自分に返らない。共有アプリの投稿は相手にも自分の分が返らなくなる(どちら向きでも隠す・相手には知らせない)。
         `uid`(投稿の `author`)か `listingId`(掲載者をサーバーが引く)のどちらか。`users/{uid}/blocks/{blockedUid}` に保存。冪等。自分は 400。
       requestBody:
         required: true
@@ -709,6 +874,36 @@ paths:
       summary: ブロックを解除する(冪等)
       responses:
         '204': { description: Unblocked }
+  /me/age-confirmation:
+    get:
+      tags: [matching]
+      summary: 18 歳以上の申告をしたか(#507)
+      description: 本人の自己申告を記録したか(`users/{uid}.ageConfirmedAt`)。年齢そのものは保存しない。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [ageConfirmed], properties: { ageConfirmed: { type: boolean } } }
+    put:
+      tags: [matching]
+      summary: 18 歳以上と申告する(#507)
+      description: |
+        `ageConfirmed: true` で記録する(冪等)。false・省略は 400(`details.reason: age_unconfirmed`)。
+        申告の無い人には、仲間探しの口(interests・matches の一覧、プロフィールの投稿)が 400 `age_unconfirmed` を返し、プロフィール・連絡先の entity の records は自分の分だけ返る。
+        `POST /interests`・`.../accept` に `ageConfirmed: true` を付けた時も記録する。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [ageConfirmed], properties: { ageConfirmed: { type: boolean } } }
+      responses:
+        '200':
+          description: 記録した
+          content:
+            application/json:
+              schema: { type: object, required: [ageConfirmed], properties: { ageConfirmed: { type: boolean } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
   /apps/{appId}/members:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -729,6 +924,7 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Member' } }
                   role: { type: string, enum: [owner, member], description: 呼び出したユーザーの立場 }
+                  admin: { type: boolean, description: '呼び出したユーザーが管理者か(#272・作成者は常に true)' }
         '403': { $ref: '#/components/responses/NotMember' }
   /apps/{appId}/members/{uid}:
     parameters:
@@ -746,6 +942,32 @@ paths:
         '400': { description: 作成者は抜けられない / uid が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { description: 作成者以外が他人を外そうとした, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: その uid は参加者ではない(他人を外す時), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    patch:
+      tags: [members]
+      summary: 参加者を管理者にする / 管理者から外す(#272)
+      description: |
+        呼び出せるのは**管理者だけ**(作成者は常に管理者)。管理者でない参加者は 403(`details.reason: admins_only`)、参加者でなければ 403 `not_member`。
+        作成者は管理者から外せない(400)。`me` で自分が管理者をやめられる。管理者は field の `editableBy: admins` を変えられ、entity の `deleteBy` が admins / authorOrAdmins なら他人のレコードを消せる(docs/dsl/README.md §3.13)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admin]
+              properties: { admin: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uid, admin]
+                properties: { uid: { type: string }, admin: { type: boolean } }
+        '400': { description: 作成者を外そうとした / uid が不正 / admin が無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 管理者ではない(admins_only)/ 参加者ではない(not_member), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: その uid は参加者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/interests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -755,6 +977,7 @@ paths:
       description: |
         `box=incoming`(既定)は自分に届いて未回答のもの、`outgoing` は自分が送って未回答のもの。新しい順に最大 500 件。
         相手が見送った・ブロックした送信も `outgoing` に `pending` のまま出る(断られたことは相手に伝えない)。お互いにブロックしている人(どちら向きでも)は出さない。
+        18 歳以上の申告(`/me/age-confirmation`)が無ければ 400(`details.reason: age_unconfirmed`)。
         アプリ(公開 DSL)に `match:"profile"` の entity が無ければ 404(`details.reason: no_matching`)。プロフィールが scope:shared なら作成者・参加者以外は 403 `not_member`。運営が非公開にしたアプリは 403 `unpublished`。
       parameters:
         - { in: query, name: box, schema: { type: string, enum: [incoming, outgoing], default: incoming } }
@@ -776,7 +999,7 @@ paths:
       summary: 「つながりたい」を送る(#507)
       description: |
         相手のプロフィールのレコード(`recordId`)に送る。自分のプロフィール(`fromRecordId`・自分が書いたもの)が要る。
-        `ageConfirmed: true`(本人による 18 歳以上の確認)が無ければ 400(`details.reason: age_unconfirmed`)。
+        `ageConfirmed: true`(本人による 18 歳以上の確認)が無く、申告の記録(`/me/age-confirmation`)も無ければ 400(`details.reason: age_unconfirmed`)。`true` を送ると申告を記録する。
         相手がもう自分に送っていれば、これが承認になり `matched` を返す。それ以外は `pending`(送り直しても 1 件)。
         自分がブロックした人には 400(`details.reason: blocked`)。相手が自分をブロックしている時は `pending` を返すが相手には届かない。
         1 人 1 日(JST)30 回まで(超えると 429 `rate_limited`・送り直しも数える)。自分のプロフィールへは 400。プロフィールが無ければ 404。
@@ -815,7 +1038,7 @@ paths:
     post:
       tags: [matching]
       summary: 届いた「つながりたい」を承認する(#507)
-      description: '`ageConfirmed: true` が要る(無ければ 400 `age_unconfirmed`)。その人からの未回答の送信が無い・お互いにブロックしている時は 404。'
+      description: '`ageConfirmed: true` か申告の記録が要る(無ければ 400 `age_unconfirmed`・true は記録する)。その人からの未回答の送信が無い・お互いにブロックしている時は 404。'
       requestBody:
         required: true
         content:
@@ -835,7 +1058,7 @@ paths:
       tags: [matching]
       summary: つながった人(#507)
       description: |
-        お互いに承認した人。新しい順に最大 500 人。お互いにブロックしている人は出さない。
+        お互いに承認した人。新しい順に最大 500 人。お互いにブロックしている人は出さない。18 歳以上の申告が無ければ 400 `age_unconfirmed`。
         この人たちと自分だけが、`match:"matched"` の entity のレコード(連絡先など)を GET records で読める(それ以外の人の分は一覧に出ず、id を指定しても 404)。
       responses:
         '200':
@@ -872,6 +1095,7 @@ paths:
         - 自分のアプリ(`users/{uid}/apps/*`)をすべて `status: "archived"` に(`DELETE /apps/{appId}` と同じ扱い)
         - 自分のシェアリンク(`shares/*`)を取り消し(`revoked: true` → 受け取り側は 404)
         - 自分の「探す」の掲載(`public_apps/*`)を取り下げ
+        - 自分の端末の登録(`users/{uid}/devices/*`)を消す(プッシュをすぐ止める・決定 #337)
         - 共有データ(`apps_public/*` 配下)の自分の投稿は**残す**。Firebase Auth のユーザーも**削除しない**
           (iOS が 204 の後にクライアント SDK で Firebase のユーザーを削除するので、同じ Apple ID で再サインインすると新しい uid になる)
         以後この uid の認証済みリクエストは **410 `account_deleted`**(この `DELETE /me` だけは何度でも 204)。
@@ -882,6 +1106,180 @@ paths:
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /me/usage:
+    get:
+      tags: [usage]
+      summary: 自分の今日の使用量と上限(#317・#630)
+      description: |
+        「今日の残り N」「上限に近い」を、依頼が断られる前に出すための読み取り。本人の分だけ(パスに uid は無い)。
+        - `ai`: 生成・チャット・text の合計(1 つの枠・単位は重み。新規 3・修正 2・チャット 1・text 1・text の要約など 2 は `weights`)。ai が数える `rateLimits/{env}_{日付}_uid_{uid}` をそのまま読む(1 回の読み取り・キャッシュしない)。`limit` / `remaining` は ai の `X-RateLimit-Limit` / `-Remaining` と同じ(匿名 30・サインイン 60・Pro 300)。返した分(#548)はすぐ入る(ヘッダーは次の依頼から)
+        - `ai` が null: この appconfig が数えている所を読めない(`RATE_LIMIT_STORE=memory`・読み取りの失敗)。iOS は今までどおりヘッダーの値を使う
+        - `apps`: 持っているアプリの数(自分で作ったもの + 参加した共有のアプリ・空のアプリは数えない)と上限(プランの数 + 買った枠)。最大 30 秒遅れる(インスタンスごとのキャッシュ)
+        - `appSlots`: `apps.limit` の内訳(`base` + `purchased`)と、今 1 つ買えるか(`canBuySlot`・`slotCoins`)。数えない時は null
+        - `perApp`: 自分のプランの、アプリごとの上限(記録・写真)。実際の数は `GET /apps/{appId}/usage`
+        - `limit` / `remaining` が null = 数えない(環境変数 0・`PLAN_LIMITS_MODE=off`)。`resetAt` は次の 0:00 JST
+      responses:
+        '200':
+          description: "OK(`Cache-Control: private, no-store`)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyUsage' }
+              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1, textTask: 2, textLong: 3, textImage: 3 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /apps/{appId}/usage:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [usage]
+      summary: このアプリの記録・写真の使用量と上限(#317)
+      description: |
+        次の書き込みで `plan_limit_reached` の判定に使うのと同じ数え方: 呼び出した人が見える記録(自分の分 + 共有の分)の全 entity の合計と、その写真の数。払う人のプランの上限で出す(自分のアプリは自分、他の人が作ったアプリは作成者)。
+        - 参加者が見られるのは自分から見える分の数・作成者のプラン(free / pro)と上限だけ。作成者の uid は返さない(`payer: creator`)
+        - scope:"shared" の entity は参加していなければ数えない(他のグループのデータの量を見せない)。作成者が公開していない共有の entity も数えない
+        - 自分の写しが無いアプリは 404(GET /dsl と違い、ここでは写しを作らない)
+        - 数は最大 30 秒遅れる(entity と写真の項目ごとに count 集計をするので、インスタンスごとにキャッシュ)
+      responses:
+        '200':
+          description: "OK(`Cache-Control: private, no-store`)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppUsage' }
+              example: { appId: kakeibo-1, plan: pro, payer: creator, upgrade: false, records: { used: 120, limit: 50000, remaining: 49880 }, photos: { used: 8, limit: 5000, remaining: 4992 } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me/devices/{installationId}:
+    parameters: [{ in: path, name: installationId, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }, description: 'アプリの入れ直しごとに端末で作る識別子(例: UUID)' }]
+    put:
+      tags: [notifications]
+      summary: プッシュ通知の端末トークンを登録・更新する(#269)
+      description: |
+        `users/{uid}/devices/{installationId}` に保存(本人の分だけ。パスに uid は無い)。同じ `installationId` は上書き(`createdAt` は保つ)。
+        1 人 10 台まで。11 台目を登録すると、最後の更新が古いものから消す。同じトークンが別のアカウント(または別の `installationId`)にあれば、そちらを消す(1 台の端末でアカウントを替えた時に前のアカウントの通知が届かないように)。
+        トークンはレスポンスにもログにも出さない。退会(`DELETE /me`)の時点で全部消す(決定 #337)。APNs が 410(Unregistered)を返したトークン・FCM が UNREGISTERED / SENDER_ID_MISMATCH を返したトークンは runner が消す。
+        `platform` で送り先が決まる(#918): `ios` は APNs、`android` は FCM。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              additionalProperties: false
+              properties:
+                platform: { type: string, enum: [ios, android], default: ios, description: '端末の OS。省略は ios(#918 より前の iOS アプリ)' }
+                token: { type: string, description: 'ios は APNs の端末トークン(`^([0-9a-fA-F]{2}){32,100}$`。大文字は小文字にして保存)。android は FCM の登録トークン(`^[A-Za-z0-9_:.-]{32,1000}$`。大文字小文字はそのまま保存)' }
+                environment: { type: string, enum: [sandbox, production], description: 'トークンが有効な APNs の環境。ios は必須。android は省略可(production として保存し、送り分けには使わない: FCM のトークンは発行した Firebase プロジェクトで有効)' }
+                appVersion: { type: string, maxLength: 32 }
+                os: { type: string, maxLength: 32, example: iOS 18.1 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Device' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [notifications]
+      summary: 端末の登録を消す(サインアウト・通知を切った時。冪等)
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /me/notify-consent/{appId}:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    put:
+      tags: [notifications]
+      summary: 他の人の行動で届くこのアプリの通知を受け取るか(#339)
+      description: |
+        `users/{uid}/notifyConsent/{appId}` に保存。保存が無い = 受け取らない(runner は作成者以外に送らない)。
+        有効にするには自分のコピー(無ければ 404)と、共有のデータがあるアプリでは参加(無ければ 403 `not_member`)が要る。無効にするのはいつでもできる。
+        決定 #339 の既定(shared は参加の時に確認つきで有効・public は無効)は、iOS が参加の画面でこの API を呼んで実現する。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed]
+              additionalProperties: false
+              properties:
+                allowed: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/NotifyConsent' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me/notify-consent/feedback-fixed:
+    get:
+      tags: [notifications]
+      summary: 送ったフィードバックが直った時に push でも知らせてよいか(#374)
+      description: |
+        `users/{uid}/notifyConsent/_feedback_fixed` を読む。保存が無い = 無効。
+        `/me/notify-consent/{appId}` より具体的なパスなので、こちらが先に当たる。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FeedbackFixedConsent' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    put:
+      tags: [notifications]
+      summary: 送ったフィードバックが直った時の push の同意を変える(#374)
+      description: |
+        `users/{uid}/notifyConsent/_feedback_fixed` に保存(`cmd/feedback-loop fixed` が push の前に読む所)。本人の分だけ(パスに uid は無い)。
+        iOS はフィードバックの画面の「直ったら知らせてほしい」(既定はオフ)をオンにして送った後に `enabled: true` を送る。オフにするのはお知らせの画面から。
+        アプリ内のお知らせ(`GET /me/notices`)は同意なしで作られる。push は `LOOP_NOTIFY_PUSH=on` の時だけ・週 1 回まで。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FeedbackFixedConsent' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /me/notices:
+    get:
+      tags: [notifications]
+      summary: 自分への「あなたの声で直りました」の一覧(#374)
+      description: |
+        `loop_notices`(`cmd/feedback-loop fixed` が作る)のうち本人の分だけ。新しい順。期限(作成から 90 日)を過ぎたものは出さない。
+        `unreadCount` はすべてのページの未読の数(設定の行のバッジに使う)。
+      parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, unreadCount]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/LoopNotice' } }
+                  unreadCount: { type: integer, minimum: 0 }
+                  nextPageToken: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /me/notices/{noticeId}/read:
+    parameters: [{ in: path, name: noticeId, required: true, schema: { type: string, pattern: '^ntc_[0-9a-f]{24}$' } }]
+    post:
+      tags: [notifications]
+      summary: お知らせを既読にする(#374。冪等・最初の readAt を保つ)
+      description: 他の人のお知らせの ID は、無い ID と同じく 404(あるかどうかも分からない)。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LoopNotice' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /me/entitlements:
     get:
       tags: [entitlements]
@@ -889,6 +1287,7 @@ paths:
       description: |
         `users/{uid}/entitlements/pro` を返す。`isPro` は「取り消されていない・期限内(猶予期間 `graceExpiresAt` を含む)・許可された環境(`APPSTORE_ENVIRONMENTS`)」。
         ai の回数制限(#449)も同じ判定で Pro の上限にする。iOS は購入・復元・起動時に `POST /me/entitlements/apple` で送った結果をこれで確かめられる。
+        Android で買った Pro(`POST /me/entitlements/google`)も同じ文書に入る(`pro.platform: googlePlay`)。iOS で買った Pro は Android でも、Android で買った Pro は iOS でも効く。
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
@@ -942,6 +1341,258 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: signature } } }
 
+  /me/entitlements/google:
+    post:
+      tags: [entitlements]
+      summary: Google Play の購入(定期購入)を送って Pro を保存する
+      description: |
+        Android が購入・復元の後に、Play の `Purchase` の `productId` と `purchaseToken` を送る。サーバーは Google Play Developer API の
+        `purchases.subscriptionsv2.get`(パッケージ名 `GOOGLE_PLAY_PACKAGE_NAME`・サービスアカウントで呼ぶ)で購入を読み直して確かめる:
+        - `productId` が許可リスト(`GOOGLE_PLAY_PRODUCT_IDS`)にあり、購入の `lineItems` に入っていること
+        - `externalAccountIdentifiers.obfuscatedExternalAccountId` が呼んだ人の `AccountToken(uid)`(iOS の `appAccountToken` と同じ値)と合うこと。合わなければ **409 `account_mismatch`**
+        - `subscriptionState` が ACTIVE / IN_GRACE_PERIOD / CANCELED(自動更新を止めただけ)なら `lineItems[].expiryTime` まで Pro。ON_HOLD・PAUSED・EXPIRED は Pro にしない。支払い前(期限が無い)は 422 `pending`
+        - テスト購入(`testPurchase`・ライセンス テスター)は `environment: Sandbox`、それ以外は `Production`。`isPro` は `APPSTORE_ENVIRONMENTS` で絞る(iOS と同じ)
+
+        期限切れの購入もエラーにせず保存する(`isPro: false`)。古い購入が新しいものを上書きすることはない(iOS と同じ)。
+
+        **購入と uid の結びつき**: `googleplay_purchases/{sha256(purchaseToken)}` に uid を記録し、1 つの購入を 1 つの uid にだけ結びつける(`purchaseToken` そのものは保存しない)。
+        規則は `POST /me/entitlements/apple` と同じ(退会済みの uid からは移す・別の有効な uid なら **409 `transaction_owned_by_other`**)。
+        前の購入を置き換えた購入(`linkedPurchaseToken`・プラン変更や買い直し)は、前の購入が別の有効な uid に結びついていれば同じく 409。
+
+        まだ承認(acknowledge)されていない購入は、Pro にした後でサーバーが `purchases.subscriptions.acknowledge` で承認する(失敗してもエラーにしない。端末も承認する)。
+        更新・解約・返金は `POST /googleplay/notifications`(Real-time developer notifications)で反映する。
+
+        サービスアカウントの鍵(`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`)が無いサーバーは **503 `not_configured`**。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, purchaseToken]
+              properties:
+                productId: { type: string, example: jp.kz2601.metamon.pro.monthly }
+                purchaseToken: { type: string, maxLength: 4096, description: 'Play の `Purchase.purchaseToken`。ログ・画面に出さない' }
+      responses:
+        '200': { description: 保存後の状態, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: 'この購入は別のアカウント用(`account_mismatch`)か、別の有効なアカウントに結びついている(`transaction_owned_by_other`)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: account_mismatch, message: 'this purchase was made for another account' } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422':
+          description: '確かめられない購入。`details.reason` は not_found(Play が知らない token)/ product_id(対象外の商品)/ pending(支払い前)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: invalid_transaction, message: 'the purchase could not be verified', details: { reason: not_found } } }
+        '503':
+          description: 'Google Play の設定が無い(`not_configured`)か、Google Play Developer API に繋がらない(`upstream_unavailable`・あとで送り直す)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  /me/coins:
+    get:
+      tags: [coins]
+      summary: 自分のコインの残高(#630)
+      description: |
+        `users/{uid}/coins/wallet` を出どころ別に返す。引く順番は `grant`(Pro の毎月の分・`grantPeriodEnd` で消える・繰り越さない)→ `initial`(最初の分)→ `purchased`(買った分・期限なし)。
+        - `available` = 新しい呼び出しに使える量、`reserved` = 実行中の呼び出しが押さえている量、`total` = 両方の合計(履歴の合計と一致)
+        - 読むたびに、期限の来た分を整える: サインイン済み(匿名でない)の最初の読み取りで `COIN_INITIAL_GRANT` を 1 回だけ足す / Pro の請求期間が変わったら `COIN_PRO_MONTHLY` に戻す / 期間が過ぎた毎月の分を消す / 確定されないまま `COIN_HOLD_TTL` を過ぎた押さえを戻す
+        - `COIN_BILLING_MODE=off`(既定)では何も読み書きせず `mode: off` とすべて 0 を返す
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CoinWallet' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/coins/ledger:
+    get:
+      tags: [coins]
+      summary: 自分のコインの履歴(#630)・新しい順
+      description: |
+        `users/{uid}/coinLedger` を新しい順に返す。残高の変更と同じトランザクションで 1 行ずつ書く。`amount` は符号つき。
+        `COIN_BILLING_MODE=off` では空。
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { in: query, name: cursor, schema: { type: string }, description: 前の応答の `nextCursor` }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CoinLedger' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/coins/settings:
+    put:
+      tags: [coins]
+      summary: 枠を超えた後のコイン払いの設定(#630)
+      description: |
+        `overflow.enabled`(既定 OFF)と `overflow.monthlyCap`(本人が決める月のコインの上限・0〜1000000000)を財布に保存する。
+        `COIN_BILLING_MODE=enforce` の時、runner は作成者の月の枠を超えた分を、ON ならまとまりごとにコインで買う(台帳の `spend_overflow`)。今月の `spent` + 1 まとまりが `monthlyCap` を超えるなら買わずに止める。この口は今月コインで払った量(`spent`)を変えない。
+        `COIN_BILLING_MODE=off` では 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overflow]
+              properties:
+                overflow: { $ref: '#/components/schemas/CoinOverflowSettings' }
+      responses:
+        '200': { description: 保存した後の残高, content: { application/json: { schema: { $ref: '#/components/schemas/CoinWallet' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: '`COIN_BILLING_MODE=off`(`not_found`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/coins/apple:
+    post:
+      tags: [coins]
+      summary: コインのパック(消耗型)の署名付き取引を送ってコインを足す(#630)
+      description: |
+        iOS は購入の後、サーバーが 200 を返してから `Transaction.finish()` を呼ぶ(消耗型は StoreKit で復元されないので、届くまで送り直す)。
+        検証は `POST /me/entitlements/apple` と同じ(Apple Root CA - G3・ES256・`bundleId`・`environment`。**Xcode の環境は拒む**)。違いは次のとおり:
+        - `productId` は `COIN_PACKS` にある id だけ。足す枚数も `COIN_PACKS`(この repo に値を書かない)
+        - `type` が `Consumable` であること(`expiresDate` が無い)。取り消し(返金)済みは拒む
+        - **冪等**: `coin_transactions/{transactionId}` と財布を同じトランザクションで書く。同じ取引の 2 回目は `credited: false` で今の残高を返す。別のアカウントが同じ取引を送ると 409
+        - 匿名のアカウントは買えない(403 `forbidden`・`details.reason: anonymous`)
+        - `COIN_BILLING_MODE=off` では 404
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedTransaction]
+              properties:
+                signedTransaction: { type: string, description: 'StoreKit 2 の JWS(`header.payload.signature`)', maxLength: 32768 }
+      responses:
+        '200': { description: 足した後(または足し済み)の状態, content: { application/json: { schema: { $ref: '#/components/schemas/CoinCredit' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: '匿名のアカウント(`forbidden`・`details.reason: anonymous`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: '`COIN_BILLING_MODE=off`(`not_found`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409':
+          description: この取引は別のアカウントに足し済み
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: transaction_owned_by_other, message: 'this purchase was credited to another account' } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422':
+          description: '検証に失敗。`details.reason` は malformed / chain / signature / bundle_id / product_id / environment / not_consumable / revoked'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: not_consumable } } }
+
+  /me/coins/slot:
+    post:
+      tags: [coins]
+      summary: 持てるアプリの枠を 1 つコインで買う(#630)
+      description: |
+        `COIN_PRICE_APP_SLOT` コインで、持てるアプリの数を 1 つ増やす(期限なし・プランを変えても残る)。引く順番は他の支払いと同じ(grant → initial → purchased)。
+        - **冪等**: `requestId`(iOS が押すたびに作る UUID・送り直しは同じ値)ごとに 1 回。同じ `requestId` の 2 回目は `bought: false` で今の枠を返し、コインを引かない
+        - 財布の `appSlots`・台帳の `spend_slot` の行・冪等の記録(`coinReservations`)を 1 つのトランザクションで書く
+        - `COIN_BILLING_MODE=enforce` かつ `COIN_PRICE_APP_SLOT` > 0 の時だけ。それ以外は 404(log では前に買った枠は数えるが、新しくは買えない)
+        - 上限に達していなくても買える
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: 買った後(または買い済み)の状態
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bought, appSlots, coins, wallet]
+                properties:
+                  bought: { type: boolean, description: false = この requestId は買い済み(何も引いていない) }
+                  appSlots: { type: integer, description: 買った枠の合計 }
+                  coins: { type: integer, description: 1 枠のコイン }
+                  wallet: { $ref: '#/components/schemas/CoinWallet' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { $ref: '#/components/responses/CoinsPaymentRequired' }
+        '404': { description: '枠を買えない(`COIN_BILLING_MODE` が enforce でない・`COIN_PRICE_APP_SLOT` が 0)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /apps/{appId}/calls/token:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [calls]
+      summary: 通話の部屋に入るトークン(#447)
+      description: |
+        公開済みの DSL に `callButton` がある共有のアプリ(public / shared の entity がある)の部屋 `app:{appId}`(`room` を付けた部品は `app:{appId}:{room}`)に入る LiveKit のアクセストークンを出す。
+        - 出すのはアプリの作成者と参加者(共有リンクで参加した人)だけ(それ以外は 403 `not_member`)。公開カタログで入れただけの人も参加者でなければ 403
+        - 権限: 部屋に入る・聞く・マイクを出す。カメラは部品が `video: true` で、body も `video: true` の時だけ。データの送信・自分の metadata の変更はできない。部屋の人数の上限は `CALL_MAX_PARTICIPANTS`
+        - トークンは `CALL_TOKEN_TTL`(既定 10 分)の間だけ入るのに使える。`identity` は `sessionId`(この人の通話 1 回)
+        - コイン(#630): `COIN_PER_CALL_MINUTE` × `CALL_BLOCK_MINUTES` を**呼び出した人自身の財布**から押さえる(`COIN_BILLING_MODE=enforce` の時。0 なら押さえない)。続けて話す時は `reservedUntil` の前に同じ `sessionId` でもう一度呼ぶ(次のまとまりを押さえる)。足りなければ 402 `coins_insufficient`(`details.payer: self`)で、アプリは通話を出る
+        - 精算は LiveKit の webhook(`POST /calls/webhook`)で、入ってから出るまでの分(始まった分は 1 分)× `COIN_PER_CALL_MINUTE` を押さえた分の中で 1 回だけ引く。webhook が来なければ押さえた分は期限(まとまり + `CALL_HOLD_GRACE`)で戻る
+        - 1 時間に `CALL_TOKENS_PER_HOUR` 回まで(超えると 429)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                room: { type: string, pattern: '^[a-z0-9][a-z0-9_-]{0,31}$', description: 'callButton の room(省略 = アプリの部屋)' }
+                video: { type: boolean, description: 'カメラも使う(部品が video: true の時だけ効く)' }
+                name: { type: string, maxLength: 40, description: 'ほかの人のタイルに出す名前(40 文字で切る)' }
+                sessionId: { type: string, description: '続けて話す時(次のまとまりを押さえる)。前の応答の sessionId' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CallJoin' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { $ref: '#/components/responses/CoinsPaymentRequired' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { description: '通話が off(`details.reason: calls_disabled`)・共有のアプリでない(`no_shared_data`)・その部屋の callButton が無い(`no_call_button`)・続けようとした通話が終わっている(`call_ended`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: '1 時間の上限(`EXT_USER_PER_HOUR`)。`Retry-After` と details(scope=user・limit・retryAfterSec)。runner の provider ごとの回数の上限(#1715)も 429 で、details の scope は user_hourly / user_daily / app_hourly / app_daily / global_daily / provider_paused(provider が 429 を返した後の 1 分)・provider・retryAfterSec', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /calls/webhook:
+    post:
+      tags: [calls]
+      security: []
+      summary: LiveKit の webhook の受け口(#447)・認証不要
+      description: |
+        LiveKit Cloud がこの URL に送る(プロジェクトの設定で登録する)。Firebase の認証・App Check は無し。`Authorization` の JWT(API キーと秘密で署名・本文の sha256 を含む)を LiveKit の SDK で確かめる。違えば 401 `unauthenticated`。
+        - `participant_joined`: 入った時刻を残す
+        - `participant_left`: 分を数えてコインを精算する(1 回だけ・同じ event がもう一度来ても同じ量を確定するだけ)
+        - `room_finished`: まだ精算していない人を全部精算する
+        - ほかの event は何もしない。204 で LiveKit は再送をやめる。500 は再送される
+        `CALLS_ENABLED` が off の時は 404(登録しない)。
+      responses:
+        '204': { description: 処理した(または何もしない event) }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { description: 一時的な失敗(LiveKit が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /coins/config:
+    get:
+      tags: [coins]
+      security: []
+      summary: コインの表示用の数(#630)・認証不要
+      description: |
+        iOS が画面に出す数(パックの枚数・処理ごとの目安・最初の分・Pro の毎月の分・Pro の月の枠)。iOS に値段を書かないため、すべて appconfig の環境変数(起動時に 1 回読む)から出す。0 の目安・枠は省く。
+        1 コインの値段(`COIN_PER_USD`)は出さない。`Cache-Control: public, max-age=300`。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CoinConfig' } } } }
+
   /appstore/notifications:
     post:
       tags: [entitlements]
@@ -978,6 +1629,47 @@ paths:
           description: '検証に失敗(Apple 以外の証明書・改ざん・対象外の bundleId / 環境など)。`details.reason` は `POST /me/entitlements/apple` と同じ'
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
         '500': { description: 一時的な失敗(Apple が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /googleplay/notifications:
+    post:
+      tags: [entitlements]
+      security: []
+      summary: Google Play の Real-time developer notifications の受け口(Pub/Sub の push)
+      description: |
+        Play が購読の変化(更新・解約・保留・猶予期間・取り消し・返金など)を Pub/Sub に送り、push サブスクリプションがここに届ける。Firebase の認証・App Check は無し。
+        Pub/Sub が付ける OIDC トークン(`Authorization: Bearer`)の audience(`GOOGLE_PLAY_RTDN_AUDIENCE`)と送り手のサービスアカウント(`GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT`)を確かめる。
+        - 通知は `purchaseToken` しか持たないので、`purchases.subscriptionsv2.get` で読み直して `POST /me/entitlements/google` と同じ規則で保存する。uid は `googleplay_purchases/{sha256(purchaseToken)}` の結びつきで引く
+        - `voidedPurchaseNotification`(返金・取り消し)の定期購入も読み直す
+        - 200 で Pub/Sub は再送をやめる。500 は再送される(一時的な失敗)
+        `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`・`GOOGLE_PLAY_RTDN_AUDIENCE`・`GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT` がすべて設定された時だけ有効(無い時は 404)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: object
+                  required: [data]
+                  properties:
+                    data: { type: string, format: byte, description: 'DeveloperNotification(JSON)の base64' }
+                    messageId: { type: string }
+                subscription: { type: string }
+      responses:
+        '200':
+          description: '処理済み。`applied`(反映)・`unbound`(まだどのアカウントにも結びついていない購入。Android が送った時に結びつく)・`test`(Play Console のテスト通知)・`ignored`(別のパッケージ・Pro 以外など)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome: { type: string, enum: [applied, ignored, test, unbound] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { description: 一時的な失敗(Pub/Sub が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/release-requests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -1150,17 +1842,336 @@ paths:
         '413': { description: スクショが大きすぎる / 本文全体が 1 MiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 今日の上限。`Retry-After` と details(scope=user・limit・resetAt・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /feeds/{provider}:
+    get:
+      tags: [feeds]
+      deprecated: true
+      summary: 外部の公開データを読む(DSL の feed・#348)。運営の許可リストだけ・読むだけ
+      description: |
+        **kept for older iOS builds**。新しい呼び出しは同じパラメータを本文で送る POST(利用者が入力した値を URL に載せない)。中身・上限・キャッシュは POST と同じ。
+        DSL の `feed` 部品が表示するデータを、サーバーが**決まった出どころ**から取って返す。端末は外部へ直接つながらない。
+        - provider は閉じた一覧(weather / warnings / pressure / holidays / rss / arxiv / diet / typhoon / bikeshare / status)。取りに行く URL はサーバーのコードで固定で、リクエストから URL・ホスト・パスは受け取らない。
+        - weather: `region`(気象庁の府県予報区のコード・`dsl.WeatherRegions` のどれか)が必須。位置(緯度経度)は受け取らない。
+        - warnings: `region`(同じコード)が必須。今出ている警報・注意報(解除・なしは出さない)を強いものから。無ければ items は空。
+        - pressure: `region`(同じコード)が必須。サーバーがその地域の決まった 1 地点(県庁などの所在地)の 48 時間の海面気圧の予報を 6 時間ごとの行にする。端末の位置は使わない。
+        - holidays: パラメータなし(今日以降の祝日)。
+        - typhoon(#1661): パラメータなし。気象庁が今情報を出している台風(5 つまで)を 1 つ 1 行で(番号と名前・中心気圧・最大風速・位置・予報の時刻)。台風が無い時は items は空。お知らせ用で、警報の代わりにはならない。
+        - rss: `feedId`(許可したフィードの id)が必須。任意のフィードの URL は指定できない。
+        - arxiv: `feedId`(許可した arXiv の分野・`dsl.ArxivCategories`)が必須。その分野の新着(投稿日の新しい順)。題名・著者(3 人まで)・投稿日・論文のページ。要約は返さない。
+        - diet: `q`(国会会議録で探す語・空白をまとめて 1〜40 字・制御文字や見えない文字は 400)が必須。発言の新しい会議の順に、発言者(会派)・院と会議名と号・会議の日付・発言のページ。発言の本文は返さない。`q` は diet と bikeshare 以外では 400。
+        - bikeshare(#1694): `feedId`(GBFS の system id・`dsl.BikeshareSystems`)と `q`(探す地点 `"緯度,経度"`・日本の範囲の 10 進の数。違えば 400)が必須。地点から 2 km 以内のポートを近い順に、名前・「自転車 n 台・返せる空き n・約 n m」・事業者の最終更新(RFC 3339)。地点はサーバーが小数 3 桁に丸め、出どころには送らない(system の全ポートを取りサーバーで選ぶ)。キャッシュは台数 2 分・ポートの位置 6 時間で、地点を鍵にしない。`Cache-Control` は max-age=60。
+        - status: `feedId`(許可したサービス・`dsl.StatusPages`: claude / cloudflare / github / vercel)が必須。その status ページ(Atlassian Statuspage)の全体の状態・対応中の障害・実施中のメンテナンス・止まっている部分・予定のメンテナンス。障害の更新の本文は返さない。
+        - 上の表に無いパラメータ・同じパラメータの重複は 400。
+        - サーバーはプロバイダごとにキャッシュする(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・rss 15 分・arxiv 3 時間・diet 3 時間・typhoon 10 分・status 5 分)。arxiv と diet は出どころの求めにより、インスタンスあたり 1 本ずつ 3 秒あけて取りに行く(順番待ちは 10 秒まで。超えたら 503)。出どころが落ちている時は 24 時間以内の最後の取得結果を `stale: true` で返す。
+        - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで(diet は別枠で 1 分 10 回)。diet の検索語で出どころまで取りに行くのは 1 ユーザー 1 時間 20 回まで(キャッシュにある語は数えない・超えると 429 `rate_limited`)。
+        - `FEEDS_DISABLED`(カンマ区切りの provider・`all`)で止められる。止めている provider は 503 `upstream_unavailable`(details.reason = disabled)。
+        - 出典(`source`)を一覧の下に必ず出す(公共データ利用規約 第1.0版・pressure は CC BY 4.0 の出典の記載)。
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet, typhoon, bikeshare, status] } }
+        - { name: region, in: query, schema: { type: string, pattern: '^[0-9]{6}$' }, description: 'weather / warnings / pressure だけ・必須。例 130000(東京都)' }
+        - { name: feedId, in: query, schema: { type: string, enum: [digital-news, fdma-disaster, fdma-news, go-blog, osaka-city-news, soumu-news, cs.AI, cs.CL, cs.CR, cs.CV, cs.HC, cs.LG, cs.RO, cs.SE, stat.ML, docomo-cycle, docomo-cycle-tokyo, hellocycling, claude, cloudflare, github, vercel] }, description: 'rss(digital-news / fdma-news / fdma-disaster / soumu-news / osaka-city-news / go-blog)・arxiv(cs.AI など)・bikeshare(GBFS の system id)・status(claude / cloudflare / github / vercel)だけ・必須' }
+        - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 40 }, description: 'diet・bikeshare だけ・必須。diet は国会会議録で探す語(空白区切りは AND)、bikeshare は地点 "緯度,経度"' }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        '200': &feedOK
+          description: 'OK(Cache-Control は private, max-age=300・bikeshare は 60)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [provider, title, items, source, fetchedAt]
+                properties:
+                  provider: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet, typhoon, bikeshare, status] }
+                  title: { type: string, example: 石川県の天気 }
+                  items:
+                    type: array
+                    maxItems: 20
+                    items:
+                      type: object
+                      required: [title]
+                      properties:
+                        date: { type: string, description: 'weather / holidays / diet(会議の日)は YYYY-MM-DD、rss・arxiv(投稿)・warnings(発表の時刻)・pressure(6 時間の始まり)・bikeshare(事業者の最終更新)は RFC 3339' }
+                        title: { type: string, maxLength: 200 }
+                        subtitle: { type: string, maxLength: 120 }
+                        icon: { type: string, description: SF Symbols の名前(weather・warnings) }
+                        url: { type: string, pattern: '^https://', description: 'rss の記事(https のみ。それ以外は省略)' }
+                        max: { type: number, description: 最高気温(°C)・pressure は最高の気圧(hPa) }
+                        min: { type: number, description: 最低気温(°C)・pressure は最低の気圧(hPa) }
+                        pop: { type: integer, minimum: 0, maximum: 100, description: 降水確率(%) }
+                        drop: { type: boolean, description: 'pressure: 24 時間以内に 6 hPa 以上下がる(この行で終わる下がり)' }
+                        series: { type: array, maxItems: 6, items: { type: number }, description: 'pressure: 行の中の 1 時間ごとの気圧(hPa)' }
+                  source:
+                    type: object
+                    required: [name, url, license]
+                    properties:
+                      name: { type: string, example: 気象庁ホームページ }
+                      url: { type: string, format: uri }
+                      license: { type: string, example: 公共データ利用規約(第1.0版) }
+                  fetchedAt: { type: string, format: date-time }
+                  stale: { type: boolean, description: 出どころが落ちていて、最後に取れた結果を返した }
+        '400': { description: 許可リストに無い region / feedId・未知のパラメータ・limit の範囲外, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: 未知の provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    post:
+      tags: [feeds]
+      summary: 外部の公開データを読む(GET と同じ・パラメータは本文)
+      description: |
+        GET と同じ読み込み(許可リスト・検査・キャッシュ・1 ユーザー 1 時間の上限は GET と共通で数える)。利用者が入力した値(diet の `q`)を URL に載せないため、パラメータを JSON の本文で送る。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet, typhoon, bikeshare, status] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                region: { type: string, pattern: '^[0-9]{6}$', description: 'weather / warnings / pressure だけ・必須' }
+                feedId: { type: string, description: 'rss・arxiv・bikeshare・status だけ・必須(GET の feedId と同じ一覧)' }
+                q: { type: string, minLength: 1, maxLength: 40, description: 'diet・bikeshare だけ・必須。diet は国会会議録で探す語、bikeshare は地点 "緯度,経度"' }
+                limit: { type: integer, minimum: 1, maximum: 20, default: 5 }
+            example: { q: 予算 委員会, limit: 5 }
+      responses:
+        '200': *feedOK
+        '400': { description: 許可リストに無い region / feedId・未知のキー・limit の範囲外・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: 未知の provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: 本文が 4 KiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限(GET と共通)。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /lookup/book:
+    get:
+      tags: [lookup]
+      deprecated: true
+      summary: ISBN から本の書名・著者・出版社・出版日を引く(DSL の lookupBook)
+      description: |
+        **kept for older iOS builds**。新しい呼び出しは `isbn` を本文で送る POST(利用者が入力した値を URL に載せない)。中身・上限・キャッシュは POST と同じ。
+        DSL の `lookupBook` ボタンがフォームを埋めるための値を、サーバーが**決まった出どころ**(openBD v1・鍵なし)から取って返す。端末は外部へ直接つながらない。
+        - `isbn` だけを受け取る(ISBN-10 / ISBN-13・ハイフンと空白は可)。桁と検査数字(ISBN-13 は 978 / 979 始まり)を確かめてから取りに行くので、正しくない ISBN は出どころへ出ない(400)。他のパラメータ・重複は 400。
+        - 取りに行く URL はサーバーのコードで固定(`https://api.openbd.jp/v1/get?isbn={13 桁}`)。公開アドレス以外へはつながない(feeds と同じクライアント)・8 秒で打ち切り・本文 256 KiB まで・同じホストへのリダイレクト 3 回まで。
+        - キャッシュは ISBN ごと(見つかった本 1 日・無かった 6 時間・失敗 1 分)。同じ ISBN の同時の取得は 1 回にまとめる。
+        - 1 ユーザー 1 時間 `BOOK_LOOKUP_USER_PER_HOUR` 回(既定 60)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `BOOK_LOOKUP_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
+        - **既定で止めている**(openBD の利用条件が本の紹介のためなので・2026-11-08)。`BOOK_LOOKUP_ENABLED=1` の時だけ動く。`BOOK_LOOKUP_DISABLED=1`・`FEEDS_DISABLED=all` は ENABLED より強く止める。止めている時は ISBN を確かめる前に 503 `upstream_unavailable`(details.reason = disabled)。
+        - 利用者のことは何も出どころへ送らない(ISBN だけ)。出典(`source`)をフォームの下に出す。
+      parameters:
+        - { name: isbn, in: query, required: true, schema: { type: string, maxLength: 40 }, example: 978-4-7808-0204-7 }
+      responses:
+        '200': &bookOK
+          description: 'OK(Cache-Control は private, max-age=3600)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [isbn, title, source, fetchedAt]
+                properties:
+                  isbn: { type: string, pattern: '^97[89][0-9]{10}$', description: ISBN-13 に直した値 }
+                  title: { type: string, maxLength: 300 }
+                  authors: { type: string, maxLength: 300, description: '出どころの書き方のまま 1 つの文字(例「山田玲子／著 水野菜生／英訳」)' }
+                  publisher: { type: string, maxLength: 120 }
+                  publishedDate: { type: string, pattern: '^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$', description: 'YYYY-MM-DD / YYYY-MM / YYYY' }
+                  coverUrl: { type: string, pattern: '^https://cover\.openbd\.jp/', description: 書影(出どころの書影のホストの https だけ。無ければ省略) }
+                  source:
+                    type: object
+                    required: [name, url, license]
+                    properties:
+                      name: { type: string, example: openBD }
+                      url: { type: string, format: uri }
+                      license: { type: string }
+                  fetchedAt: { type: string, format: date-time }
+              example:
+                isbn: '9784780802047'
+                title: おにぎりレシピ101
+                authors: 山田玲子／著 水野菜生／英訳
+                publisher: ポット出版
+                publishedDate: '2014-04-08'
+                coverUrl: 'https://cover.openbd.jp/9784780802047.jpg'
+                source: { name: openBD, url: 'https://openbd.jp/', license: 'openBD の利用条件(本の紹介のため)・書誌は国立国会図書館の書誌データ(CC BY 4.0)を含む' }
+                fetchedAt: '2026-11-08T03:00:00Z'
+        '400': { description: ISBN の桁・検査数字が正しくない・未知のパラメータ・重複, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: この ISBN の本が出どころに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない・取得の予算切れ(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    post:
+      tags: [lookup]
+      summary: ISBN から本の情報を引く(GET と同じ・ISBN は本文)
+      description: |
+        GET と同じ引き方(検査・キャッシュ・止め方・1 ユーザー 1 時間の上限は GET と共通で数える)。利用者が入力した ISBN を URL に載せないため、JSON の本文で送る。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。止めている時は ISBN を確かめる前に 503。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [isbn]
+              properties:
+                isbn: { type: string, maxLength: 40, description: ISBN-10 / ISBN-13(ハイフンと空白は可) }
+            example: { isbn: 978-4-7808-0204-7 }
+      responses:
+        '200': *bookOK
+        '400': { description: ISBN の桁・検査数字が正しくない・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: この ISBN の本が出どころに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: 本文が 4 KiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限(GET と共通)。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない・取得の予算切れ(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /apps/{appId}/ext/{provider}/{op}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: provider, required: true, schema: { type: string, pattern: '^[a-z][a-zA-Z0-9]{1,31}$' }, example: fakeFree, description: '閉じた一覧の provider(DSL の provider)。一覧に無ければ 404' }
+      - { in: path, name: op, required: true, schema: { type: string, pattern: '^[a-z][a-zA-Z0-9]{1,47}$' }, example: listItems, description: 'その provider の決まった op。無ければ 404' }
+    post:
+      tags: [ext]
+      summary: 外の API を 1 回呼ぶ(#1493)
+      description: |
+        DSL の `externalCall` / `externalList` が使う。appconfig は人(ID トークン・App Check)とアプリと引数を確かめ、サービス間の認証(OIDC)で runner の `/internal/ext/call` に渡す。API キーと利用者のトークンは runner だけが持ち、端末には来ない。
+        - **誰の枠か**: 共有のアプリ(公開の DSL に public / shared の entity がある)は**作成者**の `runs`(作成者の Pro)。呼べるのは参加者(public の entity があるアプリは入れた人も)。それ以外は 403 `not_member`。自分のアプリ・自分の写しの private のアプリは呼び出した人の `runs`。有料の provider のコインは押した人
+        - **Pro だけ**(決定 1): 作成者が Pro でなければ 402 `pro_required`。呼び出した人が作成者でない時は `details.reason: creator_needs_pro`(課金画面ではなく案内を出す)。`PRO_GATE_MODE` に関係なく runner が確かめる
+        - **引数**: op が決めた名前だけ(ほかは 400)・値は文字列で 4096 バイトまで・URL に見える値は 400・op ごとの値の検査(通貨の記号など)も 400。runner でも同じ検査をする
+        - **冪等**: `X-Request-Id` を有料の provider のコインの押さえの鍵にする(送らなければサーバーが作る)
+        - **数え方**: 1 回 = `runs` 1(Pro の月の枠・超えた後のコイン払い)。有料の provider は押さえる → 実費 × `COIN_PER_USD` → 差額を戻す。失敗(時間切れ・5xx)は両方戻す。鍵だけの読む op(為替など)は同じ引数の答えを決まった時間キャッシュし、キャッシュから返した時は数えない(Pro の確認はする)
+        - 1 ユーザー 1 時間 `EXT_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`
+        - runner でも provider ごとに数える: 利用者・アプリの 1 時間 / 1 日(`EXT_LIMIT_*`)・環境全体の 1 日(`EXT_GLOBAL_DAILY*`)・provider が 429 を返した後の 1 分止め。超えると 429 `rate_limited`(`details.scope`・`Retry-After`)
+        - `EXT_RUNNER_URL` が無い時・provider が止まっている(`EXT_<PROVIDER>_ENABLED` が無い・`EXT_DISABLED`・鍵が無い)時は 503 `ext_unavailable`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                args:
+                  type: object
+                  description: op の引数(名前は op ごとに決まっている)
+                  additionalProperties: { type: string, maxLength: 4096 }
+            example: { args: { q: rain } }
+      responses:
+        '200':
+          description: 'OK。有料の provider は `X-Coins-Charged` / `X-Coins-Balance` も返す'
+          headers:
+            X-Coins-Charged: { schema: { type: integer }, description: 有料の provider で引いたコイン }
+            X-Coins-Balance: { schema: { type: integer }, description: 引いた後の残高 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtResult' }
+              example: { rows: [{ title: fake 1, subtitle: rain, value: '1' }] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { description: '`pro_required`(作成者が Pro でない・`details.reason: creator_needs_pro`)・`allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient`(CoinsPaymentRequired と同じ)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { description: provider / op が一覧に無い・アプリが自分のツリーに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: '`ext_not_connected`: OAuth の要る op で、本人がつないでいない・切った・provider が拒んだ(`details.provider`)。`POST /me/connections/{provider}/start` でつなぐ。`duplicate_request`: 有料の provider で、この `X-Request-Id` はもうコインの押さえに使った(同じ呼び出しはもう一度しない)',content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: '公開を止めた共有のアプリ(`unpublished`)・退会済み(`account_deleted`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '500': { description: runner の中の失敗(`internal`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '502': { description: '`upstream_unavailable`: 外の API が失敗した・runner に届かない', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '`ext_unavailable`: 止まっている(`details.provider`)・`ext_busy`: 混んでいる', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '504': { description: '`upstream_timeout`: 外の API が時間内(`EXT_TIMEOUT`・既定 8 秒)に答えない', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/connections:
+    get:
+      tags: [ext]
+      summary: つないだサービスの一覧(#1493)
+      description: |
+        利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付・今月の回数(`monthCalls`・#2144)だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
+        `EXT_RUNNER_URL` が無い時は空の一覧。
+        `providers` はつなげるサービスの一覧(#1566・OAuth の要る provider だけ・id の順)。`enabled` は runner が今動かしているか(`EXT_RUNNER_URL` が無い時はみな false)。偽の provider は runner が動かしている時だけ(本番では出ない)。
+        `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ。審査用の版は OAuth の provider のキーを送らないので何も出ない(決定 6)。
+      parameters:
+        - in: query
+          name: supportedFeatures
+          required: false
+          schema: { type: string }
+          example: externalCall.googleCalendar,externalCall.todoist
+          description: 'generate と同じ値。カンマ区切り・くり返しも可。無ければ絞らない'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [connections, providers]
+                properties:
+                  connections: { type: array, items: { $ref: '#/components/schemas/ExtConnection' } }
+                  providers: { type: array, items: { $ref: '#/components/schemas/ExtProvider' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/connections/{provider}/start:
+    parameters:
+      - { in: path, name: provider, required: true, schema: { type: string }, example: fakeOauth, description: 'OAuth の要る provider。それ以外・一覧に無い provider は 404' }
+    post:
+      tags: [ext]
+      summary: サービスにつなぐのを始める(#1493)
+      description: |
+        runner が state(1 回だけ・10 分)と PKCE の `code_verifier` を作り、provider の同意の URL を返す。iOS は `ASWebAuthenticationSession` で開く。同意の後は runner の `/oauth/callback/{provider}` が code をトークンに替えて保管し、`tailorit://connected?provider=…&status=ok|error` に戻す(URL にトークン・code は入らない)。
+        - `scopes` を書かなければ読む op の分だけ。書く op の scope は使う時に足す。provider の op に無い scope は 400
+        - 本文は省ける。`Cache-Control: no-store`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                scopes: { type: array, maxItems: 32, items: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authUrl]
+                properties:
+                  authUrl: { type: string, format: uri, description: provider の同意の画面 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '`ext_unavailable`: provider が止まっている・`EXT_RUNNER_URL` が無い', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/connections/{provider}:
+    parameters:
+      - { in: path, name: provider, required: true, schema: { type: string }, example: fakeOauth }
+    delete:
+      tags: [ext]
+      summary: サービスとのつなぎを切る(#1493)
+      description: |
+        provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消す(決定 7)。`revoked` の印だけ 90 日残る。つないでいない時も 204。
+      responses:
+        '204': { description: 切った }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: OAuth の要らない provider・一覧に無い provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '`ext_unavailable`: `EXT_RUNNER_URL` が無い', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /client-config:
     get:
       security: []
-      summary: iOS の最低対応版と最新版(#302)・アプリ内のお知らせ(#333)・認証不要
+      summary: iOS / Android / macOS の最低対応版と最新版(#302・#981)・アプリ内のお知らせ(#333)・認証不要
       description: |
-        サインイン前にも iOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
+        サインイン前にも iOS / Android / macOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
         - `MIN_IOS_BUILD`: これ未満の CFBundleVersion は閉じられない「アップデートしてください」画面
         - `LATEST_IOS_BUILD`: これ未満は閉じられるお知らせ(MIN より小さければ MIN に揃える)
         - `IOS_APP_STORE_URL`: App Store のページ(https / itms-apps のみ)。省略時は iOS 側の既定
+        - `MIN_ANDROID_BUILD` / `LATEST_ANDROID_BUILD`: Android の versionCode で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する
+        - `ANDROID_STORE_URL`: Google Play のページ(https / market のみ)。省略時は Android 側の既定
+        - `MIN_MACOS_BUILD` / `LATEST_MACOS_BUILD`: Mac アプリの CFBundleVersion で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する(#981)
+        - `MAC_APP_STORE_URL`: Mac App Store のページ(https / macappstore のみ)。省略時は Mac 側の既定
+        - `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD`・`MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD`: Windows・Linux アプリのビルド番号で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。OS ごとに別に判定する(#2131)
         - `NOTICE_JSON`: アプリ内のお知らせ(`notice`・#333)。1 行のバナーで、利用者が閉じられる。iOS は閉じた `id` を覚えるので、文面を変えて出し直す時は `id` も変える。JSON が壊れている・必須が無い・未知のフィールドがある時は `notice` を省略する(他のフィールドは出す)。手順は `docs/ops/incident-runbook.md`
-        iOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
+        iOS / Android / macOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
       responses:
         '200':
           description: OK
@@ -1172,11 +2183,31 @@ paths:
                   minIOSBuild: { type: integer, minimum: 1 }
                   latestIOSBuild: { type: integer, minimum: 1 }
                   iosAppStoreUrl: { type: string, format: uri }
+                  minAndroidBuild: { type: integer, minimum: 1 }
+                  latestAndroidBuild: { type: integer, minimum: 1 }
+                  androidStoreUrl: { type: string, format: uri }
+                  minMacOSBuild: { type: integer, minimum: 1 }
+                  latestMacOSBuild: { type: integer, minimum: 1 }
+                  macAppStoreUrl: { type: string, format: uri }
+                  minWindowsBuild: { type: integer, minimum: 1 }
+                  latestWindowsBuild: { type: integer, minimum: 1 }
+                  minLinuxBuild: { type: integer, minimum: 1 }
+                  latestLinuxBuild: { type: integer, minimum: 1 }
                   notice: { $ref: '#/components/schemas/Notice' }
               example:
                 minIOSBuild: 12
                 latestIOSBuild: 15
                 iosAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
+                minAndroidBuild: 7
+                latestAndroidBuild: 9
+                androidStoreUrl: 'https://play.google.com/store/apps/details?id=jp.kz2601.metamon'
+                minMacOSBuild: 40
+                latestMacOSBuild: 42
+                macAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
+                minWindowsBuild: 50
+                latestWindowsBuild: 52
+                minLinuxBuild: 60
+                latestLinuxBuild: 61
                 notice:
                   id: 2026-11-02-ai
                   severity: warning
@@ -1188,7 +2219,19 @@ paths:
       security: []
       summary: liveness
       description: Cloud Run(`*.run.app`)では `/healthz` が Google Front End に吸われてコンテナに届かないため `/health` を使う(`/healthz` はローカル用に残っている)。
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: 'ok。stg / prod の取り違えと版を見分ける最小限だけ返す(#290・docs/infra/runtime-config.md)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  env: { type: string, description: 'APP_ENV(stg / prod)。未設定なら省略' }
+                  firestoreDatabase: { type: string, description: 'FIRESTORE_DATABASE(既定 (default))。Firestore を使わない時は省略' }
+                  version: { type: string, description: 'GIT_SHA の先頭 7 文字。未設定なら省略' }
 
 components:
   securitySchemes:
@@ -1209,6 +2252,56 @@ components:
       schema: { type: string }
   responses:
     BadRequest: { description: 入力不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    ProRequired:
+      description: |
+        Tailor It Pro が要る (#316・docs/backend/features/pro.md)。`code: pro_required`、`details.features` は要る有料の機能 ({id, title, reason}。title / reason は Accept-Language が en なら英語)。
+        - DSL の保存 (PUT / PATCH /dsl・restore・POST /apps の dsl・duplicate): 今の DSL に無い有料の機能 (sharedData・serverRules) を足す保存で、呼び出した人 (アプリの作成者) が Pro でない。既に持っている機能はそのまま (Pro が切れても開く・読む・直すはできる)。参加者の写しの保存は見ない
+        - 共有のレコードの書き込み (作成・更新・印を付ける): アプリの作成者が Pro でない。`details.reason: creator_needs_pro` は呼び出した人が作成者ではない時 (参加者は払えないので課金画面ではなく案内を出す)。読む・自分の記録を消す・印を外すは通る
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: pro_required, message: 'this needs Tailor It Pro: sharedData', details: { features: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }], reason: creator_needs_pro } } }
+    AppLimitReached:
+      description: |
+        持てるアプリの数の上限(#630・オーナー決定 2026-11-10・docs/backend/rate-limit.md の「持てるアプリの数」)。402 `app_limit_reached`。
+        - 持てるアプリ = 一覧に出るアプリ(自分で作ったもの + 参加した共有のアプリ)。version 1 のまま(一度も生成していない空のアプリ)は数えない
+        - 上限 = プランの数(`PLAN_FREE_APPS` / `PLAN_PRO_APPS`・無料 2 / Pro 5)+ コインで買った枠(`POST /me/coins/slot`)
+        - 返す所: 新しいアプリになる時(新しい appId の最初の `GET /dsl`・`POST /apps`・duplicate・シェアリンクの取り込み・「探す」から入れる)と、空のアプリが最初に生成される保存(PUT / PATCH /dsl・restore)。後者は同じトランザクションで数えるので、同時の依頼でも上限を超えない
+        - details: `resource: apps`・`plan`・`held`(今持っている数)・`limit`・`base`(プランの数)・`purchasedSlots`・`canBuySlot`(今 1 つ買える: `COIN_BILLING_MODE=enforce` かつ `COIN_PRICE_APP_SLOT` > 0)・`slotCoins`・`balance`(使えるコイン・enforce の時だけ)・`upgrade`(Pro にすると上がる)・`apps`(持っているアプリ `{id, name, mine, updatedAt}`。`mine: false` は参加した共有のアプリ = 抜ける。最大 100 件・読めない時は null)
+        - iOS は「どのアプリと置き換えますか?」を出し、消す(自分のアプリ)/ 抜ける(参加したアプリ)/ 枠を買う のあとで同じ操作をやり直す
+        - `PLAN_LIMITS_MODE=log` / `off` の時は返さない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: app_limit_reached, message: '持てるアプリの数(2 個)に達しました。使わないアプリを削除するか、共有のアプリから抜けると、新しく作ったり参加したりできます。', details: { resource: apps, plan: free, held: 2, limit: 2, base: 2, purchasedSlots: 0, canBuySlot: false, slotCoins: 0, balance: 0, upgrade: true, apps: [{ id: app_1, name: 家計簿, mine: true, updatedAt: '2026-11-10T00:00:00Z' }, { id: app_2, name: 家族の買い物, mine: false, updatedAt: '2026-11-09T00:00:00Z' }] } } }
+    ProRequiredOrAppLimit:
+      description: |
+        `pro_required`(上の ProRequired)か、新しいアプリが持てるアプリの数を超える `app_limit_reached`(AppLimitReached)。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    CoinsPaymentRequired:
+      description: |
+        コインで払えない(#630・`COIN_BILLING_MODE=enforce` の時だけ返す。off / log では返さない)。
+        - `coins_insufficient`: 払う人のコインが押さえる量より少ない(`details.required`・`details.balance`・`details.payer` = self / creator)
+        - `allowance_exhausted`: サーバーの月の枠を使い切り、超えた後のコイン払いが OFF
+        - `overflow_cap_reached`: 超えた後のコイン払いが月の上限に着いた(`details.cap`・`details.spent`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: self } } }
+    PlanLimitReached:
+      description: |
+        プランの上限 (#317・docs/backend/rate-limit.md の「プランごとの上限」)。403 `plan_limit_reached`。払う人のプランで数える: 自分のアプリは呼び出した人、他の人が作ったアプリは作成者。
+        - アプリの数は #630 から 402 `app_limit_reached`(AppLimitReached)。ここでは返さない
+        - レコードの件数 / アプリ: レコードの作成 (single の entity は数えない)。その人が見えるレコード (自分の分 + 共有の分) の全 entity の合計
+        - 写真の枚数 / アプリ: 写真の項目が空から入る作成・更新 (差し替えは数えない)
+        - details: `resource` (apps / recordsPerApp / photosPerApp)・`plan` (free / pro)・`limit`・`used`・`upgrade` (Pro にすると上限が上がる)。`reason: creator_plan_limit` は作成者のプランの上限 (参加者には課金画面ではなく案内を出す)
+        - `PLAN_LIMITS_MODE=log` / `off` の時は返さない。数えるのに失敗した時は通す
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: plan_limit_reached, message: 'このアプリを作った人のプランの上限に達しました: このアプリに保存できるデータの件数(5000 件)。作った人が Tailor It Pro にすると上限が上がります。', details: { resource: recordsPerApp, plan: free, limit: 5000, used: 5000, upgrade: true, reason: creator_plan_limit } } }
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden:
@@ -1217,6 +2310,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'only the author can modify this record', details: { author: 'uid_of_poster' } } }
+    DuplicateRecord:
+      description: entity の unique の値が同じレコードが既にある(#273)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: duplicate_record, message: 'another record already has the same values', details: { reason: duplicate, fields: [slot] } } }
     VersionConflict:
       description: If-Match が現行と不一致
       content:
@@ -1237,7 +2336,7 @@ components:
                   - 'initialScreen "main" does not exist'
                   - 'screen "home" components[1]: list entity "expenses" does not exist'
     InvalidRecord:
-      description: data がエンティティ定義に適合しない
+      description: data がエンティティ定義に適合しない(`invalid_record`)。public/shared の entity では、文字の項目(string / text)と authorName に表示できない言葉があっても 422(`text_not_allowed`・TextNotAllowed と同じ形・#321)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -1254,6 +2353,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'join this app with a share link to see its shared data', details: { reason: not_member } } }
+    TextNotAllowed:
+      description: 他の人に見える文字に表示できない言葉が含まれている(#321・docs/infra/moderation.md)。details.field は直す項目(record の field id・authorName・displayName・name・description・tags)。message はそのまま見せてよい固定の文で、どの言葉かは返さない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: text_not_allowed, message: '表示できない言葉が含まれています', details: { field: description } } }
   schemas:
     Notice:
       type: object
@@ -1287,23 +2392,210 @@ components:
               description: 機械可読コード。appconfig が返すものだけ(ai のコードは `openapi-ai.yaml` の `Error`)。`backend/internal/httpx/codes.go` と一致することをテストで確かめる(#523)
               enum:
                 - account_deleted
+                - account_mismatch
+                - allowance_exhausted
                 - app_check_failed
+                - app_limit_reached
+                - app_stopped
                 - bad_request
+                - coins_insufficient
+                - duplicate_record
+                - duplicate_request
+                - ext_busy
+                - ext_not_connected
+                - ext_unavailable
                 - forbidden
                 - internal
                 - invalid_dsl
                 - invalid_record
                 - invalid_transaction
+                - not_configured
                 - not_found
+                - overflow_cap_reached
                 - payload_too_large
+                - plan_limit_reached
+                - pro_required
                 - rate_limited
+                - text_not_allowed
                 - transaction_owned_by_other
                 - unauthenticated
                 - unpublished
+                - upstream_timeout
+                - upstream_unavailable
                 - version_conflict
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
+    ExtConnection:
+      type: object
+      required: [provider, status]
+      properties:
+        provider: { type: string, example: fakeOauth }
+        status: { type: string, enum: [active, error], description: 'error = provider がトークンを拒んだ(つなぎ直す)' }
+        scopes: { type: array, items: { type: string } }
+        connectedAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        monthCalls:
+          type: integer
+          minimum: 0
+          description: 'この人が今月(JST)その provider を呼んだ回数(#2144)。回数の上限と同じ数え方(キャッシュから返した分・呼ぶ前に止まった分は数えない)で、自動の動きの分も入る。上限の値は返さない。読めなかった時・古い runner の時は省く'
+    ExtProvider:
+      type: object
+      description: つなげるサービス(GET /me/connections の providers)
+      required: [id, nameJa, nameEn, enabled]
+      properties:
+        id: { type: string, example: googleCalendar, description: 'POST /me/connections/{provider}/start の provider' }
+        nameJa: { type: string, example: Google カレンダー }
+        nameEn: { type: string, example: Google Calendar }
+        enabled: { type: boolean, description: 'このサーバーで今つなげるか(false なら画面はボタンを押せなくする)' }
+    ExtResult:
+      type: object
+      description: op の決まった形の答え(外の API の生の JSON は返さない)。読む op は rows、1 件は item、書く op は resultId
+      properties:
+        rows: { type: array, items: { $ref: '#/components/schemas/ExtRow' } }
+        item: { $ref: '#/components/schemas/ExtRow' }
+        resultId: { type: string, description: 書く op が作ったものの id(DSL の resultIdField) }
+    ExtRow:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        subtitle: { type: string }
+        value: { type: string }
+        url: { type: string, format: uri }
+    CallJoin:
+      type: object
+      required: [url, token, room, identity, sessionId, expiresAt, video, blockMinutes, reservedUntil, coinsReserved, coinsPerMinute]
+      properties:
+        url: { type: string, description: 'LiveKit の接続先(`LIVEKIT_URL`・wss://)' }
+        token: { type: string, description: 'LiveKit のアクセストークン(JWT)。ログ・画面に出さない' }
+        room: { type: string, example: 'app:app_01HXYZ' }
+        identity: { type: string, description: 'LiveKit の participant identity(= sessionId)' }
+        sessionId: { type: string, description: '続けて話す時にもう一度送る' }
+        expiresAt: { type: string, format: date-time, description: 'このトークンで入れる期限(`CALL_TOKEN_TTL` と押さえた分の終わりの短い方)' }
+        video: { type: boolean, description: 'カメラを出してよい' }
+        blockMinutes: { type: integer, description: '1 回で押さえる分(`CALL_BLOCK_MINUTES`)' }
+        reservedUntil: { type: string, format: date-time, description: 'この時刻の前に sessionId でもう一度呼ぶ' }
+        coinsReserved: { type: integer, description: 'このまとまりで押さえたコイン(0 = 数えない・log / off)' }
+        coinsPerMinute: { type: integer, description: '`COIN_PER_CALL_MINUTE`(0 = 数えない)' }
+    CoinConfig:
+      type: object
+      required: [mode, packs, estimates, initialGrant, proMonthly, allowance, overflow]
+      properties:
+        mode: { type: string, enum: [enforce, log, off], description: '`COIN_BILLING_MODE`。iOS は enforce の時だけコインの画面を出す(off / log では出さない)' }
+        packs:
+          type: array
+          description: '`COIN_PACKS` の順'
+          items:
+            type: object
+            required: [productId, coins]
+            properties:
+              productId: { type: string }
+              coins: { type: integer, minimum: 1 }
+        estimates: { type: object, additionalProperties: { type: integer }, description: '処理(generate / edit / chat / text)ごとの「約 N コイン」(`COIN_ESTIMATE_<OP>`)。0 は省く' }
+        initialGrant: { type: integer, description: '`COIN_INITIAL_GRANT`' }
+        proMonthly: { type: integer, description: '`COIN_PRO_MONTHLY`' }
+        allowance: { type: object, additionalProperties: { type: integer }, description: 'Pro の月の枠(runs / recipients / writes / reads・`ALLOWANCE_PRO_<KIND>`)。0 は省く' }
+        overflow:
+          type: object
+          required: [blocks]
+          description: 枠を超えた後にコインで買う 1 まとまり(#630)。買えない種類は省く
+          properties:
+            blocks:
+              type: object
+              additionalProperties:
+                type: object
+                required: [size, coins]
+                properties:
+                  size: { type: integer, description: '1 まとまりで増える量(`COIN_OVERFLOW_BLOCK_<KIND>`)' }
+                  coins: { type: integer, description: '1 まとまりのコイン(`COIN_OVERFLOW_PRICE_<KIND>`)' }
+            blockRuns: { type: integer, description: 'runs の 1 まとまりの回数(blocks.runs.size と同じ。無ければ省く)' }
+            blockCoins: { type: integer, description: 'runs の 1 まとまりのコイン(blocks.runs.coins と同じ。無ければ省く)' }
+        appSlotCoins: { type: integer, description: 'アプリの枠 1 つのコイン(`COIN_PRICE_APP_SLOT`)。買えない時(0・enforce 以外)は省く' }
+    CoinCredit:
+      type: object
+      required: [credited, transactionId, productId, coins, wallet]
+      properties:
+        credited: { type: boolean, description: 'false = この取引は足し済み(送り直し)' }
+        transactionId: { type: string }
+        productId: { type: string }
+        coins: { type: integer, description: このパックの枚数 }
+        wallet: { $ref: '#/components/schemas/CoinWallet' }
+    CoinLedger:
+      type: object
+      required: [entries, nextCursor]
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            required: [id, kind, amount, at]
+            properties:
+              id: { type: string }
+              kind:
+                type: string
+                enum:
+                  - adjust
+                  - grant_expire
+                  - grant_initial
+                  - grant_monthly
+                  - purchase
+                  - refund_apple
+                  - refund_failed
+                  - spend_ai
+                  - spend_call
+                  - spend_ext
+                  - spend_overflow
+                  - spend_slot
+              amount: { type: integer, description: 符号つきの増減 }
+              op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)。spend_ext は ext' }
+              appId: { type: string }
+              provider: { type: string, example: openWeather, description: 'spend_ext の外のサービス(registry の id・#2145)。この前に書いた行には無い(端末は今の文言)。表示名は端末が id から引く' }
+              transactionId: { type: string, description: purchase の App Store の取引 }
+              productId: { type: string }
+              at: { type: string, format: date-time }
+        nextCursor: { type: string, description: '続きが無ければ空' }
+    CoinWallet:
+      type: object
+      required: [mode, total, available, purchased, grant, initial, reserved, overflow]
+      properties:
+        mode: { type: string, enum: [enforce, log, off] }
+        total: { type: integer, description: 'available + reserved' }
+        available: { type: integer, description: 'purchased + grant + initial' }
+        purchased: { type: integer, description: 買った分(期限なし) }
+        grant: { type: integer, description: Pro の毎月の分(grantPeriodEnd で消える) }
+        grantPeriodEnd: { type: string, format: date-time, description: 毎月の分の期限(Pro の請求期間の終わり)。無ければ省略 }
+        initial: { type: integer, description: 最初の分 }
+        reserved: { type: integer, description: 実行中の呼び出しが押さえている分 }
+        appSlots: { type: integer, description: 'コインで買ったアプリの枠(#630・期限なし)。持っている数と上限は `GET /me/usage` の `apps` / `appSlots`' }
+        overflow:
+          type: object
+          required: [enabled, monthlyCap, spent]
+          description: 枠を超えた後のコイン払い(`PUT /me/coins/settings`)
+          properties:
+            enabled: { type: boolean, description: 既定 false }
+            monthlyCap: { type: integer, description: 本人が決めた月のコインの上限 }
+            spent: { type: integer, description: '今月(日本時間の月)枠を超えた分にコインで払った量' }
+        allowance:
+          type: object
+          description: |
+            Pro のサーバーの月の枠(日本時間の月)の使った量。キーは runs(自動の動きの実行)/ recipients(通知の宛先)/ writes(書き込み)/ reads(読み取り)。
+            runner が作成者ごとに数える(共有アプリも作成者の分)。読めない時・`COIN_BILLING_MODE=off` では省く
+          additionalProperties: { $ref: '#/components/schemas/CoinAllowanceUse' }
+    CoinAllowanceUse:
+      type: object
+      required: [used]
+      properties:
+        used: { type: integer, description: 今月使った量 }
+        limit: { type: integer, description: '今月使える量 = allowance + blocks × 1 まとまりの量。枠が 0(数えるだけ)の時は省く' }
+        allowance: { type: integer, description: '`ALLOWANCE_PRO_<KIND>`。0 は省く' }
+        blocks: { type: integer, description: 今月コインで買ったまとまりの数。0 は省く }
+    CoinOverflowSettings:
+      type: object
+      required: [enabled, monthlyCap]
+      properties:
+        enabled: { type: boolean }
+        monthlyCap: { type: integer, minimum: 0, maximum: 1000000000 }
     Entitlements:
       type: object
       required: [isPro, pro]
@@ -1325,6 +2617,7 @@ components:
                 revokedAt: { type: string, format: date-time, description: '返金・取り消しの時刻(無ければ省略)' }
                 updatedAt: { type: string, format: date-time }
                 willRenew: { type: boolean, description: '自動更新が有効か(#315・通知か照合で分かるまで省略)' }
+                platform: { type: string, enum: [googlePlay], description: 'Google Play で買った Pro(App Store なら省略)。その時 `originalTransactionId` は購入の結びつきのキー、`transactionId` は Play の注文 ID' }
     AppSummary:
       type: object
       required: [id, name, currentVersion, status, createdAt, updatedAt]
@@ -1336,12 +2629,118 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         sortIndex: { type: integer, minimum: 1, description: '変身一覧で自分が並べた位置(1 が先頭・#277)。並べ替えたことが無いアプリには無い' }
+        glanceStat: { type: string, description: 'アプリの一覧のカードに出す数字の部品の id(link-10)。"-" は出さない。無ければ初期画面の先頭の stat' }
     AppWithDSL:
       allOf:
         - { $ref: '#/components/schemas/AppSummary' }
         - type: object
           required: [dsl]
           properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
+    AppUsage:
+      type: object
+      required: [appId, plan, payer, upgrade, records, photos]
+      properties:
+        appId: { type: string }
+        plan: { type: string, enum: [free, pro], description: 払う人のプラン }
+        payer: { type: string, enum: [creator, self], description: 'self = 自分のアプリ・creator = 他の人が作ったアプリ(作成者のプランで数える)' }
+        upgrade: { type: boolean, description: 'Pro にすると記録か写真の上限が上がる(`plan_limit_reached` の `upgrade` と同じ考え)' }
+        records: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        photos: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+    AutomationResult:
+      type: string
+      description: |
+        直近の 1 回の結果。iOS はこの語ごとに文言を持つ。知らない語は「その他」として扱う。
+        - none: まだ動いていない(30 日以上動いていない時も)
+        - ok: 動いた
+        - notify_paused: 動いたが通知は止めた(通知の停止中)
+        - limit: 今日の上限に達したので止めた(動いたが、アプリの今日の書き込み・通知の上限で一部を止めた時も)
+        - service_limit: サービス全体の今日の上限に達したので止めた
+        - service_paused: サービス全体で自動の動きを一時停止している
+        - plan: 今のプランでは動かない(匿名のアカウント・共有のデータは Pro)
+        - stopped: 運営がこのアプリ・ルールを止めている(非公開化を含む)
+        - changed: アプリが変わってこのルールが無くなった
+        - unavailable: アプリか作成者のアカウントが使えない状態だった
+        - late: 遅れたので動かさなかった(後でまとめて動かさない)
+        - inactive: しばらく開かれていないので休んでいる(開くと再開)
+        - failed: 何度か試したがうまくいかなかった
+        - disabled: 作成者がこのルールをオフにしている(オフの前に届いていたきっかけを動かさなかった)
+        - other: この版の知らない結果
+        - allowance_exhausted: 作成者の今月のサーバーの枠(実行・通知・書き込み・読み取り)を使い切り、超えた後のコイン払いが OFF なので止めた(動いたが書き込み・通知を止めた時も。#630)
+        - overflow_cap_reached: 超えた後のコイン払いが、作成者の決めた今月のコインの上限に達したので止めた(#630)
+        - coins_insufficient: 超えた後のコイン払いが ON だが、作成者のコインが足りないので止めた(#630)
+      enum:
+        - allowance_exhausted
+        - changed
+        - coins_insufficient
+        - disabled
+        - failed
+        - inactive
+        - late
+        - limit
+        - none
+        - notify_paused
+        - ok
+        - other
+        - overflow_cap_reached
+        - plan
+        - service_limit
+        - service_paused
+        - stopped
+        - unavailable
+    AutomationFailureReason:
+      type: string
+      description: |
+        うまくいかなかった時の理由。result が failed の時だけ返す(それ以外・古い記録では省く)。決まった語だけを返し、エラーの中身・パス・ID は返さない。iOS はこの語ごとに文言を持つ。知らない語は「何度か試しましたがうまくいきませんでした」として扱う。
+        - notify_failed: 通知を送れなかった
+        - record_unavailable: 読む・変えるはずの記録が無くなっていたか、読めなかった
+        - mismatch: ルールが今のアプリのデータの形と合っていない
+        - write_rejected: 記録を保存できなかった(同じ値の記録が既にある等)
+        - source_unavailable: 外部の情報を取りにいけなかった
+        - timeout: 時間内に終わらなかった
+        - internal: サービス側の問題(または分類できない失敗)
+      enum:
+        - internal
+        - mismatch
+        - notify_failed
+        - record_unavailable
+        - source_unavailable
+        - timeout
+        - write_rejected
+    AutomationRule:
+      type: object
+      required: [id, description, trigger, result, enabled]
+      properties:
+        id: { type: string }
+        description: { type: string, description: 'ルールの説明(`DescribeServerRuleIn`)。Accept-Language が en なら英語、それ以外・無しなら日本語。例: 「毎日 07:00、「記録」に記録を足す」 / Every day at 07:00: add a record to "記録"' }
+        trigger: { type: string, enum: [record, schedule] }
+        result: { $ref: '#/components/schemas/AutomationResult' }
+        failureReason: { $ref: '#/components/schemas/AutomationFailureReason' }
+        enabled: { type: boolean, description: 'false = 作成者がオフにしている(DSL の serverRules[].enabled)。オフのルールは動かず、実行の数にも数えない。切り替えは PATCH /v1/apps/{appId}/dsl か AI の編集' }
+        consecutiveFailures: { type: integer, minimum: 0, description: 'うまくいかなかった(failed)回数の連続。うまく動くと 0 に戻る。0 なら省く。続いていればチャットで直すか提案する目安' }
+        lastRunAt: { type: string, format: date-time, description: 最後に動いた(止めた・失敗したを含む)時刻。まだ無ければ省く }
+        lastOkAt: { type: string, format: date-time, description: 最後にうまく動いた時刻 }
+        stopped: { $ref: '#/components/schemas/AutomationStop' }
+    AutomationStop:
+      type: object
+      description: 運営の停止が効いている印(このキーがある時だけ)。理由・誰が・通報の数は返さない
+      properties:
+        until: { type: string, format: date-time, description: 自動で解ける時刻。無ければ運営が解くまで }
+    Automations:
+      type: object
+      required: [appId, rules]
+      properties:
+        appId: { type: string }
+        stopped: { $ref: '#/components/schemas/AutomationStop' }
+        notifyPaused: { $ref: '#/components/schemas/AutomationStop' }
+        quota:
+          type: object
+          description: アプリの今日の実行の数(runner の上限の数え方。最後に動いた時の数。まだ動いていなければ省く)
+          required: [used, limit, resetAt]
+          properties:
+            used: { type: integer, minimum: 0 }
+            limit: { type: integer, minimum: 1 }
+            resetAt: { type: string, format: date-time, description: 次に 0 に戻る時刻(日本時間の 0 時) }
+        rules: { type: array, items: { $ref: '#/components/schemas/AutomationRule' } }
     DSLEnvelope:
       type: object
       required: [appId, version, dsl]
@@ -1351,17 +2750,29 @@ components:
         dsl: { $ref: '../dsl/dsl.schema.json' }
         source: { $ref: '#/components/schemas/VersionSource' }
         createdAt: { type: string, format: date-time }
+    UsageMeter:
+      type: object
+      required: [used, limit, remaining]
+      properties:
+        used: { type: integer, minimum: 0 }
+        limit: { type: [integer, 'null'], description: null = 数えない }
+        remaining: { type: [integer, 'null'], minimum: 0, description: 'max(0, limit - used)。null = 数えない' }
     VersionSource:
       type: object
       description: このバージョンが生まれた経緯
       required: [kind]
       properties:
-        kind: { type: string, enum: [ai, manual, restore, system, import] }
+        kind: { type: string, enum: [ai, manual, restore, system, import], description: 'restore は POST .../restore だけが付ける。PUT / PATCH で送った restore は manual として保存' }
         mode: { type: string, enum: [full, patch], description: 'full = PUT (初回/create/fallback), patch = PATCH (編集)' }
         transcript: { type: string, description: ユーザー発話 (ai) }
         summary: { type: string, description: 変更の一文要約 (iOS が読み上げ) }
         model: { type: string }
-        restoredFrom: { type: integer }
+        restoredFrom:
+          type: integer
+          minimum: 1
+          description: |
+            kind=restore の版だけが持つ、中身の元の版番号(省略可・古いクライアントは無視してよい)。
+            サーバーが restore の時に記録する。PUT / PATCH で送った値は捨てる(#1774)。
     VersionSummary:
       type: object
       required: [appId, version, createdAt]
@@ -1406,6 +2817,12 @@ components:
       properties:
         count: { type: integer, minimum: 0, description: '印を付けている人数' }
         mine: { type: boolean, description: '呼び出した本人が付けているか' }
+    FollowState:
+      type: object
+      required: [following, count]
+      properties:
+        following: { type: boolean, description: '操作の後にフォローしているか' }
+        count: { type: integer, minimum: 0, description: 'このアプリで自分がフォローしている人数' }
     Share:
       type: object
       required: [token, appId, name, dslVersion, url, webUrl]
@@ -1448,6 +2865,86 @@ components:
         uid: { type: string }
         name: { type: string, description: '未設定は "匿名"' }
         createdAt: { type: string, format: date-time }
+    Device:
+      type: object
+      required: [installationId, platform, environment, createdAt, updatedAt]
+      description: 登録した端末(トークンは返さない)
+      properties:
+        installationId: { type: string }
+        platform: { type: string, enum: [ios, android] }
+        environment: { type: string, enum: [sandbox, production] }
+        appVersion: { type: string }
+        os: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MyUsage:
+      type: object
+      required: [plan, tier, resetAt, ai, apps, perApp]
+      properties:
+        plan: { type: string, enum: [free, pro] }
+        tier: { type: string, enum: [anonymous, pro, signed_in], description: 'ai の上限の段(`RateLimitDetails.tier` と同じ)' }
+        resetAt: { type: string, format: date-time, description: 次の 0:00 JST }
+        ai:
+          description: 生成・チャット・text の今日の合計(単位)。読めない時は null
+          oneOf:
+            - type: 'null'
+            - allOf:
+                - { $ref: '#/components/schemas/UsageMeter' }
+                - type: object
+                  required: [weights]
+                  properties:
+                    weights:
+                      type: object
+                      required: [chat, create, edit, text, textTask, textLong, textImage]
+                      properties:
+                        chat: { type: integer }
+                        create: { type: integer }
+                        edit: { type: integer }
+                        text: { type: integer }
+                        textTask: { type: integer }
+                        textLong: { type: integer, description: aiButton の length long の重さ }
+                        textImage: { type: integer, description: aiButton の inputPhoto (写真つき) の重さ }
+        apps: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        appSlots:
+          description: 持てるアプリの上限の内訳(#630)。数えない時は null
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [base, purchased, limit, canBuySlot, slotCoins]
+              properties:
+                base: { type: integer, description: プランの数(PLAN_FREE_APPS / PLAN_PRO_APPS) }
+                purchased: { type: integer, description: コインで買った枠(期限なし) }
+                limit: { type: integer, description: base + purchased }
+                canBuySlot: { type: boolean, description: '今 1 つ買える(`COIN_BILLING_MODE=enforce` かつ `COIN_PRICE_APP_SLOT` > 0)' }
+                slotCoins: { type: integer, description: 1 枠のコイン(買えない時は 0) }
+        perApp:
+          type: object
+          properties:
+            photosPerApp: { type: [integer, 'null'] }
+            recordsPerApp: { type: [integer, 'null'] }
+    NotifyConsent:
+      type: object
+      required: [appId, allowed, updatedAt]
+      properties:
+        appId: { type: string }
+        allowed: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    FeedbackFixedConsent:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        updatedAt: { type: string, format: date-time, description: PUT の応答だけ }
+    LoopNotice:
+      type: object
+      description: 「あなたの声で直りました」(#374)。決まった文 + 人が承認した Issue の題名だけ(LLM は書かない・フィードバックの原文は入らない)
+      required: [id, title, body, createdAt]
+      properties:
+        id: { type: string, pattern: '^ntc_[0-9a-f]{24}$' }
+        title: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: string, format: date-time, description: 無い = 未読 }
     ReleaseRequest:
       type: object
       required: [id, appId, name, dslVersion, purpose, status]
@@ -1478,6 +2975,7 @@ components:
         uid: { type: string }
         displayName: { type: string, description: 'import 時の displayName(無ければ空。作成者は常に空)' }
         role: { type: string, enum: [owner, member] }
+        admin: { type: boolean, description: '管理者(#272)。作成者は常に true' }
         via: { type: string, enum: [share, legacy], description: 'share = リンクで参加 / legacy = #254 以前からアプリを持っていた(移行)。作成者には無い' }
         joinedAt: { type: string, format: date-time, description: 作成者には無い }
         you: { type: boolean, description: 呼び出したユーザー本人 }

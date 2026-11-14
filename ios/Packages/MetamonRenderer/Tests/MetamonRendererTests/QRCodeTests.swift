@@ -7,7 +7,7 @@ import MetamonDSL
 /// `qrCode`(#422): 生成(誤り訂正 M・整数倍で拡大・余白)・qrScanner と同じ CoreImage で読み戻せること・空 / 長すぎ・
 /// 値の出どころ(text / {{}} / field / computed / value)・描画(空で落ちない・描いた画像からも読める)。
 final class QRCodeTests: XCTestCase {
-    private func decode(_ image: UIImage) -> [String] {
+    private func decode(_ image: PlatformImage) -> [String] {
         guard let cg = image.cgImage,
               let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil, options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
         else { return [] }
@@ -96,10 +96,10 @@ final class QRCodeTests: XCTestCase {
         let ctx = RenderContext(route: Route(screen: "card_form"), form: form)
 
         // QR_SHOT_DIR(xcodebuild では TEST_RUNNER_QR_SHOT_DIR)があれば PNG も書き出す(PR のスクショ用)
-        func render(_ name: String) throws -> UIImage {
+        func render(_ name: String) throws -> PlatformImage {
             let r = ImageRenderer(content: QrCodeLeaf(c: c, ctx: ctx).frame(width: 320, height: 480).background(Color.white))
             r.scale = 2
-            let img = try XCTUnwrap(r.uiImage, "描画できない")
+            let img = try XCTUnwrap(r.platformImage, "描画できない")
             if let dir = ProcessInfo.processInfo.environment["QR_SHOT_DIR"], !dir.isEmpty {
                 try? img.pngData()?.write(to: URL(fileURLWithPath: dir).appending(path: "qrcode-\(name).png"))
             }

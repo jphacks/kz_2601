@@ -2,3 +2,19 @@
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:42
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:47
 19585e6c607daf879faceefaa5f06dfb827de30e:backend/internal/auth/verifier.go:curl-auth-header:43
+# LiveKit のテスト用の偽の鍵(e92d242d で追加・3e3aeafc で偽と分かる値に置き換え済み)。実の鍵ではない。
+e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.go:generic-api-key:41
+e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23
+# SharedPreferences のキー名(exactAlarm.prompted.v1)の誤検知。秘密情報ではない。
+860439072a981a5daabedf24da7f85a1036fbfef:android/app/src/main/kotlin/jp/kz2601/metamon/notifications/ExactAlarmAsk.kt:generic-api-key:45
+# SwitchBot のテスト用の偽の値(b57df1d・feat/backend-switchbot-1704 に残る。develop では strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.go:generic-api-key:19
+b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.go:generic-api-key:20
+# Windows のプロパティキー PKEY_Title の GUID(公開の定数)。秘密情報ではない。
+6ad265f1f4383e6546f9b9312e7551e7f392e2a7:desktop/app/src/main/kotlin/jp/kz2601/metamon/desktop/platform/JumpList.kt:generic-api-key:256
+# OAuth 1.0a のテスト値(RFC 5849 の公開サンプル)。秘密情報ではない。
+7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:68
+7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:105
+7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:132
+# OAuth 1.0a のテスト値(RFC 5849 の公開サンプル)。同じ行の別コミット。秘密情報ではない。
+cf0c4e2868c4163533f1789d60329d7a9ab0d5e3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:101

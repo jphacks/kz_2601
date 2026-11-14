@@ -35,17 +35,15 @@ final class TimerClockTests: XCTestCase {
         XCTAssertFalse(TimerRun(base: 20).isRunning)
     }
 
-    func testPlanSchedulesOnlyInBackgroundForRunningCountdown() {
+    func testPlanSchedulesForRunningCountdownRegardlessOfScreen() {
         let run = TimerRun(base: 0, startedAt: t0)
-        XCTAssertEqual(TimerNotificationPlan.decide(isForeground: false, isCountdown: true, run: run, total: 60, now: t0 + 10),
-                       .schedule(at: t0 + 60))
-        XCTAssertEqual(TimerNotificationPlan.decide(isForeground: true, isCountdown: true, run: run, total: 60, now: t0 + 10),
-                       .cancel, "前面では画面で見えているので通知しない")
-        XCTAssertEqual(TimerNotificationPlan.decide(isForeground: false, isCountdown: false, run: run, total: 60, now: t0 + 10),
+        XCTAssertEqual(TimerNotificationPlan.decide(isCountdown: true, run: run, total: 60, now: t0 + 10),
+                       .schedule(at: t0 + 60), "開始した時点で予約する(前面・部品の表示に関係なく)")
+        XCTAssertEqual(TimerNotificationPlan.decide(isCountdown: false, run: run, total: 60, now: t0 + 10),
                        .cancel, "stopwatch は終わりが無い")
-        XCTAssertEqual(TimerNotificationPlan.decide(isForeground: false, isCountdown: true, run: TimerRun(base: 10), total: 60, now: t0),
+        XCTAssertEqual(TimerNotificationPlan.decide(isCountdown: true, run: TimerRun(base: 10), total: 60, now: t0),
                        .cancel, "一時停止中は予約しない")
-        XCTAssertEqual(TimerNotificationPlan.decide(isForeground: false, isCountdown: true, run: run, total: 60, now: t0 + 61),
+        XCTAssertEqual(TimerNotificationPlan.decide(isCountdown: true, run: run, total: 60, now: t0 + 61),
                        .cancel, "既に終わっていれば予約しない")
     }
 
@@ -56,5 +54,22 @@ final class TimerClockTests: XCTestCase {
         XCTAssertEqual(store.load(key), TimerRun(base: 3, startedAt: t0))
         store.save(TimerRun(), for: key)
         XCTAssertNil(store.load(key), "リセット(初期状態)は保存を消す")
+    }
+
+    func testClearAppRemovesOnlyThatAppsTimers() {
+        let store = TimerRunStore.shared
+        let app = UUID().uuidString.lowercased()
+        let other = app + "2" // 前方一致で別アプリを巻き込まない
+        let run = TimerRun(base: 5, startedAt: t0)
+        store.save(run, for: "\(app)/home/timer")
+        store.save(run, for: "\(app)/form/t2")
+        store.save(run, for: "\(other)/home/timer")
+        defer { store.clear("\(other)/home/timer") }
+
+        store.clearApp(appId: app)
+
+        XCTAssertNil(store.load("\(app)/home/timer"))
+        XCTAssertNil(store.load("\(app)/form/t2"))
+        XCTAssertEqual(store.load("\(other)/home/timer"), run)
     }
 }

@@ -41,7 +41,7 @@ func (f *Firestore) AddReport(ctx context.Context, r Report, day string, limit i
 	ref := f.c.Collection(reportsCollection).Doc(r.ID)
 	qref := f.c.Collection(reportQuotaCollection).Doc(r.ReporterUID)
 	if r.CreatedAt.IsZero() {
-		r.CreatedAt = time.Now().UTC()
+		r.CreatedAt = Now()
 	}
 	created := false
 	err := f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
@@ -117,7 +117,7 @@ func (f *Firestore) PutBlock(ctx context.Context, uid string, b Block) error {
 	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
 		d := blockDoc{Name: b.Name, CreatedAt: b.CreatedAt}
 		if d.CreatedAt.IsZero() {
-			d.CreatedAt = time.Now().UTC()
+			d.CreatedAt = Now()
 		}
 		if snap, err := tx.Get(ref); err == nil {
 			var old blockDoc
@@ -159,7 +159,7 @@ func hiddenUpdates(hidden bool, reason string) []firestore.Update {
 			{Path: "hiddenAt", Value: firestore.Delete}}
 	}
 	return []firestore.Update{{Path: "hidden", Value: true}, {Path: "hiddenReason", Value: reason},
-		{Path: "hiddenAt", Value: time.Now().UTC()}}
+		{Path: "hiddenAt", Value: Now()}}
 }
 
 // SetCatalogHidden implements Moderation.

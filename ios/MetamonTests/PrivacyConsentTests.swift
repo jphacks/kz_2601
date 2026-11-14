@@ -47,6 +47,44 @@ final class PrivacyConsentTests: XCTestCase {
         XCTAssertFalse(AIConsentStore(defaults: defaults).isGranted)
     }
 
+    /// 説明の版が上がった(ポリシー 6 章)時: 古い版に同意した人には、次の起動で 1 回だけ同意の画面を出し直す。
+    func testBumpedVersionAsksAgainOnceOnNextLaunch() {
+        // 前の版に同意し、説明も見た人(版を上げる前の端末の状態)
+        defaults.set(AIConsentStore.currentVersion - 1, forKey: "metamon.aiConsent.version")
+        defaults.set(Date(timeIntervalSince1970: 1_700_000_000), forKey: "metamon.aiConsent.date")
+        defaults.set(true, forKey: "metamon.aiConsent.prompted")
+
+        let store = AIConsentStore(defaults: defaults)
+        XCTAssertFalse(store.isGranted)
+        XCTAssertNil(store.grantedAt)
+        XCTAssertTrue(store.needsReconsent)
+        XCTAssertTrue(store.shouldPromptOnLaunch)
+
+        // 「あとで」: この版ではもう起動時には出さない(生成しようとした時に出る)
+        store.markPrompted()
+        XCTAssertFalse(AIConsentStore(defaults: defaults).shouldPromptOnLaunch)
+        XCTAssertTrue(AIConsentStore(defaults: defaults).needsReconsent)
+
+        // 同意し直すと出さない
+        store.grant()
+        XCTAssertTrue(AIConsentStore(defaults: defaults).isGranted)
+        XCTAssertFalse(AIConsentStore(defaults: defaults).needsReconsent)
+        XCTAssertFalse(AIConsentStore(defaults: defaults).shouldPromptOnLaunch)
+    }
+
+    func testLaunchPromptForFirstRunAndNotForRevokedOrLater() {
+        let store = AIConsentStore(defaults: defaults)
+        XCTAssertTrue(store.shouldPromptOnLaunch, "初回は出す")
+        XCTAssertFalse(store.needsReconsent, "同意したことが無い人は出し直しではない")
+        store.markPrompted()
+        XCTAssertFalse(store.shouldPromptOnLaunch, "「あとで」の人には起動時に出さない")
+        store.grant()
+        XCTAssertFalse(store.shouldPromptOnLaunch)
+        store.revoke()
+        XCTAssertFalse(store.needsReconsent, "自分で取り消した人は出し直しの対象にしない")
+        XCTAssertFalse(store.shouldPromptOnLaunch)
+    }
+
     func testPromptedFlagAndReset() {
         let store = AIConsentStore(defaults: defaults)
         XCTAssertFalse(store.hasBeenPrompted)

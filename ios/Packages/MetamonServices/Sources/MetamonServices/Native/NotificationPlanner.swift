@@ -11,21 +11,32 @@ public struct PlannedNotification: Codable, Sendable, Equatable {
         case monthly(day: Int, hour: Int, minute: Int)
         /// 毎年その月日(#266)。2/29 や、ずらすと 2 月末をまたぐ時は使わない
         case yearly(month: Int, day: Int, hour: Int, minute: Int)
+        /// 場所に着いた時(`UNLocationNotificationTrigger`・端末内の領域監視)。repeats = 着くたび、false = 最初の 1 回だけ
+        case region(latitude: Double, longitude: Double, radius: Double, repeats: Bool)
     }
 
     public var identifier: String
     public var title: String
     public var body: String
     public var trigger: Trigger
+    /// 止めるまで鳴るアラームで届ける(`NotificationSpec.alarm`)。nil = 普通の通知(保存済みの古い予約も nil で読める)。
+    public var alarm: Bool?
+    /// 場所の通知: レコードを保存した時刻(現在地が分からない時、新しい順に選ぶ)。
+    public var savedAt: Date?
 
-    public init(identifier: String, title: String, body: String, trigger: Trigger) {
+    public var isAlarm: Bool { alarm == true }
+    public var isRegion: Bool { if case .region = trigger { true } else { false } }
+
+    public init(identifier: String, title: String, body: String, trigger: Trigger, alarm: Bool? = nil, savedAt: Date? = nil) {
         self.identifier = identifier
         self.title = title
         self.body = body
         self.trigger = trigger
+        self.alarm = alarm
+        self.savedAt = savedAt
     }
 
-    /// `now` より後の次の発火時刻。過ぎた 1 回きりは nil。
+    /// `now` より後の次の発火時刻。過ぎた 1 回きり・場所の通知(時刻が無い)は nil。
     public func nextFire(after now: Date, calendar: Calendar = .current) -> Date? {
         switch trigger {
         case .at(let d):
@@ -38,6 +49,8 @@ public struct PlannedNotification: Codable, Sendable, Equatable {
             return calendar.nextDate(after: now, matching: DateComponents(day: d, hour: h, minute: m, second: 0), matchingPolicy: .strict)
         case .yearly(let mo, let d, let h, let m):
             return calendar.nextDate(after: now, matching: DateComponents(month: mo, day: d, hour: h, minute: m, second: 0), matchingPolicy: .strict)
+        case .region:
+            return nil
         }
     }
 }
@@ -67,19 +80,31 @@ public enum NotificationPlanner {
         now: Date = Date(), calendar: Calendar = .current
     ) -> [PlannedNotification] {
         specs.flatMap { spec -> [PlannedNotification] in
-            if spec.isConditional { return [] } // #265 条件の通知は予約しない(ConditionNotifications)
-            if spec.isRecordBased, let entity = spec.entity {
-                return (records[entity] ?? []).flatMap { planRecord(appId: appId, spec: spec, record: $0, now: now, calendar: calendar) }
-            }
-            guard let trigger = fixedTrigger(spec, now: now, calendar: calendar) else { return [] }
-            return [PlannedNotification(identifier: identifier(appId: appId, specId: spec.id), title: spec.title, body: spec.body, trigger: trigger)]
+            planSpec(appId: appId, spec: spec, records: records, now: now, calendar: calendar)
+                .flatMap { jittered($0, minutes: spec.jitterMinutes, now: now, calendar: calendar) }
+                .map { $0.marked(alarm: spec.alarm) }
         }
+    }
+
+    private static func planSpec(
+        appId: String, spec: NotificationSpec, records: [String: [Record]], now: Date, calendar: Calendar
+    ) -> [PlannedNotification] {
+        if spec.isConditional { return [] } // #265 条件の通知は予約しない(ConditionNotifications)
+        if spec.isNearBased, let near = spec.near {
+            return (records[near.entity] ?? []).compactMap { planNear(appId: appId, spec: spec, near: near, record: $0) }
+        }
+        if spec.isRecordBased, let entity = spec.entity {
+            return (records[entity] ?? []).flatMap { planRecord(appId: appId, spec: spec, record: $0, now: now, calendar: calendar) }
+        }
+        guard let trigger = fixedTrigger(spec, now: now, calendar: calendar) else { return [] }
+        return [PlannedNotification(identifier: identifier(appId: appId, specId: spec.id), title: spec.title, body: spec.body, trigger: trigger)]
     }
 
     /// ボタンで押した時の予約(固定時刻のみ)。
     public static func action(appId: String, spec: NotificationSpec, now: Date = Date(), calendar: Calendar = .current) -> PlannedNotification? {
-        guard !spec.isConditional, let trigger = fixedTrigger(spec, now: now, calendar: calendar) else { return nil }
+        guard !spec.isConditional, !spec.isNearBased, let trigger = fixedTrigger(spec, now: now, calendar: calendar) else { return nil }
         return PlannedNotification(identifier: actionIdentifier(appId: appId, specId: spec.id), title: spec.title, body: spec.body, trigger: trigger)
+            .marked(alarm: spec.alarm)
     }
 
     /// 近い順に上限まで。過ぎた 1 回きりは落とす。
@@ -204,5 +229,13 @@ public enum NotificationPlanner {
 
     public static func weekdayNumber(_ w: String?) -> Int {
         ["sun": 1, "mon": 2, "tue": 3, "wed": 4, "thu": 5, "fri": 6, "sat": 7][w ?? ""] ?? 2
+    }
+}
+
+extension PlannedNotification {
+    func marked(alarm: Bool?) -> PlannedNotification {
+        var p = self
+        p.alarm = alarm == true ? true : nil
+        return p
     }
 }

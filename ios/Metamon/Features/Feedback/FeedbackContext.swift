@@ -51,12 +51,7 @@ struct FeedbackContext: Identifiable {
 
     @MainActor
     static func currentDevice() -> FeedbackSubmission.Device {
-        let info = Bundle.main.infoDictionary ?? [:]
-        return .init(appVersion: info["CFBundleShortVersionString"] as? String ?? "-",
-                     build: info["CFBundleVersion"] as? String ?? "-",
-                     os: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)",
-                     model: modelIdentifier(),
-                     locale: LanguagePreference.shared.code)
+        FeedbackCopy.device(os: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)", model: modelIdentifier())
     }
 
     /// 機種の識別子(例 iPhone17,1)。シミュレータは模している機種。

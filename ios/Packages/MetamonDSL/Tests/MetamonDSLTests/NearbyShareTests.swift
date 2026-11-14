@@ -3,6 +3,10 @@ import XCTest
 
 /// `nearbyShare`(#36)の送受信データ・取り込み判定。MultipeerConnectivity を通さずに検証する。
 final class NearbyShareTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     private func attendance() throws -> (AppDSL, Entity) {
         let dsl = try ExamplesFixture.load("attendance_nearby")
         return (dsl, try XCTUnwrap(dsl.entity("attendance")))
@@ -97,5 +101,79 @@ final class NearbyShareTests: XCTestCase {
         let (_, entity) = try attendance()
         let many = Array(repeating: ["name": JSONValue.string("a")], count: NearbyShare.maxReceiveRecords + 10)
         XCTAssertEqual(NearbyShare.sanitize(many, into: entity, sameApp: true).count, NearbyShare.maxReceiveRecords)
+    }
+
+    func testReceiveByteAndLengthLimits() throws {
+        let (_, entity) = try attendance()
+        let payload = NearbyShare.makePayload(sender: "花子", appId: "app1", appName: "出席カード", entity: entity,
+                                              records: [["name": .string("花子")]])
+        XCTAssertEqual(NearbyShare.decodePayload(try NearbyShare.encode(payload)), payload)
+        XCTAssertNil(NearbyShare.decodePayload(Data(repeating: 0x20, count: NearbyShare.maxReceiveBytes + 1)), "大きすぎるデータは読まない")
+        XCTAssertNil(NearbyShare.decodeHeader(Data(repeating: 0x20, count: NearbyShare.maxHeaderBytes + 1)))
+
+        var tooMany = payload
+        tooMany.records = Array(repeating: ["name": .string("a")], count: NearbyShare.maxReceiveRecords + 1)
+        XCTAssertNil(NearbyShare.decodePayload(try NearbyShare.encode(tooMany)), "受け取る件数の上限を超えたら捨てる")
+
+        var h = payload.header
+        h.sender = String(repeating: "名", count: 200)
+        h.appName = String(repeating: "a", count: 300)
+        h.count = 10_000
+        let v = try XCTUnwrap(NearbyShare.decodeHeader(try NearbyShare.encode(h)))
+        XCTAssertEqual(v.sender.count, NearbyLimits.maxNameLength, "名前は切り詰める")
+        XCTAssertEqual(v.appName.count, NearbyLimits.maxLabelLength)
+        XCTAssertEqual(v.count, NearbyShare.maxReceiveRecords)
+
+        var longEntity = payload.header
+        longEntity.entityId = String(repeating: "e", count: NearbyLimits.maxIdLength + 1)
+        XCTAssertNil(NearbyShare.decodeHeader(try NearbyShare.encode(longEntity)), "id が長すぎる招待は断る")
+        var manyFields = payload.header
+        manyFields.fields = (0...NearbyLimits.maxFields).map { .init(id: "f\($0)", type: "string") }
+        XCTAssertNil(NearbyShare.decodeHeader(try NearbyShare.encode(manyFields)), "項目一覧が長すぎる招待は断る")
+        var anonymous = payload.header
+        anonymous.sender = ""
+        XCTAssertEqual(NearbyShare.decodeHeader(try NearbyShare.encode(anonymous))?.sender, NearbyLimits.anonymousName)
+
+        let ack = NearbyShare.Ack(ok: true, added: 9_999, message: String(repeating: "m", count: 1000))
+        let a = try XCTUnwrap(NearbyShare.decodeAck(try NearbyShare.encode(ack)))
+        XCTAssertEqual(a.added, NearbyShare.maxReceiveRecords)
+        XCTAssertEqual(a.message?.count, NearbyLimits.maxMessageLength)
+    }
+
+    func testSendStaysUnderByteLimit() throws {
+        let (_, entity) = try attendance()
+        let big = String(repeating: "あ", count: 4000) // 約 12 KB / 件
+        let rows = (0..<NearbyShare.maxSendRecords).map { _ in ["name": JSONValue.string(big)] }
+        let p = NearbyShare.makePayload(sender: "s", appId: "a", appName: "x", entity: entity, records: rows)
+        XCTAssertLessThanOrEqual(try NearbyShare.encode(p).count, NearbyShare.maxSendBytes)
+        XCTAssertLessThan(p.records.count, NearbyShare.maxSendRecords)
+        XCTAssertEqual(p.header.count, p.records.count)
+        XCTAssertLessThan(NearbyShare.maxSendBytes, NearbyShare.maxReceiveBytes, "受け取る上限は送る上限より大きい")
+    }
+
+    /// 「名前を出さない」(すれ違い通信と同じ設定): MCPeerID と Header の送り主が「近くの人」になり、オフなら本名。
+    func testAnonymousSenderAndPeerName() throws {
+        let (_, entity) = try attendance()
+        let rows: [[String: JSONValue]] = [["name": .string("花子")]]
+
+        let anonPeer = NearbyLimits.peerName("花子のiPhone", anonymous: true)
+        XCTAssertEqual(anonPeer, NearbyLimits.anonymousName)
+        let anon = NearbyShare.makePayload(sender: anonPeer, appId: "a", appName: "x", entity: entity, records: rows)
+        XCTAssertEqual(anon.header.sender, NearbyLimits.anonymousName)
+        let anonHeader = try NearbyShare.decodeHeader(NearbyShare.encode(anon.header))
+        XCTAssertEqual(anonHeader?.sender, NearbyLimits.anonymousName, "受け取った側でも決まった文言のまま")
+        XCTAssertEqual(NearbyLimits.displayName(anonHeader?.sender ?? ""), "近くの人")
+
+        let realPeer = NearbyLimits.peerName(" 花子のiPhone ", anonymous: false)
+        XCTAssertEqual(realPeer, "花子のiPhone")
+        let real = NearbyShare.makePayload(sender: realPeer, appId: "a", appName: "x", entity: entity, records: rows)
+        XCTAssertEqual(real.header.sender, "花子のiPhone")
+
+        XCTAssertEqual(real.sent(as: anonPeer).header.sender, NearbyLimits.anonymousName, "送る直前に今の名前へ差し替える")
+        XCTAssertEqual(real.sent(as: anonPeer).records, real.records)
+        XCTAssertEqual(NearbyLimits.peerName("", anonymous: false), NearbyLimits.anonymousName, "空なら「近くの人」")
+        let long = NearbyLimits.peerName(String(repeating: "あ", count: 60), anonymous: false)
+        XCTAssertLessThanOrEqual(long.utf8.count, 63, "MCPeerID の上限(UTF-8 63 バイト)")
+        XCTAssertTrue(long.hasPrefix("あ"))
     }
 }

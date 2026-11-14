@@ -25,15 +25,17 @@ const (
 	defaultMaxRetries = 2
 )
 
-// Message is one conversation turn (text only).
+// Message is one conversation turn. Images (a user turn of /v1/text only,
+// client_image.go) are never read from a request body and never logged.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string       `json:"role"`
+	Content string       `json:"content"`
+	Images  []ImageBlock `json:"-"`
 }
 
 // Completion is one structured-output request to Claude.
 type Completion struct {
-	System    string          // cached as a single text block
+	System    string          // first cached system block
 	Messages  []Message       // user/assistant turns
 	Schema    json.RawMessage // output_config.format json_schema
 	MaxTokens int
@@ -51,6 +53,13 @@ type Completion struct {
 	// Thinking, when set, is sent as thinking.type (adaptive|disabled|
 	// between_tools). Empty = omitted (the model default, adaptive).
 	Thinking string
+	// SystemSuffix, when set, is a second cached block after System (edit
+	// rules): the model reads System+SystemSuffix, and a request whose System
+	// equals another's (create) reuses that cached prefix.
+	SystemSuffix string
+	// SystemTail, when set, is an uncached block after both: per-request
+	// rules (on_demand_rules.go) that must not change the cached prefix.
+	SystemTail string
 }
 
 // Usage is the token accounting of one call.
@@ -118,6 +127,9 @@ type Client struct {
 	// ("compiled grammar is too large" / "too many optional parameters"), so
 	// the schema goes into the prompt instead and dsl.Parse stays the gate.
 	StructuredOutput bool
+	// GenerateCacheTTL is CacheTTL1h to cache a create turn's system blocks
+	// for an hour (AI_GENERATE_CACHE_TTL, #2295); otherwise 5 minutes.
+	GenerateCacheTTL string
 	// Logger receives the per-attempt ai.usage line (#298); nil = slog.Default().
 	Logger *slog.Logger
 }
@@ -226,8 +238,15 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if req.Thinking != "" {
 		wr.Thinking = map[string]any{"type": req.Thinking}
 	}
-	if req.System != "" {
-		wr.System = []wireBlock{{Type: "text", Text: req.System, CacheControl: map[string]any{"type": "ephemeral"}}}
+	cacheTTL := ""
+	for _, t := range []string{req.System, req.SystemSuffix} {
+		if t != "" {
+			cacheTTL = c.systemCacheTTL(ctx)
+			wr.System = append(wr.System, wireBlock{Type: "text", Text: t, CacheControl: cacheControl(cacheTTL)})
+		}
+	}
+	if req.SystemTail != "" {
+		wr.System = append(wr.System, wireBlock{Type: "text", Text: req.SystemTail})
 	}
 	oc := map[string]any{}
 	if effort != "" {
@@ -269,7 +288,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 		}
 		started := time.Now()
 		resp, err := c.once(ctx, body, onText)
-		c.logUsage(ctx, usageRecord{model: model, stream: req.OnText != nil, attempt: attempt + 1, resp: resp, err: err, latency: time.Since(started)})
+		c.logUsage(ctx, usageRecord{model: model, stream: req.OnText != nil, attempt: attempt + 1, resp: resp, err: err, latency: time.Since(started), cacheTTL: cacheTTL})
 		if err == nil {
 			return resp, nil
 		}

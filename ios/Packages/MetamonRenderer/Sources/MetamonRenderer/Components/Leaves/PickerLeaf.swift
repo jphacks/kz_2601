@@ -6,6 +6,7 @@ import MetamonDSL
 struct PickerLeaf: View {
     let c: Component
     let ctx: RenderContext
+    @FocusState private var focused: Bool
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
@@ -15,6 +16,20 @@ struct PickerLeaf: View {
             let picker = Picker(c.label ?? "", selection: selection) {
                 ForEach(options, id: \.self) { Text($0).tag($0) }
             }
+            #if os(macOS)
+            // Mac: 4 件以下はラジオ・それ以上はメニュー(DSL の style が優先・#942)
+            LabeledInput(label: c.label) {
+                Group {
+                    switch MacPickerStyle.choose(hint: c.style, optionCount: options.count) {
+                    case .radioGroup: picker.pickerStyle(.radioGroup).labelsHidden()
+                    case .segmented: picker.pickerStyle(.segmented).labelsHidden()
+                    case .menu: picker.pickerStyle(.menu).labelsHidden()
+                    }
+                }
+                .focused($focused) // フルキーボードアクセスが on の時の Tab の止まり先(#2065)
+                .macFormTabStop(c, $focused)
+            }
+            #else
             switch Self.style(c, optionCount: options.count) {
             case "segmented":
                 LabeledInput(label: c.label) {
@@ -23,7 +38,7 @@ struct PickerLeaf: View {
                         .accessibilityLabel(c.label ?? "")
                 }
             case "wheel":
-                picker.pickerStyle(.wheel).frame(height: 120)
+                picker.wheelPickerStyle().frame(height: 120)
             default:
                 // menu は List/Form の外ではラベルを描かないので、他の入力と同じく上にラベルを出す
                 LabeledInput(label: c.label) {
@@ -31,6 +46,7 @@ struct PickerLeaf: View {
                                selection: selection, options: options.map { ($0, $0) })
                 }
             }
+            #endif
         } else {
             NeedsForm(c: c)
         }

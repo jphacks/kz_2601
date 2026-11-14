@@ -12,6 +12,12 @@ struct SettingsSheet: View {
     @State private var confirmDelete = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    /// ログアウトの確認(端末のデータを消す・未送信の扱い)
+    @State private var signOutPrompt: SignOutFlow.Prompt?
+    /// 送ってからログアウトしようとして送り切れなかった件数
+    @State private var signOutUnsent: Int?
+    @State private var isSigningOut = false
+    @State private var signOutError: String?
     @State private var showSupportDetails = false
     @State private var copiedSupportInfo = false
     #if !APP_STORE_REVIEW
@@ -23,6 +29,7 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                LinkedAccountsSection() // #361 つながっているサインインの方法・Apple をつなぐ
                 #if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、投稿に出す名前も出さない(#247)
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
                 #endif
@@ -31,13 +38,24 @@ struct SettingsSheet: View {
                 #endif
                 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
+                CoinSettingsSection() // #630 コイン(サーバーが有効にした時だけ)
                 #endif
+                #if !APP_STORE_REVIEW // 審査用の版は OAuth の provider を外す(決定 6)
+                if ConnectedServicesPolicy.isAvailable { ConnectedServicesSection() } // #1493 つないだサービス
+                #endif
+                RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
+                UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
+                Section { AppIconSettingsRow() } // #232 ホーム画面のアイコン(全員・審査用の版も出す)
+                ActionButtonHintSection() // #1993 iOS 17 だけ: アクションボタンにショートカットを割り当てる案内
                 voiceModelSection
                 clarifySection
                 speechSection
                 appSection
                 if !rt.dsl.app.notifications.isEmpty { notificationSection }
+                #if !APP_STORE_REVIEW
+                PushConsentSection() // #269
+                #endif
                 RetentionSettingsSection() // #482 記録の自動削除
                 syncSection
                 #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(プライバシーの表示に無い種類を集めるため・#319)
@@ -47,12 +65,16 @@ struct SettingsSheet: View {
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 supportSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
+                #if METAMON_STG // 開発用メニュー(#2079): stg の版だけ・接続先が prod なら出さない
+                if DebugMenuPolicy.isAvailable { DebugMenuEntrySection() }
+                #endif
             }
             .navigationTitle("設定")
+            .task { await rt.refreshPlanUsage() } // #317 使っている量(5 分キャッシュ)
             .screenMapSheet { dismiss() } // 設定は音声シートから開くので、閉じればその画面の文脈で話せる
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } }
+                SheetCloseToolbarItem { dismiss() }
             }
             .confirmationDialog(L10n.key("アプリを初期状態に戻しますか？", review: "今の記録帳を初期状態に戻しますか？"), isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("初期状態に戻す", role: .destructive) {
@@ -61,7 +83,7 @@ struct SettingsSheet: View {
                 }
                 Button("キャンセル", role: .cancel) {}
             } message: {
-                Text(L10n.key("生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
+                Text(L10n.key("作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
             }
         }
         .presentationDetents([.medium, .large])
@@ -77,17 +99,46 @@ struct SettingsSheet: View {
         } message: {
             Text(deleteError ?? "")
         }
+        .alert("ログアウトしますか？", isPresented: Binding(get: { signOutPrompt != nil }, set: { if !$0 { signOutPrompt = nil } }),
+               presenting: signOutPrompt) { prompt in
+            switch prompt {
+            case .plain:
+                Button("ログアウト", role: .destructive) { signOut(.discardAndWipe) }
+            case .unsent(_, let canSend):
+                if canSend {
+                    Button("送ってからログアウト") { signOut(.sendThenWipe) }
+                        .keyboardShortcut(.defaultAction)
+                }
+                Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: { prompt in
+            Text(SignOutCopy.message(isAnonymous: session.user?.isAnonymous == true, prompt: prompt))
+        }
+        .alert("送れなかった記録があります", isPresented: Binding(get: { signOutUnsent != nil }, set: { if !$0 { signOutUnsent = nil } }),
+               presenting: signOutUnsent) { _ in
+            Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+            Button("キャンセル", role: .cancel) {}
+        } message: { n in
+            Text(SignOutCopy.unsentAfterFlush(n))
+        }
+        .alert("ログアウトできませんでした", isPresented: Binding(get: { signOutError != nil }, set: { if !$0 { signOutError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(signOutError ?? "")
+        }
         .overlay {
-            if isDeleting {
-                ProgressView("削除しています…")
+            if isDeleting || isSigningOut {
+                ProgressView(LocalizedStringKey(isDeleting ? "削除しています…" : "ログアウトしています…"))
                     .padding(Theme.Spacing.lg)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
         }
-        .interactiveDismissDisabled(isDeleting)
+        .interactiveDismissDisabled(isDeleting || isSigningOut)
         #if !APP_STORE_REVIEW
+        .coinSheets() // #630 設定の上にお店・プランの比較を重ねる
         .sheet(item: $feedback) { ctx in
-            FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+            FeedbackComposerView(context: ctx, client: services.feedback, notifyWhenFixed: services.loopNotices.map { FeedbackFixedOptIn.live(client: $0) }) { feedback = nil }
         }
         #endif
         #if DEBUG
@@ -107,16 +158,22 @@ struct SettingsSheet: View {
     /// アカウント削除(#119・App Store 5.1.1(v))。サーバーで論理削除 → 端末のデータ → サインアウト。
     @ViewBuilder
     private var deleteAccountSection: some View {
-        if session.user != nil {
+        if session.user != nil, !BuildConfig.isDebugTestAccount { // 試験用の枠は消さない(#2084)
             Section {
                 Button(role: .destructive) { confirmDelete = true } label: {
                     Label("アカウントを削除", systemImage: "person.crop.circle.badge.xmark")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(rt.canDelete ? Color.red : Color.secondary) // 生成中は押せない見た目に
                 }
-                .disabled(isDeleting)
+                .disabled(isDeleting || isSigningOut || !rt.canDelete)
                 .accessibilityIdentifier("settings.deleteAccount")
             } footer: {
-                Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    if !rt.canDelete {
+                        Text(AppRuntime.deleteBlockedReason)
+                            .accessibilityIdentifier("settings.deleteAccount.blocked")
+                    }
+                    Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
+                }
             }
         }
     }
@@ -130,13 +187,30 @@ struct SettingsSheet: View {
     }
 
     private func deleteAccount() {
+        guard rt.canDelete else { return } // 確認を出した後に生成が始まった
         isDeleting = true
         Task {
             defer { isDeleting = false }
             do {
                 if try await session.deleteAccount(account: services.account, runtime: rt) { dismiss() }
             } catch {
-                deleteError = error.localizedDescription
+                deleteError = ErrorCopy.accountFailureBody(error, context: "account delete")
+            }
+        }
+    }
+
+    /// ログアウト: 端末のデータをアカウント削除と同じに消してからサインアウトする。
+    private func signOut(_ choice: SignOutFlow.Choice) {
+        isSigningOut = true
+        Task {
+            defer { isSigningOut = false }
+            do {
+                switch try await session.signOutAndWipe(runtime: rt, choice: choice) {
+                case .signedOut: dismiss()
+                case .unsent(let n): signOutUnsent = n
+                }
+            } catch {
+                signOutError = ErrorCopy.accountFailureBody(error, context: "sign out")
             }
         }
     }
@@ -153,7 +227,7 @@ struct SettingsSheet: View {
                         .font(.body.weight(.medium))
                         .accessibilityIdentifier("settings.accountStatus")
                 }
-                if user.isAnonymous {
+                if user.isAnonymous && !BuildConfig.isDebugTestAccount { // 試験用の枠は Apple に引き継がない(#2084)
                     // #276: uid を保ったまま Apple に昇格(作ったアプリとデータはそのまま)
                     AppleLinkButton()
                         .listRowInsets(EdgeInsets(top: Theme.Spacing.sm, leading: Theme.Spacing.md, bottom: Theme.Spacing.sm, trailing: Theme.Spacing.md))
@@ -162,16 +236,22 @@ struct SettingsSheet: View {
                     }
                 }
                 Button("ログアウト", role: .destructive) {
-                    session.signOut()
-                    dismiss()
+                    Task {
+                        await rt.settlePendingRecordDeletes() // 取り消し待ちの削除(M11)も未送信に数える
+                        signOutPrompt = SignOutFlow.prompt(pending: rt.recordSync.pendingCount, isOnline: rt.recordSync.isOnline)
+                    }
                 }
+                .disabled(isDeleting || isSigningOut)
+                .accessibilityIdentifier("settings.signOut")
             } else {
                 Text("サインインしていません").foregroundStyle(.secondary)
             }
         } header: {
             Text("アカウント")
         } footer: {
-            if session.user?.isAnonymous == true {
+            if BuildConfig.isDebugTestAccount {
+                Text(verbatim: "開発用メニューの試験用の枠です。いつもの Apple ID と結びつかないように、Apple への引き継ぎとアカウントの削除は出しません。")
+            } else if session.user?.isAnonymous == true {
                 Text(L10n.key("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。",
                                review: "Apple でサインインすると、用意した記録帳とデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、用意した記録帳に戻れません。"))
             }
@@ -236,10 +316,11 @@ struct SettingsSheet: View {
             Toggle(SpeechCopy.settingTitle, isOn: $reader.enabled)
                 .tint(Theme.Colors.brandA)
                 .accessibilityIdentifier("settings.speech")
+            SpeechVoiceSettingsRows() // 声と速さ(#2229)
         } header: {
             Text(SpeechCopy.sectionTitle)
         } footer: {
-            Text(SpeechCopy.settingFooter)
+            Text(SpeechCopy.settingFooter + "\n" + SpeechVoiceCopy.footer)
         }
     }
 
@@ -249,10 +330,13 @@ struct SettingsSheet: View {
                 dismiss()
                 Task { await rt.undo() }
             } label: {
-                Label("ひとつ前の状態に戻す", systemImage: "arrow.uturn.backward")
+                Label("元に戻す", systemImage: "arrow.uturn.backward")
             }
             .disabled(rt.isMorphing)
             ScreenMapSettingsRow() // #116
+            #if !APP_STORE_REVIEW // 審査用ビルドは serverRules を作らない(#614)
+            AutomationsSettingsRow() // #347 自動の動き(serverRules があるアプリだけ)
+            #endif
             Button {
                 dismiss()
                 rt.replayTutorial() // #274
@@ -260,6 +344,14 @@ struct SettingsSheet: View {
                 Label("使い方を見る", systemImage: "questionmark.circle")
             }
             .accessibilityIdentifier("settings.tutorial")
+            Button {
+                dismiss()
+                rt.replayCoachMarks() // #1441
+            } label: {
+                Label("操作のヒントをもう一度見る", systemImage: "hand.tap")
+            }
+            .accessibilityHint("長押しやドラッグなど、見た目から分からない操作の案内をもう一度出します")
+            .accessibilityIdentifier("settings.coachMarks")
             NavigationLink {
                 // #415: 選んだ例は音声画面(か対話)の入力欄に入る。送らない
                 PromptTipsView { text in
@@ -270,6 +362,13 @@ struct SettingsSheet: View {
                 Label("頼み方のコツ", systemImage: "lightbulb")
             }
             .accessibilityIdentifier("settings.tips")
+            NavigationLink {
+                AutomationGuideView() // #1995 ショートカットのオートメーションの案内
+            } label: {
+                Label("ショートカットで自動にする", systemImage: "clock.arrow.2.circlepath")
+            }
+            .accessibilityHint("App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます")
+            .accessibilityIdentifier("settings.automationGuide")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label(L10n.key("アプリをリセット(初期状態に戻す)", review: "記録帳をリセット(初期状態に戻す)"), systemImage: "arrow.counterclockwise")
             }
@@ -304,6 +403,9 @@ struct SettingsSheet: View {
                 Label("フィードバックを送る", systemImage: "envelope")
             }
             .accessibilityIdentifier("settings.feedback")
+            if let notices = services.loopNotices {
+                NoticesSettingsRow(client: notices) // #374 「あなたの声で直りました」
+            }
         } footer: {
             Text("端末を振っても開けます。何を送るかは送る前に選べます。")
         }
@@ -320,12 +422,25 @@ struct SettingsSheet: View {
                     Label("通知がオフです(タップで設定を開く)", systemImage: "bell.slash")
                 }
             }
-            if rt.upcomingNotifications.isEmpty {
+            if rt.placesLocationOff {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label("位置情報が許可されていないため、場所に着いた時の通知は届きません(タップで設定を開く)", systemImage: "location.slash")
+                }
+                .accessibilityIdentifier("settings.placesLocationOff")
+            } else if rt.notificationPlaces > 0 {
+                Label("保存した場所 \(rt.notificationPlaces) か所の近くに着いたら知らせます", systemImage: "location")
+                    .foregroundStyle(.secondary)
+            }
+            let list = UpcomingNotificationList(rt.upcomingNotifications, places: rt.notificationPlaces,
+                                                locationOff: rt.placesLocationOff)
+            if list.isEmpty {
                 Text("予約中の通知はありません").foregroundStyle(.secondary)
             }
-            ForEach(Array(rt.upcomingNotifications.prefix(5).enumerated()), id: \.offset) { _, n in
+            ForEach(list.rows) { n in
                 LabeledContent {
-                    Text(NotificationCopy.when(n.date)).monospacedDigit()
+                    Text(n.when).monospacedDigit()
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(n.title)
@@ -390,6 +505,7 @@ struct SettingsSheet: View {
             }
             .font(.body)
             .accessibilityIdentifier("settings.contact")
+            LicensesLink() // #306: 審査用の版にも出す
             DisclosureGroup(isExpanded: $showSupportDetails) {
                 ForEach(info.rows, id: \.label) { row in
                     LabeledContent(row.label) {

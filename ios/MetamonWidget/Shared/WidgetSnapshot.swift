@@ -2,7 +2,7 @@ import Foundation
 
 /// 本体 → ウィジェットの受け渡しデータ。App Group の `UserDefaults` に JSON で 1 件だけ置く。
 /// 集計は本体(`WidgetSnapshotWriter` / `Aggregator`)で済ませ、ウィジェットは文字列を描画するだけ(Renderer/DSL 非依存)。
-/// このファイルは Metamon 本体と MetamonWidget の両ターゲットにコンパイルされる(project.yml)。
+/// このファイルは Metamon 本体と MetamonWidget、Mac の MetamonMac と MetamonMacWidget(#984)にコンパイルされる(project.yml)。
 struct WidgetSnapshot: Codable, Equatable {
     struct Stat: Codable, Equatable, Identifiable {
         var id: String { key }
@@ -46,6 +46,8 @@ struct WidgetSnapshot: Codable, Equatable {
     /// 新しい順の記録。nil = 出さない(entity が無い・未取得)/ 空 = まだ記録が無い。
     var recent: [Row]? = nil
     var trend: Trend? = nil
+    /// どのアプリの数字か(Mac: 押した時にそのアプリを開く・#984 / iOS: 集中モードのフィルタで出すか決める・#1992)。古いスナップショットは nil
+    var appId: String? = nil
 
     static let appGroupID = "group.jp.kz2601.metamon"
     private static let storageKey = "metamon.widget.snapshot"

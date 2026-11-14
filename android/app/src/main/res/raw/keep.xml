@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- リソース縮小(#1134)で消さない。GoogleSignIn が getIdentifier で名前から引く(google-services が生成する) -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@string/default_web_client_id" />

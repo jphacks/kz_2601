@@ -3,6 +3,10 @@ import XCTest
 
 /// `export`(#421): CSV のエスケープ・BOM、列の選び方(写真・hidden)、行の並び、ファイル名、Action のデコード。
 final class RecordExportTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     private func entity(_ json: String) throws -> Entity {
         try JSONDecoder().decode(Entity.self, from: Data(json.utf8))
     }

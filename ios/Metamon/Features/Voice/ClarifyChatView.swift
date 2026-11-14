@@ -9,10 +9,16 @@ import MetamonServices
 /// - 入力はマイク(WhisperKit・録音は親の `VoiceInputView` が持つ)+ 文字入力
 struct ClarifyChatView: View {
     @Environment(AppRuntime.self) private var rt
+    /// 横向き(#625)でキーボードが出ている間は、選択肢・ボタンを畳んで入力欄と吹き出しの場所を残す
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let micMode: MicButton.Mode
     let statusText: String
     let onMic: () -> Void
     let onSend: (String) -> Void
+    #if !APP_STORE_REVIEW
+    /// 続けて失敗している自動の動きの「直しますか?」(#347)。nil = 出さない
+    var automationFix: AutomationFixOfferModel? = nil
+    #endif
 
     @State private var typed = ""
     /// #220: 複数選択中の案・チップ。返事(吹き出しの数)が変わったら空に戻す
@@ -35,6 +41,9 @@ struct ClarifyChatView: View {
     private var multiSelect: Bool { rt.chatTurn?.isMultiSelect == true }
     private var current: MultiPick { pick.key == rt.chatBubbles.count ? pick : MultiPick(key: rt.chatBubbles.count) }
 
+    /// 横向き + 文字入力中(#625): 画面の大半がキーボードに隠れ、選択肢とボタンを出すと吹き出しが 0 行になる
+    private var collapsesOffer: Bool { LandscapeLayout.isCompactHeight(verticalSizeClass) && typing }
+
     var body: some View {
         transcriptScroll
             .padding(.top, Theme.Spacing.sm)
@@ -47,16 +56,26 @@ struct ClarifyChatView: View {
                     }
                     #if APP_STORE_REVIEW
                     // 審査用ビルドは App 内課金を持たない(#450 G1)
-                    suggestionChips
-                    actionButton
+                    if !collapsesOffer {
+                        suggestionChips
+                        actionButton
+                    }
                     #else
                     if let paid = rt.paidConfirm {
                         PaidFeatureCard(confirmation: paid)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else {
+                    } else if rt.heldBuild != nil {
+                        HeldBuildCard() // H3: 無料枠切れで止めた。会話は残して「続きから作る」
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if !collapsesOffer {
+                        if let automationFix, !busy, rt.errorCard == nil { AutomationFixOfferRow(model: automationFix) }
                         suggestionChips
                         actionButton
                     }
+                    #endif
+                    RemainingTodayBadge() // #630 今日の残り
+                    #if !APP_STORE_REVIEW
+                    CoinEstimateLine(operation: rt.dsl.isVoiceOnly ? .generate : .edit) // #630 送る前の「約 N コイン」
                     #endif
                     inputRow
                 }
@@ -101,6 +120,9 @@ struct ClarifyChatView: View {
                         BubbleRow(bubble: bubble, emphasized: bubble.id == lastAssistantId && rt.chatTurn?.kind == .question)
                             .id(bubble.id)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    if !rt.chatPending, let n = QuestionProgress.number(bubbles: rt.chatBubbles, mode: rt.chatMode, latest: rt.chatTurn?.kind) {
+                        QuestionProgressLabel(number: n) // M5 あと何問か
                     }
                     if rt.chatPending {
                         TypingIndicator()
@@ -217,29 +239,28 @@ struct ClarifyChatView: View {
             let multi = multiSelect && rt.chatTurn?.kind == .question
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 if multi { MultiSelectHint() }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        ForEach(chips, id: \.self) { chip in
-                            let on = multi && current.chips.contains(chip)
-                            Button { if multi { toggle(chip: chip) } else { onSend(chip) } } label: {
-                                HStack(spacing: 4) {
-                                    if multi { Image(systemName: on ? "checkmark.circle.fill" : "circle") }
-                                    Text(chip)
-                                }
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                                .padding(.horizontal, Theme.Spacing.md)
-                                .padding(.vertical, Theme.Spacing.sm + 2)
-                                .background(on ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.surface), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.35)))
+                // M5: 横スクロールだと画面の外のチップに気づかないので、折り返して全部見せる
+                ChipFlowLayout(spacing: Theme.Spacing.sm) {
+                    ForEach(chips, id: \.self) { chip in
+                        let on = multi && current.chips.contains(chip)
+                        Button { if multi { toggle(chip: chip) } else { onSend(chip) } } label: {
+                            HStack(spacing: 4) {
+                                if multi { Image(systemName: on ? "checkmark.circle.fill" : "circle") }
+                                Text(chip)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("chat.chip")
-                            .accessibilityAddTraits(on ? .isSelected : [])
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                            .padding(.horizontal, Theme.Spacing.md)
+                            .padding(.vertical, Theme.Spacing.sm + 2)
+                            .background(on ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.surface), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.35)))
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("chat.chip")
+                        .accessibilityAddTraits(on ? .isSelected : [])
                     }
-                    .padding(.horizontal, 1)
                 }
+                .padding(.horizontal, 1)
                 if multi {
                     let enabled = MultiSelect.canSubmit(selectedCount: current.chips.count)
                     Button { onSend(MultiSelect.joinedAnswer(current.chips)) } label: {
@@ -331,6 +352,47 @@ struct ClarifyChatView: View {
 // MARK: - Parts
 
 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
+/// 無料枠切れで止めた新規作成(H3)。会話はそのまま。「続きから作る」は同じ依頼で作る(枠が無ければ課金画面)。
+private struct HeldBuildCard: View {
+    @Environment(AppRuntime.self) private var rt
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(alignment: .top) {
+                Label(L10n.tr("今日の無料作成(\(rt.dailyFreeCreations)回)を使い切りました"), systemImage: "crown.fill")
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("held.headline")
+                Spacer(minLength: Theme.Spacing.sm)
+                Button { rt.dismissHeldBuild() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("閉じる"))
+                .accessibilityIdentifier("held.close")
+            }
+            Text(L10n.tr("会話はこのまま残っています。Tailor It Pro にすると、続きからすぐ作れます。明日になると、また無料で作れます。"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { Task { await rt.continueHeldBuild() } } label: {
+                Text(L10n.tr("続きから作る"))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Theme.brandGradient, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(rt.morphJob != nil)
+            .accessibilityIdentifier("held.continue")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metamonCard()
+    }
+}
+
 /// 有料機能の確認カード(#77)。「〇〇には Tailor It Pro(¥500 / 月)が必要です」→ 購入して作る(= 課金画面・#414)/ この機能なしで作る。
 private struct PaidFeatureCard: View {
     @Environment(AppRuntime.self) private var rt
@@ -360,10 +422,11 @@ private struct PaidFeatureCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // H4: 課金画面は自動では開かず、「Pro にする」を押した時に開く(#414 はこれで満たす)
             Button { Task { await rt.purchaseAndBuild() } } label: {
                 HStack(spacing: Theme.Spacing.sm) {
                     if rt.paidConfirmBusy { ProgressView().tint(.white) }
-                    Text(L10n.tr("購入して作る")).font(.headline)
+                    Text(L10n.tr("Pro にする")).font(.headline)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -397,6 +460,59 @@ private struct PaidFeatureCard: View {
     }
 }
 #endif
+
+/// 答えのチップを左から並べ、幅が足りなければ次の行へ折り返す(M5)。
+struct ChipFlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        let rows = Self.rows(sizes: measure(subviews, maxWidth: maxWidth), maxWidth: maxWidth, spacing: spacing)
+        return CGSize(width: rows.map(\.width).max() ?? 0, height: rows.last.map { $0.y + $0.height } ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = measure(subviews, maxWidth: bounds.width)
+        for row in Self.rows(sizes: sizes, maxWidth: bounds.width, spacing: spacing) {
+            var x = bounds.minX
+            for index in row.items {
+                subviews[index].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(sizes[index]))
+                x += sizes[index].width + spacing
+            }
+        }
+    }
+
+    /// 長いチップは幅いっぱいで折り返した大きさ。
+    private func measure(_ subviews: Subviews, maxWidth: CGFloat) -> [CGSize] {
+        subviews.map { $0.sizeThatFits(ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)) }
+    }
+
+    struct Row: Equatable {
+        var items: [Int]
+        var y: CGFloat
+        var width: CGFloat
+        var height: CGFloat
+    }
+
+    /// 行の割り付け(純粋関数・テスト用)。1 つで幅を超えるチップは 1 行に 1 つ。
+    static func rows(sizes: [CGSize], maxWidth: CGFloat, spacing: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var current = Row(items: [], y: 0, width: 0, height: 0)
+        for (index, size) in sizes.enumerated() {
+            let width = min(size.width, maxWidth)
+            let needed = current.items.isEmpty ? width : current.width + spacing + width
+            if !current.items.isEmpty, needed > maxWidth {
+                rows.append(current)
+                current = Row(items: [], y: current.y + current.height + spacing, width: 0, height: 0)
+            }
+            current.width = current.items.isEmpty ? width : current.width + spacing + width
+            current.height = max(current.height, size.height)
+            current.items.append(index)
+        }
+        if !current.items.isEmpty { rows.append(current) }
+        return rows
+    }
+}
 
 private struct BubbleRow: View {
     let bubble: AppRuntime.ChatBubble

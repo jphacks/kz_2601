@@ -8,6 +8,8 @@ struct ButtonLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
     let ctx: RenderContext
+    /// 通信を待つアクション(lookupBook)の実行中。くるくるを出して二度押しを防ぐ
+    @State private var running = false
 
     /// 新規フォーム(recordId 無し)では `deleteRecord` を隠す。削除対象が無いので押しても何も起きないため。
     /// 他人の共有レコード(#249)では、更新できなければ `saveRecord`、作った人でなければ `deleteRecord` を隠す。
@@ -24,13 +26,36 @@ struct ButtonLeaf: View {
         isVisible(action: action, isEditing: form?.isEditing ?? false, readOnly: form?.isReadOnly ?? false, canDelete: form?.canDelete ?? true)
     }
 
-    /// icon 省略時の既定。書き出し(#421)は共有の矢印にして「押すと共有シートが開く」と分かるように。
+    /// icon 省略時の既定。書き出し(#421)は共有の矢印にして「押すと共有シートが開く」と分かるように。カレンダーへの追加も同じ考え。
     static func defaultIcon(_ action: Action?) -> String? {
-        action?.type == .export ? "square.and.arrow.up" : nil
+        switch action?.type {
+        case .export: "square.and.arrow.up"
+        case .addToCalendar: "calendar.badge.plus"
+        case .lookupBook: "text.book.closed"
+        default: nil
+        }
+    }
+
+    /// visibleTo "admins"(#272): 管理者でないと分かっている時だけ隠す(分からない間は出し、サーバーが判定する)。
+    /// 押してから終わるまで待つ間、くるくるを出すアクション。
+    static func showsProgress(_ action: Action?) -> Bool { action?.type == .lookupBook }
+
+    /// 押した時に同期で呼ぶ。実行中なら false(二度押し)。待つアクションは、最初の await より前に実行中にする。
+    static func begin(_ action: Action, running: inout Bool) -> Bool {
+        guard !running else { return false }
+        if showsProgress(action) { running = true }
+        return true
+    }
+
+    static func isVisible(visibleTo: String?, isAdmin: Bool?) -> Bool {
+        visibleTo != "admins" || isAdmin != false
     }
 
     var body: some View {
-        if Self.isVisible(action: c.action, form: ctx.form) {
+        // follow / unfollow(#270)は今の投稿の作者の状態に合う方だけ
+        if Self.isVisible(action: c.action, form: ctx.form),
+           Self.isVisible(visibleTo: c.visibleTo, isAdmin: rt.viewerIsAdmin),
+           rt.showsFollowButton(c.action, recordId: ctx.actionContext().currentRecordId) {
             styled
         }
     }
@@ -38,10 +63,26 @@ struct ButtonLeaf: View {
     @ViewBuilder
     private var styled: some View {
         let button = Button {
-            guard let action = c.action else { return }
-            Task { await rt.run(action, ctx.actionContext()) }
+            guard let action = c.action, Self.begin(action, running: &running) else { return }
+            let waits = Self.showsProgress(action)
+            Task {
+                // 保存・リセットはフォームを読む / 空にするので、変換中の文字を確定させてから(#627)
+                if TextSubmission.commitsInput(before: action.type) { await KeyboardState.finishEditing() }
+                await rt.run(action, ctx.actionContext())
+                if waits { running = false }
+            }
         } label: {
-            if let icon = c.icon ?? Self.defaultIcon(c.action) { Label(c.label ?? "", systemImage: icon) } else { Text(c.label ?? "") }
+            if running {
+                HStack(spacing: RenderTheme.Spacing.xs) {
+                    ProgressView()
+                    Text(c.label ?? "")
+                }
+                .accessibilityLabel(L("読み込み中…"))
+            } else if let icon = c.icon ?? Self.defaultIcon(c.action) {
+                Label(c.label ?? "", systemImage: icon)
+            } else {
+                Text(c.label ?? "")
+            }
         }
         switch c.style {
         case "secondary": button.buttonStyle(RenderButtonStyle(kind: .secondary))
@@ -57,7 +98,10 @@ struct ButtonLeaf: View {
 struct RenderButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, destructive, plain }
     let kind: Kind
-    @Environment(\.isEnabled) private var isEnabled
+    /// 押せるが使えない見た目(#1640: aiButton は押すと理由を出す)。無効と同じ薄さにする
+    var dimmed = false
+    @Environment(\.isEnabled) private var envEnabled
+    private var isEnabled: Bool { envEnabled && !dimmed }
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 52

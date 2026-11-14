@@ -29,10 +29,14 @@ public protocol SpeechTranscriber: AnyObject {
     /// 録音を止めて文字起こし。短すぎ/無音/マイク未入力は `TranscriberFailure`(理由付き)を throw し、
     /// 認識はできたが文字が出なかった時だけ "" を返す(理由は `lastDiagnostics` に残る)。
     func stopAndTranscribe() async throws -> String
+    /// 録音を捨てて止める(文字起こしはしない)。録音中に画面が閉じられた時など。録音していなければ何もしない。
+    func cancelRecording()
     /// 直近の録音/認識の診断(録音秒数・サンプル数・音量・AVAudioSession・権限・モデル状態)。未実装なら nil。
     var lastDiagnostics: TranscriberDiagnostics? { get }
     /// 端末にモデルが無く、prepare するとダウンロードが始まるか(#246: その前にサイズを示して確認する)。
     var needsDownload: Bool { get }
+    /// 本命のモデルの準備中で、仮の聞き取り(端末内の Apple の音声認識・U5)を使っているか。画面に「簡易の聞き取り」と出す。
+    var isProvisional: Bool { get }
 }
 
 public extension SpeechTranscriber {
@@ -40,6 +44,8 @@ public extension SpeechTranscriber {
     var downloadProgress: Double { 0 }
     var lastDiagnostics: TranscriberDiagnostics? { nil }
     var needsDownload: Bool { false }
+    var isProvisional: Bool { false }
+    func cancelRecording() {}
 }
 
 /// 「音声を聞き取れませんでした」の理由を画面とログに出すための診断情報。
@@ -67,10 +73,10 @@ public struct TranscriberDiagnostics: Equatable, Sendable {
 
     /// toast に添える 1 行要約。例: `録音2.3秒・音量-28dB・入力:iPhone Microphone`
     public var summary: String {
-        var parts = [String(format: "録音%.1f秒", recordedSeconds)]
-        parts.append(peakAmplitude > 0 ? String(format: "音量%.0fdB", peakDecibels) : "無音")
-        if !inputRoute.isEmpty { parts.append("入力:\(inputRoute)") }
-        return parts.joined(separator: "・")
+        var parts = [L("録音\(recordedSeconds, specifier: "%.1f")秒")]
+        parts.append(peakAmplitude > 0 ? L("音量\(peakDecibels, specifier: "%.0f")dB") : L("無音"))
+        if !inputRoute.isEmpty { parts.append(L("入力:\(inputRoute)")) }
+        return parts.joined(separator: L("・"))
     }
 }
 
@@ -85,16 +91,22 @@ public enum TranscriberFailure: LocalizedError, Equatable, Sendable {
     case tooShort(seconds: Double)
     /// サンプルは届いたが全て 0 付近(ミュート/マイク故障/入力ルート不正)
     case silent(seconds: Double, peakDecibels: Float)
+    /// 仮の聞き取り(Apple の端末内の音声認識)の許可が無い(U5)。文字の入力を案内する
+    case speechRecognitionDenied
+    /// この端末・言語では端末内の音声認識が使えない(サーバーへ送る認識は使わない・U5)
+    case onDeviceRecognitionUnavailable
 
     public var errorDescription: String? {
         switch self {
-        case .notReady(let status): return "音声モデルを準備中です(\(status))。少し待ってからお試しください"
-        case .microphoneDenied: return "マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください"
-        case .audioSession(let reason): return "録音を開始できませんでした(オーディオセッション: \(reason))"
-        case .noInputAvailable: return "使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)"
-        case .noAudioCaptured(let s): return String(format: "マイクから音声が届きませんでした(録音%.1f秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください", s)
-        case .tooShort(let s): return String(format: "録音が短すぎました(%.1f秒)。タップしてから話し、話し終えてからもう一度タップしてください", s)
-        case .silent(let s, let db): return String(format: "音声が小さすぎました(録音%.1f秒・音量%.0fdB)。マイクに向かって話してください", s, db)
+        case .notReady(let status): return L("音声モデルを準備中です(\(status))。少し待ってからお試しください")
+        case .microphoneDenied: return L("マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください")
+        case .audioSession(let reason): return L("録音を開始できませんでした(オーディオセッション: \(reason))")
+        case .noInputAvailable: return L("使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)")
+        case .noAudioCaptured(let s): return L("マイクから音声が届きませんでした(録音\(s, specifier: "%.1f")秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください")
+        case .tooShort(let s): return L("録音が短すぎました(\(s, specifier: "%.1f")秒)。タップしてから話し、話し終えてからもう一度タップしてください")
+        case .silent(let s, let db): return L("音声が小さすぎました(録音\(s, specifier: "%.1f")秒・音量\(db, specifier: "%.0f")dB)。マイクに向かって話してください")
+        case .speechRecognitionDenied: return L("音声認識の許可がありません。音声モデルの準備ができるまでは、文字で入力してください")
+        case .onDeviceRecognitionUnavailable: return L("この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください")
         }
     }
 }

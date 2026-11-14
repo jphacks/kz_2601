@@ -1,0 +1,544 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "id" : "next",
+          "props" : {
+            "label" : "次の予定日",
+            "unavailable" : false,
+            "value" : "2026-10-31"
+          },
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "id" : "cycle",
+          "props" : {
+            "label" : "周期",
+            "unavailable" : false,
+            "unit" : "日",
+            "value" : "28 日"
+          },
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "id" : "log",
+          "props" : {
+            "entity" : "periods",
+            "rows" : [
+              {
+                "recordId" : "p1",
+                "title" : "10/3(土)"
+              },
+              {
+                "recordId" : "p2",
+                "title" : "9/5(土)"
+              }
+            ]
+          },
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "settings_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "id" : "open_settings",
+          "props" : {
+            "label" : "周期の設定"
+          },
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "settings",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "cycle_days" : 28
+        }
+      },
+      "id" : "settings_form",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "id" : null,
+          "props" : {
+            "field" : "cycle_days",
+            "label" : "周期",
+            "unit" : "日",
+            "value" : 28
+          },
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "numberField"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "settings_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "settings",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "周期の設定",
+      "toolbar" : [
+
+      ]
+    }
+  ],
+  "steps" : [
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "tap" : "open_settings"
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "settings",
+          "readOnly" : false,
+          "recordId" : null,
+          "values" : {
+            "cycle_days" : 28
+          }
+        },
+        "id" : "settings_form",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "id" : null,
+            "props" : {
+              "field" : "cycle_days",
+              "label" : "周期",
+              "unit" : "日",
+              "value" : 28
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "numberField"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "settings_form",
+          "stack" : "sheet"
+        },
+        "saveBar" : {
+          "action" : {
+            "entity" : "settings",
+            "type" : "saveRecord"
+          },
+          "label" : "保存"
+        },
+        "title" : "周期の設定",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "settings_form",
+        "stack" : "sheet"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "input" : {
+          "field" : "cycle_days",
+          "value" : 30
+        }
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "settings",
+          "readOnly" : false,
+          "recordId" : null,
+          "values" : {
+            "cycle_days" : 30
+          }
+        },
+        "id" : "settings_form",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "id" : null,
+            "props" : {
+              "field" : "cycle_days",
+              "label" : "周期",
+              "unit" : "日",
+              "value" : 30
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "numberField"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "settings_form",
+          "stack" : "sheet"
+        },
+        "saveBar" : {
+          "action" : {
+            "entity" : "settings",
+            "type" : "saveRecord"
+          },
+          "label" : "保存"
+        },
+        "title" : "周期の設定",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "settings_form",
+        "stack" : "sheet"
+      }
+    },
+    {
+      "effects" : [
+        {
+          "saved" : {
+            "data" : {
+              "cycle_days" : 30
+            },
+            "entity" : "settings",
+            "recordId" : "new-1"
+          }
+        }
+      ],
+      "op" : {
+        "tapToolbar" : "保存"
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "id" : "next",
+            "props" : {
+              "label" : "次の予定日",
+              "unavailable" : false,
+              "value" : "2026-11-02"
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "id" : "cycle",
+            "props" : {
+              "label" : "周期",
+              "unavailable" : false,
+              "unit" : "日",
+              "value" : "30 日"
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "id" : "log",
+            "props" : {
+              "entity" : "periods",
+              "rows" : [
+                {
+                  "recordId" : "p1",
+                  "title" : "10/3(土)"
+                },
+                {
+                  "recordId" : "p2",
+                  "title" : "9/5(土)"
+                }
+              ]
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "presentation" : "sheet",
+                  "screen" : "settings_form",
+                  "type" : "navigate"
+                },
+                "on" : "tap"
+              }
+            ],
+            "id" : "open_settings",
+            "props" : {
+              "label" : "周期の設定"
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "記録",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "tap" : "open_settings"
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "settings",
+          "readOnly" : false,
+          "recordId" : "new-1",
+          "values" : {
+            "cycle_days" : 30
+          }
+        },
+        "id" : "settings_form",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "id" : null,
+            "props" : {
+              "field" : "cycle_days",
+              "label" : "周期",
+              "unit" : "日",
+              "value" : 30
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "numberField"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "settings_form",
+          "stack" : "sheet"
+        },
+        "saveBar" : {
+          "action" : {
+            "entity" : "settings",
+            "type" : "saveRecord"
+          },
+          "label" : "保存"
+        },
+        "title" : "周期の設定",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "settings_form",
+        "stack" : "sheet"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "input" : {
+          "field" : "cycle_days",
+          "value" : 32
+        }
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "settings",
+          "readOnly" : false,
+          "recordId" : "new-1",
+          "values" : {
+            "cycle_days" : 32
+          }
+        },
+        "id" : "settings_form",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "id" : null,
+            "props" : {
+              "field" : "cycle_days",
+              "label" : "周期",
+              "unit" : "日",
+              "value" : 32
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "numberField"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "settings_form",
+          "stack" : "sheet"
+        },
+        "saveBar" : {
+          "action" : {
+            "entity" : "settings",
+            "type" : "saveRecord"
+          },
+          "label" : "保存"
+        },
+        "title" : "周期の設定",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "settings_form",
+        "stack" : "sheet"
+      }
+    },
+    {
+      "effects" : [
+        {
+          "saved" : {
+            "data" : {
+              "cycle_days" : 32
+            },
+            "entity" : "settings",
+            "recordId" : "new-1"
+          }
+        }
+      ],
+      "op" : {
+        "tapToolbar" : "保存"
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "id" : "next",
+            "props" : {
+              "label" : "次の予定日",
+              "unavailable" : false,
+              "value" : "2026-11-04"
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "id" : "cycle",
+            "props" : {
+              "label" : "周期",
+              "unavailable" : false,
+              "unit" : "日",
+              "value" : "32 日"
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "id" : "log",
+            "props" : {
+              "entity" : "periods",
+              "rows" : [
+                {
+                  "recordId" : "p1",
+                  "title" : "10/3(土)"
+                },
+                {
+                  "recordId" : "p2",
+                  "title" : "9/5(土)"
+                }
+              ]
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "presentation" : "sheet",
+                  "screen" : "settings_form",
+                  "type" : "navigate"
+                },
+                "on" : "tap"
+              }
+            ],
+            "id" : "open_settings",
+            "props" : {
+              "label" : "周期の設定"
+            },
+            "stacked" : true,
+            "state" : "rendered",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "記録",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    }
+  ]
+}

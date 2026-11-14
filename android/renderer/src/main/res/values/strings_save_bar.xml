@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- フォームの保存バーを押した後の表示(#1374・iOS の FormSaveBar)。 -->
+<resources>
+    <string name="renderer_save_bar_saved">保存しました</string>
+    <string name="renderer_save_bar_queued_offline">接続が戻ったら自動で送ります</string>
+</resources>

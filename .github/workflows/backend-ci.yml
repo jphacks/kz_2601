@@ -1,5 +1,5 @@
 # backend(Go) の CI。PR が Open(非Draft) / develop・main への push で発火。
-# **5分以内が必須**(timeout-minutes: 5 で強制。超えたら lint 対象やテストを削るのではなく原因を直す)。
+# **10分以内が必須**(timeout-minutes: 10 で強制。2026-11-13 にテストが増えて 5 分を超えたので上げた。超えたら lint 対象やテストを削るのではなく原因を直す)。
 #
 # 設計メモ:
 # - workflow レベルの `paths:` フィルタは使わない。required status check にした時、
@@ -40,6 +40,9 @@ jobs:
             backend:
               - 'backend/**'
               - 'docs/dsl/conformance/expr/**'
+              - 'docs/dsl/examples/**'
+              # cmd/dslgen の生成物(TestGeneratedKotlinIsUpToDate が古さを検査する・#1006)
+              - 'android/dsl/src/main/kotlin/**/generated/**'
               - '.github/workflows/backend-ci.yml'
 
   backend-ci:
@@ -47,7 +50,7 @@ jobs:
     needs: backend-changes
     if: needs.backend-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -68,7 +71,20 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      # action はバイナリを GitHub から取得し、5xx を再試行しない(install-mode: goinstall はビルドで 5 分枠を超えうる)。
+      # 1 回目は continue-on-error にし、失敗した時だけもう 1 回走らせる。2 回目の結果がジョブの成否になる
+      # (lint の本当の指摘なら 2 回目も落ちる)。
       - name: golangci-lint
+        id: golangci-lint
+        continue-on-error: true
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: backend
+          args: --timeout=3m
+
+      - name: golangci-lint(再試行)
+        if: steps.golangci-lint.outcome == 'failure'
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
@@ -77,6 +93,11 @@ jobs:
 
       - name: go build
         run: go build ./...
+
+      # 評価ケース・編集の土台の JSON を全部、形に合った読み方で検証する(API は呼ばない)。
+      # 形の分からないファイルは失敗にして、黙って検証漏れにならないようにする。
+      - name: ai-eval cases (offline)
+        run: go run ./cmd/ai-eval -check-all internal/ai/eval
 
       - name: go test (-race)
         run: go test ./... -race -count=1

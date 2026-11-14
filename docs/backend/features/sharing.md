@@ -29,4 +29,4 @@ app_owners/{appId}    # {uid, createdAt}  appId の作成者(publish できる�
 
 | 変数 | appconfig | ai | 既定 / 備考 |
 |---|---|---|---|
-| `SHARE_WEB_BASE_URL` | o | - | 未設定 = リクエストのホスト。Web の共有ページ(`GET /s/{token}`)のベース URL |
+| `SHARE_WEB_BASE_URL` | o | - | 未設定 = リクエストのホスト。Web の共有ページ(`GET /s/{token}`)のベース URL。prod は tailor-it.app の `/s/*` を appconfig に中継できてから `https://tailor-it.app` にする(Universal Links・#331・`docs/infra/universal-links/README.md`) |

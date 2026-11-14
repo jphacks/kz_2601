@@ -8,7 +8,33 @@ import (
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
+
+// With every container disallowed, Component is just Leaf.
+func TestRelaxWithoutContainers(t *testing.T) {
+	var root map[string]any
+	if err := json.Unmarshal(dsl.SchemaJSON(), &root); err != nil {
+		t.Fatal(err)
+	}
+	c := root["$defs"].(map[string]any)["Container"].(map[string]any)
+	c["properties"].(map[string]any)["type"].(map[string]any)["enum"] = []any{}
+	raw, _ := json.Marshal(root)
+	out, err := Relax(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s map[string]any
+	_ = json.Unmarshal(out, &s)
+	defs := s["$defs"].(map[string]any)
+	if got := refNames(defs["Component"]); len(got) != 1 || got[0] != "Leaf" {
+		t.Fatalf("component: %v", defs["Component"])
+	}
+	if _, ok := defs["Container"]; ok {
+		t.Fatal("empty Container should be dropped")
+	}
+}
 
 func findKeyword(t *testing.T, v any, path string, bad map[string]bool, hits *[]string) {
 	t.Helper()
@@ -85,17 +111,30 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 	if _, ok := lp["children"]; ok {
 		t.Fatal("leaf must not have children")
 	}
-	comp := p["$defs"].(map[string]any)["Component"].(map[string]any)["properties"].(map[string]any)
-	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) != len(allComponents) {
-		t.Fatalf("component: %v", comp["type"])
+	// Component = Container | Leaf (Leaf's properties written once);
+	// PatchNode stays the flat union of every component kind.
+	pd := p["$defs"].(map[string]any)
+	if got := refNames(pd["Component"]); len(got) != 2 || got[0] != "Container" || got[1] != "Leaf" {
+		t.Fatalf("component: %v", pd["Component"])
 	}
-	for _, gone := range []string{"Container", "Text", "Stat"} {
+	cont := pd["Container"].(map[string]any)["properties"].(map[string]any)
+	if cont["children"] == nil || len(cont["type"].(map[string]any)["enum"].([]any))+wantLeaves != len(allComponents) {
+		t.Fatalf("container: %v", cont["type"])
+	}
+	node := pd["PatchNode"].(map[string]any)["properties"].(map[string]any)
+	if node["children"] == nil || node["format"] == nil || node["columnCount"] == nil {
+		t.Fatalf("patch node misses component properties: %v", node)
+	}
+	for _, gone := range []string{"Text", "Stat"} {
 		if _, ok := p["$defs"].(map[string]any)[gone]; ok {
 			t.Fatalf("%s should be pruned", gone)
 		}
 	}
-	// Schemas stay small enough for the API grammar compiler.
-	if n := len(GenerationSchema()); n > 20000 {
+	// Schemas stay small enough for the API grammar compiler (structured
+	// output is opt-in for this schema). 20000 → 21000: develop's parts (#659)
+	// plus addToCalendar / alarm reached 20025. Component = Container | Leaf
+	// brought it to ~15.6 KB; the cap stays as the tripwire.
+	if n := len(GenerationSchema()); n > 21000 {
 		t.Fatalf("generation schema too large: %d bytes", n)
 	}
 }
@@ -159,5 +198,40 @@ func TestFewShotMatchesDocsExample(t *testing.T) {
 	}
 	if !strings.Contains(systemPrompt, `"name":"家計簿"`) || !strings.Contains(systemPrompt, "6 列") {
 		t.Fatal("system prompt must embed the few-shot and the grid rules")
+	}
+}
+
+// PatchNode merges Notification.near (object) and placeSearch near (string
+// enum): a patch can write either, so both stay as alternatives.
+func TestPatchNodeKeepsBothNearShapes(t *testing.T) {
+	var root struct {
+		Defs map[string]struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(PatchGenerationSchema(), &root); err != nil {
+		t.Fatal(err)
+	}
+	var near struct {
+		AnyOf []struct {
+			Type       string         `json:"type"`
+			Enum       []string       `json:"enum"`
+			Properties map[string]any `json:"properties"`
+		} `json:"anyOf"`
+	}
+	if err := json.Unmarshal(root.Defs["PatchNode"].Properties["near"], &near); err != nil {
+		t.Fatal(err)
+	}
+	var obj, str bool
+	for _, a := range near.AnyOf {
+		obj = obj || (a.Type == "object" && a.Properties["locationField"] != nil)
+		str = str || (a.Type == "string" && len(a.Enum) == 1 && a.Enum[0] == "current")
+	}
+	if !obj || !str {
+		t.Fatalf("PatchNode.near = %s", root.Defs["PatchNode"].Properties["near"])
+	}
+	// two scalars still merge as before (no anyOf for Id vs string)
+	if f := string(root.Defs["PatchNode"].Properties["entity"]); strings.Contains(f, "anyOf") {
+		t.Fatalf("PatchNode.entity = %s", f)
 	}
 }

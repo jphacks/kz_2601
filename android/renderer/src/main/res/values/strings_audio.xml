@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 音の部品(audioRecorder・speakButton・transcribeField・#864)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_audio_delete">削除</string>
+    <string name="renderer_audio_delete_a11y">%1$sを削除</string>
+    <string name="renderer_audio_dictation_failed">声を文字にできませんでした。もう一度お試しください</string>
+    <string name="renderer_audio_dictation_not_heard">うまく聞き取れませんでした。もう一度、はっきり話してください</string>
+    <string name="renderer_audio_dictation_not_ready">音声モデルを準備中です。少し待ってからお試しください</string>
+    <string name="renderer_audio_mic_denied">マイクを使えません。設定アプリで Tailor It のマイクへのアクセスを許可してください</string>
+    <string name="renderer_audio_not_on_device">この端末にはありません</string>
+    <string name="renderer_audio_play">録音を再生</string>
+    <string name="renderer_audio_record">録音する</string>
+    <string name="renderer_audio_record_failed">録音できませんでした。もう一度お試しください。</string>
+    <string name="renderer_audio_recorder_hint">上限 %1$s・イヤホンのボタンでも開始・停止できます</string>
+    <string name="renderer_audio_recorder_title">録音</string>
+    <string name="renderer_audio_recording_a11y">録音中 %1$s</string>
+    <string name="renderer_audio_rerecord">録り直す</string>
+    <string name="renderer_audio_speak">読み上げる</string>
+    <string name="renderer_audio_speak_empty">読み上げる内容がまだありません</string>
+    <string name="renderer_audio_stop">停止</string>
+    <string name="renderer_audio_stop_speaking">止める</string>
+    <string name="renderer_audio_transcribe_get_model">音声モデルを用意する</string>
+    <string name="renderer_audio_transcribe_listening">聞いています… タップで終わる</string>
+    <string name="renderer_audio_transcribe_mic">話して入力</string>
+    <string name="renderer_audio_transcribe_no_host">この画面では話して入力を使えません</string>
+    <string name="renderer_audio_transcribe_placeholder">マイクを押して話すと、ここに文字で入ります</string>
+    <string name="renderer_audio_transcribe_preparing">音声モデルを準備しています…</string>
+    <string name="renderer_audio_transcribe_unavailable">この端末では話して入力を使えません。文字で入力してください</string>
+    <string name="renderer_audio_transcribe_working">文字にしています…</string>
+</resources>

@@ -29,7 +29,23 @@ func (w Weights) Weight(r *http.Request, body []byte) int {
 	case "/v1/chat":
 		return w.Chat
 	case "/v1/text":
-		return w.Text
+		var req struct {
+			Task   string          `json:"task"`
+			Length string          `json:"length"`
+			Image  json.RawMessage `json:"image"` // aiButton inputPhoto: not decoded here (nor aiChat messages)
+		}
+		_ = json.Unmarshal(body, &req)
+		n := w.Text // the heaviest of task / long / image
+		if req.Task != "" && req.Task != "generate" {
+			n = max(n, w.TextTask)
+		}
+		if req.Length == "long" || req.Task == "chat" { // aiChat weighs like long (up to 16 KB of turns)
+			n = max(n, w.TextLong)
+		}
+		if len(req.Image) > 0 && string(req.Image) != "null" {
+			n = max(n, w.TextImage)
+		}
+		return n
 	case "/v1/generate":
 		var req struct {
 			Mode string `json:"mode"`
@@ -82,7 +98,11 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			r.Body = io.NopCloser(bytes.NewReader(body))
 
 			weight := l.cfg.Weights.Weight(r, body)
-			dec, err := l.Allow(r.Context(), id, ClientIP(r), weight)
+			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
+			// (anonymous too: an anonymous account gets no initial coins, #630); the
+			// tier's Pro check sees it as the verified caller (#2085)
+			ctx := auth.ContextWithIdentity(r.Context(), id)
+			dec, err := l.AllowPlatform(ctx, id, ClientIP(r), httpx.ClientPlatform(r), weight)
 			if err != nil {
 				httpx.Error(w, http.StatusInternalServerError, httpx.CodeInternal, "rate limiter unavailable")
 				return
@@ -92,40 +112,89 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 				writeLimited(w, dec, l.cfg.Now())
 				return
 			}
-			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
-			ctx := auth.ContextWithUID(r.Context(), id.UID)
 			out := &outcome{}
+			out.waive = func(ctx context.Context) bool { return l.waive(ctx, w, id.UID, ClientIP(r), dec, weight) }
 			sw := &statusWriter{ResponseWriter: w}
 			next.ServeHTTP(sw, r.WithContext(context.WithValue(ctx, outcomeKey{}, out)))
-			l.settle(r, dec, weight, out, sw.status)
+			l.settle(r, id.UID, dec, weight, out, sw.status)
 		})
 	}
 }
 
 // settle refunds what the request should not pay after all (refund.go, #548).
-func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcome, httpStatus int) {
-	status, mode := out.final(httpStatus)
+// It runs once per request, so a request is refunded at most once.
+func (l *Limiter) settle(r *http.Request, uid string, dec Decision, charged int, out *outcome, httpStatus int) {
+	status, mode, unchanged, waived := out.final(httpStatus)
+	if waived {
+		return
+	}
 	gone := r.Context().Err() != nil // the client disconnected before the end
-	units := l.cfg.Weights.refundUnits(charged, status, mode, gone)
+	units, reason := l.cfg.Weights.refundUnits(charged, status, mode, unchanged, gone)
 	if units <= 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), refundTimeout)
 	defer cancel()
+	var taken unchangedTake
+	if reason == refundUnchanged {
+		var ok bool
+		if taken, ok = l.takeUnchanged(ctx, dec.charge.store, uid); !ok {
+			// past the daily cap: pay the resolved mode as usual
+			if units, reason = l.cfg.Weights.refundUnits(charged, status, mode, false, gone); units <= 0 {
+				return
+			}
+		}
+	}
 	if err := l.Refund(ctx, dec, units); err != nil {
 		l.log.WarnContext(ctx, "ratelimit: refund failed", slog.Any("error", err), slog.Int("units", units))
+		l.untakeUnchanged(ctx, dec.charge.store, taken) // not refunded after all
 		return
 	}
 	l.log.InfoContext(ctx, "ratelimit.refund",
 		slog.Int("units", units),
 		slog.Int("status", status),
 		slog.String("mode", mode),
+		slog.String("reason", reason),
 		slog.String("path", r.URL.Path),
 	)
 }
 
+// waive refunds all of dec at once (Waive) and rewrites the headers that
+// are not sent yet to the count without this request. Past the hourly caps
+// of waived requests per uid and per ip (waive_cap.go) the request keeps its charge.
+func (l *Limiter) waive(ctx context.Context, w http.ResponseWriter, uid, ip string, dec Decision, charged int) bool {
+	if charged <= 0 || dec.charge.store == nil {
+		return false
+	}
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refundTimeout)
+	defer cancel()
+	taken, ok := l.takeWaive(rctx, dec.charge.store, uid, ip)
+	if !ok {
+		return false
+	}
+	if err := l.Refund(rctx, dec, charged); err != nil {
+		l.log.WarnContext(rctx, "ratelimit: waive failed", slog.Any("error", err), slog.Int("units", charged))
+		l.untakeWaive(rctx, dec.charge.store, taken) // not a waive after all
+		return false
+	}
+	units := min(charged, dec.charge.weight)
+	if !dec.Unmetered {
+		dec.Used = max(0, dec.Used-units)
+		dec.Remaining = max(0, dec.Limit-dec.Used)
+		setHeaders(w, dec, l.cfg.Now())
+	}
+	l.log.InfoContext(rctx, "ratelimit.refund", slog.Int("units", units), slog.String("reason", "waived"))
+	return true
+}
+
+// setHeaders writes X-RateLimit-* (and Retry-After on 429). An Unmetered
+// allowed request gets none: "remaining 0" or "remaining = limit" would both
+// mislead the client's "今日の残り" (#630).
 func setHeaders(w http.ResponseWriter, d Decision, now time.Time) {
 	h := w.Header()
+	if d.Allowed && d.Unmetered {
+		return
+	}
 	h.Set("X-RateLimit-Limit", strconv.Itoa(d.Limit))
 	h.Set("X-RateLimit-Remaining", strconv.Itoa(d.Remaining))
 	h.Set("X-RateLimit-Reset", strconv.FormatInt(d.ResetAt.Unix(), 10))

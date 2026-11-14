@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 起動直後(Compose が描くまで)の窓の色。RenderColors の canvas / brandA と同じ(#842)。 -->
+<resources>
+    <color name="metamon_canvas">#F6F3EC</color>
+    <color name="metamon_brand">#2E6A93</color>
+
+    <style name="Theme.Metamon" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/metamon_canvas</item>
+        <item name="android:colorAccent">@color/metamon_brand</item>
+    </style>
+</resources>

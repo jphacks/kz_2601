@@ -9,11 +9,23 @@ package httpx
 
 const CodeAccountDeleted = "account_deleted"
 
+// a Google Play purchase made for another account (obfuscatedAccountId, POST /v1/me/entitlements/google)
+const CodeAccountMismatch = "account_mismatch"
+
 // AI_PAUSED=1 on the ai service (#511)
 const CodeAIPaused = "ai_paused"
 
+// the server allowance is used up and paying overflow with coins is off (#630; coins.WriteError, enforce only)
+const CodeAllowanceExhausted = "allowance_exhausted"
+
 // App Check enforce (#318)
 const CodeAppCheckFailed = "app_check_failed"
+
+// the caller holds as many apps as their plan + bought slots allow (#630 app slots)
+const CodeAppLimitReached = "app_limit_reached"
+
+// the operator force-stopped the app's server features (#346)
+const CodeAppStopped = "app_stopped"
 
 const CodeAppconfigError = "appconfig_error"
 
@@ -23,7 +35,28 @@ const CodeBadOutput = "bad_output"
 
 const CodeBadRequest = "bad_request"
 
+// the payer has fewer coins than the call's hold (#630; coins.WriteError, enforce only)
+const CodeCoinsInsufficient = "coins_insufficient"
+
+// another record of the entity has the same entity.unique values (#273)
+const CodeDuplicateRecord = "duplicate_record"
+
+// the X-Request-Id of an AI call was already used for a coin hold (#630, enforce only)
+const CodeDuplicateRequest = "duplicate_request"
+
+// the runner's external API calls of this instance are full (#1493)
+const CodeExtBusy = "ext_busy"
+
+// the person has not connected the OAuth provider, or the connection was cut or refused (#1493)
+const CodeExtNotConnected = "ext_not_connected"
+
+// the external API provider is off, has no key, or EXT_DISABLED (#1493)
+const CodeExtUnavailable = "ext_unavailable"
+
 const CodeForbidden = "forbidden"
+
+// the free plan's AI work is paused: the day's AI cost passed its threshold (#317)
+const CodeFreePlanPaused = "free_plan_paused"
 
 const CodeGenerationFailed = "generation_failed"
 
@@ -35,13 +68,28 @@ const CodeInvalidRecord = "invalid_record"
 
 const CodeInvalidTransaction = "invalid_transaction"
 
+// the server lacks the settings for this feature (e.g. Google Play credentials); 503
+const CodeNotConfigured = "not_configured"
+
 const CodeNotFound = "not_found"
 
+// overflow paid with coins reached the payer's monthly cap (#630; coins.WriteError, enforce only)
+const CodeOverflowCapReached = "overflow_cap_reached"
+
 const CodePayloadTooLarge = "payload_too_large"
+
+// the payer's plan limit (apps, records, photos) is reached (#317)
+const CodePlanLimitReached = "plan_limit_reached"
+
+// a paid feature (Tailor It Pro) the caller or the app's creator does not have (#316)
+const CodeProRequired = "pro_required"
 
 const CodeRateLimited = "rate_limited"
 
 const CodeRefused = "refused"
+
+// text other people see contains a word on the moderation list (#321)
+const CodeTextNotAllowed = "text_not_allowed"
 
 const CodeTimeout = "timeout"
 

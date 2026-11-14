@@ -24,6 +24,16 @@ func NewMemory() *Memory {
 	return &Memory{entries: map[string]memEntry{}, now: time.Now}
 }
 
+// NewMemoryClock is NewMemory expiring entries by now (callers outside this
+// package with their own clock, e.g. runner/quota).
+func NewMemoryClock(now func() time.Time) *Memory {
+	m := NewMemory()
+	if now != nil {
+		m.now = now
+	}
+	return m
+}
+
 // Consume implements Store.
 func (m *Memory) Consume(_ context.Context, counters []Counter, weight int, expireAt time.Time) (Usage, error) {
 	m.mu.Lock()
@@ -40,6 +50,18 @@ func (m *Memory) Consume(_ context.Context, counters []Counter, weight int, expi
 		}
 	}
 	return u, nil
+}
+
+// Peek implements Peeker.
+func (m *Memory) Peek(_ context.Context, counters []Counter) ([]int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.expire()
+	counts := make([]int, len(counters))
+	for i, c := range counters {
+		counts[i] = m.entries[c.ID].count
+	}
+	return counts, nil
 }
 
 // Refund implements Store.

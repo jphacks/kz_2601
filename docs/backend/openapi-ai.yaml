@@ -13,8 +13,11 @@ info:
     - `POST /generate`・`POST /chat`・`POST /text` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
       上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、text 1 回 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
       既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
-      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
+      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す(undo も今日の残りを返す。利用者の上限が 0 = 数えない時は付けない・`docs/backend/rate-limit.md`)。
     - 一時停止(#511): ai に `AI_PAUSED=1` がある間、Claude を呼ぶ `POST /generate`(`mode=undo` を除く)・`POST /chat`・`POST /text` は Claude を呼ばず、上限も数えずに 503 `ai_paused` を返す。`/health`・`DELETE /chat/{appId}` は止めない。`docs/infra/ai-pause.md`
+    - 全体の遮断(#317): `AI_FREE_DAILY_BUDGET_USD` を入れると、その日(0:00 JST から)の AI の費用(`ai.usage` の `est_cost_usd` の合計)が超えた後は、Pro でない人の `POST /generate`(`mode=undo` を除く)・`POST /chat` に 503 `free_plan_paused`(`details.reason: daily_budget`・`resumeAt`・`retryAfterSec`、`Retry-After`)。上限を数えた後に判定し、数えた分は返す。Pro と `POST /text` は止めない。既定は無効。`docs/backend/rate-limit.md`
+    - appconfig のプランの上限(#317)に当たった 403 `plan_limit_reached` は、そのまま中継する。
+    - 新しいアプリを作る generate が持てるアプリの数の上限(#630)に当たった 402 `app_limit_reached` も、`details`(held・limit・canBuySlot・slotCoins・apps など・openapi-appconfig.yaml の AppLimitReached)ごとそのまま中継する。
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -36,9 +39,15 @@ paths:
         5. appconfig が 409 なら最新を取り直して 1 回だけ再生成
         6. 新 DSL と要約を返す。iOS は返却 `dsl` を即時適用してよい (再 GET 不要)
 
+        **有料の機能 (#316)**: 生成した DSL が今のアプリに無い有料の機能 (共有データ `sharedData`・サーバーの自動の動き `serverRules`) を持ち、呼び出した人が Tailor It Pro でなければ、保存せずに 402 `pro_required` (`details.features`)。生成した後・保存の前に DSL で判定する (Claude の費用は掛かる)。appconfig も保存の時に同じ判定をし、その 402 は中継する。「元に戻して」も同じ。審査用の版 (`disabledFeatures: sharedData`) では共有を private に直し、serverRules を作らないので当たらない
+
+        **コイン (#630・`COIN_BILLING_MODE`)**: off は何もしない。log は引くはずの量をログに出すだけ (止めない・応答も変わらない)。enforce では Claude を呼ぶ前に呼び出した人の財布から押さえる (`mode` が edit なら `COIN_RESERVE_EDIT`、create / auto / 省略は `COIN_RESERVE_GENERATE`、undo は押さえない)。足りなければ 402 `coins_insufficient` (ストリームでも始まる前に JSON で返す)。終わったら実際の費用 (再試行・計算パス・レシピの選びを含む合計) をコインに直して引き (押さえた量まで)、残りを戻す。失敗 (エラー・`event: error`) と、Claude を呼ばなかった結果 (auto が「元に戻して」になった時) は全部戻す。引いた量は `meta.coins`・残高は `meta.coinsBalance` (JSON モードは `X-Coins-Charged` / `X-Coins-Balance` も)。`X-Request-Id` が同じ人の前の呼び出しと同じなら 409 `duplicate_request` (Claude は呼ばず、二重に引かない)。1 日の上限 (429)・全体の予算 (503) はコインと別にそのまま
+
         **ストリーミング (`?stream=1`)**: 応答が `text/event-stream` になり、Claude の出力を逐次読んで
         - `event: app` — create ターン。出力先頭の `app` ブロックが揃った時点 (実測 p50 ≈2.4s) で `{type, attempt, locale, name, description, tabs[], summary}`。`summary` は読み上げ用の仮の一文「家計簿アプリを作っています。ホームと集計の2タブです。」
         - `event: summary` — edit ターン。PatchDocument は summary を先に書くので `{type, attempt, locale, summary}` が ops より先に届く
+        - `event: component` — create ターン (#636)。最初に見える画面 (タブがあれば初期タブ = initialScreen がタブならそれ・違えば先頭タブ、タブ無しなら initialScreen) の直下の部品が 1 つ閉じるたびに `{type, attempt, locale, screen, component:{index, id?, type, area?, label?}}`。`app` の後に、同じ attempt では同じ部品を 1 回だけ。`label` は label → title → text → prompt の最初の値。**仮置き用**: 最後の `result` の dsl (検証・補正・作り直しの後) で必ず置き直す
+        - `event: restart` — 検証で落ちて作り直す時、それまでに `component` を送っていれば `{type, attempt, locale}` (attempt は次の試行)。受け手は仮置きの部品を捨てる。続けて新しい attempt の app/component が届く
         - `event: result` — JSON モードと同じ GenerateResponse (検証・保存後)
         - `event: error` — JSON モードと同じ `{error:{code,message,details?,status}}` (HTTP は 200 のまま)
         再生成が走ると app/summary イベントは attempt を変えてもう一度届くことがある (最新を採用)。
@@ -46,7 +55,7 @@ paths:
         - in: query
           name: stream
           schema: { type: string, enum: ['1', 'true'] }
-          description: 指定すると Server-Sent Events で app/summary → result|error の順に返す
+          description: 指定すると Server-Sent Events で app/summary (→ component / restart) → result|error の順に返す
       requestBody:
         required: true
         content:
@@ -69,7 +78,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { description: appId が存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '409':
-          description: baseVersion 指定時に再試行後も競合
+          description: baseVersion 指定時に再試行後も競合 / `duplicate_request` (コイン enforce で同じ X-Request-Id・#630)
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
         '422':
           description: 生成失敗 (再生成・fallback とも不成立)。iOS は「うまく聞き取れませんでした」を再生
@@ -81,6 +90,7 @@ paths:
                   code: generation_failed
                   message: could not produce a valid app from the request
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
@@ -102,6 +112,8 @@ paths:
         - create: 既存の question / ready(曖昧なら 1 問・具体的ならすぐ ready・go-ahead は shortcut)に加え、「何が作れるの?」→ `answer`、「どんな感じがいい?」→ `proposal`(instruction = 作るアプリの依頼文)。質問は 3 回まで(answer / proposal は数えない)、それ以降の question は ready に寄せる(`source=forced`)
         - create と edit で会話は別(mode が変わると会話状態を作り直す)。answer / question / proposal は本文がそろった時点で先に返す
         - edit で DSL を読むので `Authorization` をそのまま appconfig に渡す
+
+        **コイン (#630)**: `/generate` と同じ (押さえる量は `COIN_RESERVE_CHAT`・払うのは呼び出した人・失敗は全部戻す・go-ahead の shortcut は Claude を呼ばないので引かない)。答えを先に返した時 (#147・裏で生成が続く) は、裏の呼び出しが終わってから引くので `meta.coins` は省く (iOS は `GET /v1/me/coins` で読み直す)
       requestBody:
         required: true
         content:
@@ -115,7 +127,7 @@ paths:
               schema: { $ref: '#/components/schemas/ChatResponse' }
               examples:
                 question:
-                  value: { kind: question, text: レシートの写真も残したいですか?, suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
+                  value: { kind: question, text: "レシートの写真も残したいですか?", suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
                 ready:
                   value:
                     kind: ready
@@ -172,6 +184,8 @@ paths:
                   value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { $ref: '#/components/responses/CoinsPaymentRequired' }
+        '409': { $ref: '#/components/responses/DuplicateRequest' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -191,13 +205,17 @@ paths:
 
   /text:
     post:
-      summary: aiButton task generate のオンライン版。決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で返す
+      summary: aiButton のオンライン版。generate は決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で、task 付きは input を要約・分類・書き直し・抜き出し・提案して 1 つの文で返す
       description: |
         Issue #417。端末内 AI (Apple Intelligence) が使えない端末で、Tailor It Pro の利用者が aiButton{task: generate} を押した時に iOS が呼ぶ。
-        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。Pro の判定は iOS 側 (サーバーでの Pro 判定は未実装・#316)
+        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)。ただし `appId` の共有のアプリに呼び出した人が参加している (作成者ではないメンバー) 時は、作成者の Pro で判定する (共有のアプリの費用は作成者が持つ)。作成者が Pro でなければ 402 に `details.reason: creator_needs_pro` (iOS は課金画面を出さず案内だけ)。参加はサーバーが app_owners / members で確かめる。作成者が払うのは、依頼がそのアプリの公開中の DSL (apps_public) の部品と合う時だけ (aiButton は同じ task で、instruction が prompt の `{{input}}` / `{{項目}}` を埋めたもの・aiChat は instruction が persona と同じ)。合わなければ呼び出した人の Pro で判定する。作成者が払う呼び出しはアプリごとに 1 日 `AI_CREATOR_PAID_APP_DAILY` 回まで (既定 300・超えると 429 `rate_limited`・`details.scope: app`・Claude は呼ばず利用上限も数えない)。利用上限は呼び出した人のまま
         - 上限: instruction 500 字・input 4096 バイト (超えると 413)・本文 16 KB・出力 400 トークン。count / items は 1〜10
         - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
         - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
+        - `task` (summarize / classify / rewrite / extract / suggest) を付けると、端末内 AI が無い端末での aiButton の要約などのオンライン版。input 必須・instruction 任意・shape は line だけ・classify は options 2〜20 個。重さ 2 (`RATE_LIMIT_WEIGHT_TEXT_TASK`)・出力 1000 トークン。答えは text 1 つ (行は残す・1200 字で切る)、classify は候補のどれか 1 つ (docs/backend/features/text.md)
+        - `length: long` (aiButton の長文) は、generate (shape line だけ) と classify 以外の task で使える。input 16384 バイト・出力 1500 トークン・答えは text 1 つ (段落は残す・3000 字で切る)・応答に `length: long`。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_LONG`・task / 写真の重さと大きい方)。Pro の確認は他と同じ。iOS は long では端末内 AI を使わず、いつもここを呼ぶ
+        - `image` (aiButton の inputPhoto) は写真 1 枚。JPEG (`mediaType: image/jpeg`)・長い辺 1024px 以下・base64 400 KB (409600 文字) 以下。超えると 413、JPEG でない・base64 でない・大きすぎる画像は 400。サーバーが `AI_TEXT_IMAGE=1` でなければ 403 `forbidden`。task は何でもよく、task 付きでも input は任意 (写真だけでよい)。本文の上限は写真の分だけ広い (約 433 KB)。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_IMAGE`・task / length の重さと大きい方)。写真のバイト列はどのログにも出さない
+        - コイン (#630・`COIN_BILLING_MODE=enforce`): Pro の確認の後、Claude を呼ぶ前に**呼び出した人**の財布から押さえる。上の「作成者が払う」(作成者の Pro で通る) 時も、コインは呼び出した人 (参加者) から引く (作成者のコインは使わない)。押さえる量は `COIN_RESERVE_TEXT`、写真・長文 (aiChat も)・task は設定があれば `COIN_RESERVE_TEXT_IMAGE` / `_LONG` / `_TASK` (重さと同じ順で大きい方)。足りなければ 402 `coins_insufficient` (`details.payer` = self。利用上限と作成者の Pro で通った回数は戻す)。引いた量は `meta.coins`・`meta.coinsBalance` と `X-Coins-Charged` / `X-Coins-Balance` (呼び出した人の残高)。失敗は全部戻す。同じ `X-Request-Id` は 409 `duplicate_request`。log は引くはずの量をログに出すだけ
       requestBody:
         required: true
         content:
@@ -206,6 +224,8 @@ paths:
             examples:
               list:
                 value: { instruction: 飲み会で盛り上がる、誰でも安全にできる軽い罰ゲームの案, shape: list, count: 3, locale: ja }
+              classify:
+                value: { task: classify, instruction: '', input: '本文: 会議で提案が通った', options: [うれしい, ふつう, かなしい], locale: ja }
               fields:
                 value:
                   instruction: 冷蔵庫にある食材で作れる今日の献立
@@ -234,6 +254,8 @@ paths:
                     meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
+        '409': { $ref: '#/components/responses/DuplicateRequest' }
         '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { $ref: '#/components/responses/RateLimited' }
@@ -244,7 +266,19 @@ paths:
     get:
       security: []
       summary: liveness
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: 'ok。stg / prod の取り違えと版を見分ける最小限だけ返す(#290・docs/infra/runtime-config.md)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  env: { type: string, description: 'APP_ENV(stg / prod)。未設定なら省略' }
+                  firestoreDatabase: { type: string, description: 'FIRESTORE_DATABASE(既定 (default))。Firestore を使わない時は省略' }
+                  version: { type: string, description: 'GIT_SHA の先頭 7 文字。未設定なら省略' }
 
 components:
   securitySchemes:
@@ -279,6 +313,57 @@ components:
               code: rate_limited
               message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
               details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
+    CoinsPaymentRequired:
+      description: |
+        コインで払えない(#630・`COIN_BILLING_MODE=enforce` の時だけ返す。off / log では返さない)。generate・chat・text が Claude を呼ぶ前に返す(Claude は呼ばず、利用上限も数えない)。
+        - `coins_insufficient`: 呼び出した人のコインが押さえる量(`COIN_RESERVE_<OP>`)より少ない(`details.required`・`details.balance`・`details.payer`)。AI はいつも使う人が払うので、ai では `details.payer` はいつも `self`(共有アプリの参加者も。作成者のコインは使わない)
+        - `allowance_exhausted` / `overflow_cap_reached`: サーバーの枠(3 段目)。ai では返さない予定だが、コードは共通
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: self } } }
+    PaymentRequired:
+      description: |
+        `pro_required` (Tailor It Pro が要る・ProRequired と同じ) か `coins_insufficient` (コインが足りない・CoinsPaymentRequired と同じ・#630 enforce の時だけ)。`error.code` で見分ける
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            pro:
+              value: { error: { code: pro_required, message: 'this needs Tailor It Pro: onlineAI', details: { features: [{ id: onlineAI }] } } }
+            coins:
+              value: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: self } } }
+    DuplicateRequest:
+      description: |
+        `duplicate_request` (#630・`COIN_BILLING_MODE=enforce` の時だけ)。同じ人の前の呼び出しと同じ `X-Request-Id` で、その分のコインは既に押さえた・引いた・戻した。Claude は呼ばず何も引かない。やり直すなら新しい id で送る (`details.status` = held / committed / released / expired)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: duplicate_request, message: 'this request id was already used', details: { status: committed } } }
+    ProRequired:
+      description: |
+        Tailor It Pro が要る (#316)。`code: pro_required`、`details.features` は要る有料の機能 (`PaidFeature`)。iOS は課金画面を出す。
+        `details.reason: creator_needs_pro` の時は、呼び出した人ではなくアプリの作成者の Pro が要る (appconfig の共有の書き込みを中継した時)。
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      details:
+                        type: object
+                        properties:
+                          features: { type: array, items: { $ref: '#/components/schemas/PaidFeature' } }
+                          reason: { type: string, enum: [creator_needs_pro] }
+          example:
+            error:
+              code: pro_required
+              message: 'this needs Tailor It Pro: serverRules'
+              details: { features: [{ id: serverRules, title: サーバーの自動の動き, reason: アプリを開いていない時もサーバーが記録を数えたり通知を届けたりするため、サーバーの費用がかかります。 }] }
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   schemas:
     Error:
@@ -297,17 +382,25 @@ components:
               enum:
                 - account_deleted
                 - ai_paused
+                - allowance_exhausted
                 - app_check_failed
+                - app_limit_reached
                 - appconfig_error
                 - appconfig_unreachable
                 - bad_output
                 - bad_request
+                - coins_insufficient
+                - duplicate_request
                 - forbidden
+                - free_plan_paused
                 - generation_failed
                 - internal
                 - invalid_dsl
                 - not_found
+                - overflow_cap_reached
                 - payload_too_large
+                - plan_limit_reached
+                - pro_required
                 - rate_limited
                 - refused
                 - timeout
@@ -320,13 +413,13 @@ components:
             requestId: { type: string }
     RateLimitDetails:
       type: object
-      required: [scope, tier, limit, used, remaining, resetAt, retryAfterSec]
+      required: [scope, limit, used, remaining, resetAt, retryAfterSec]
       properties:
         scope:
           type: string
-          enum: [user, ip, global]
-          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー
-        tier: { type: string, enum: [anonymous, signed_in, pro] }
+          enum: [user, ip, global, app, app_member]
+          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー / app = 共有のアプリで作成者が払う呼び出しの 1 日の上限 / app_member = その参加者ごとの 1 日の上限 (app と app_member は `POST /v1/text` だけ)
+        tier: { type: string, enum: [anonymous, signed_in, pro], description: scope app / app_member の時は無い }
         limit: { type: integer, description: 当たった上限 (単位/日) }
         used: { type: integer, description: 今日使った単位 }
         remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }
@@ -336,18 +429,83 @@ components:
       type: object
       required: [instruction]
       properties:
-        instruction: { type: string, maxLength: 500, description: aiButton の prompt (プレースホルダ置換後) }
+        instruction: { type: string, maxLength: 500, description: aiButton の prompt (プレースホルダ置換後)。task 付きは空でもよい }
+        task: { type: string, enum: [generate, summarize, classify, rewrite, extract, suggest, chat], default: generate, description: 'generate 以外は input を処理する (input 必須・shape は line だけ)。chat = aiChat の返事 (instruction = persona 必須・messages 必須・input / image は送らない・重さ 3)' }
+        options: { type: array, minItems: 2, maxItems: 20, items: { type: string, maxLength: 40 }, description: task classify の候補 (重複なし)。classify 以外では送らない }
         shape: { type: string, enum: [line, list, fields], default: line }
         count: { type: integer, minimum: 1, maximum: 10, description: list の個数 (既定 3)。list 以外では送らない }
         items: { type: array, minItems: 1, maxItems: 10, items: { type: string, maxLength: 20 }, description: fields の項目名 (重複なし)。fields 以外では送らない }
-        input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで }
+        formats:
+          type: array
+          maxItems: 10
+          description: 'aiButton outputs の fields の項目の書き方 (task generate + shape fields だけ・ほかは 400)。各 item は items の名前を 1 回まで。書き方の文はサーバーが instruction の外に足す (instruction はボタンの prompt のまま)'
+          items:
+            type: object
+            required: [item, kind]
+            properties:
+              item: { type: string, maxLength: 20 }
+              kind: { type: string, enum: [number, date, datetime, enum] }
+              options: { type: array, minItems: 1, maxItems: 20, items: { type: string, maxLength: 40 }, description: kind enum の選択肢 (enum だけ・必須) }
+        input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで (length long は 16384 バイト) }
+        length: { type: string, enum: [short, long], default: short, description: 'long = 長文 (出力 1500 トークン・答え 3000 字まで・重さ 3)。classify 不可・generate は shape line だけ' }
+        image:
+          type: object
+          required: [mediaType, data]
+          description: aiButton inputPhoto の写真 1 枚 (長い辺 1024px 以下・重さ 3・AI_TEXT_IMAGE=1 の時だけ)
+          properties:
+            mediaType: { type: string, enum: [image/jpeg] }
+            data: { type: string, maxLength: 409600, description: 標準の base64 (data URL の接頭辞なし) }
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: 'task chat の会話 (古い順・最後は user・text の合計 16384 バイトまで = 413)。chat 以外では送らない。ログに出さない'
+          items:
+            type: object
+            required: [role, text]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              text: { type: string }
+        saveTo:
+          type: object
+          required: [entity, today, fields]
+          description: 'task chat だけ: aiChat saveTo。返事が記録の案 (suggest) を返せるようにする。fields は DSL の saveTo.fields の順の field (共有のアプリで作成者が払う時は公開中の DSL と同じでないと一致しない)。保存はしない'
+          properties:
+            entity: { type: string }
+            name: { type: string, maxLength: 40, description: entity の name }
+            today: { type: string, format: date, description: 端末の今日 (YYYY-MM-DD) }
+            fields:
+              type: array
+              minItems: 1
+              maxItems: 8
+              items:
+                type: object
+                required: [id, name, type]
+                properties:
+                  id: { type: string }
+                  name: { type: string, maxLength: 40 }
+                  type: { type: string, enum: [string, text, number, date, enum] }
+                  options: { type: array, maxItems: 50, items: { type: string }, description: enum だけ (必須) }
+                  unit: { type: string, maxLength: 20 }
+                  required: { type: boolean, description: 'required で defaultValue の無い field' }
+        material:
+          type: object
+          required: [entity, text]
+          description: 'task chat だけ: aiChat inputEntity。利用者自身の記録 (最後の発言と語が重なる記録から・残りは新しい順。サーバーは並べ替えない・hidden の field と写真・位置は端末が落とす) を説明した文。最初の利用者の発言に <records> でデータとして入れる (命令としては扱わない)。text は 8192 バイトまで・messages と合わせて 16384 バイトまで (超えたら 413)。共有のアプリで作成者が払う時は entity と name が公開中の aiChat の inputEntity と同じでないと一致しない。ログに出さない'
+          properties:
+            entity: { type: string }
+            name: { type: string, maxLength: 40, description: entity の name }
+            text: { type: string, maxLength: 8192 }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
+        appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:
       type: object
       required: [shape, text, locale, meta]
       properties:
         shape: { type: string, enum: [line, list, fields] }
-        text: { type: string, description: 'そのまま記録の string/text に入れる形 (list は「・」で始まる行、fields は「名前: 値」の行)' }
+        task: { type: string, description: task 付きの依頼の時だけ (generate では省略) }
+        length: { type: string, enum: [long], description: length long の依頼の時だけ }
+        text: { type: string, description: 'そのまま記録の string/text に入れる形 (list は「・」で始まる行、fields は「名前: 値」の行。task 付きは複数行もある・1200 字まで)' }
         items: { type: array, items: { type: string }, description: list の時だけ (1〜count 個) }
         fields:
           type: array
@@ -356,6 +514,10 @@ components:
             type: object
             required: [name, value]
             properties: { name: { type: string }, value: { type: string } }
+        suggest:
+          type: object
+          additionalProperties: true
+          description: 'task chat で saveTo を送った時だけ・記録の話の時だけ: {field id: 値}。値はサーバーが field の型で確かめたもの (enum は options のどれか・number は ±1e9 の数・date は today から 366 日以内の YYYY-MM-DD・string 200 字 / text 2000 字まで)。合わない値は落とし、required が欠けたら suggest ごと省く。端末は利用者が「追加」を押した時だけ保存する'
         locale: { type: string, enum: [ja, en] }
         meta:
           type: object
@@ -363,6 +525,14 @@ components:
             model: { type: string }
             usage: { type: object, properties: { inputTokens: { type: integer }, outputTokens: { type: integer } } }
             latencyMs: { type: integer }
+            coins: { $ref: '#/components/schemas/CoinsCharged' }
+            coinsBalance: { $ref: '#/components/schemas/CoinsBalance' }
+    CoinsCharged:
+      type: integer
+      description: '#630。この呼び出しで引いたコイン (`COIN_BILLING_MODE=enforce` で引いた時だけ。off / log・失敗・後から引く時は省く)。iOS は残高を読み直す'
+    CoinsBalance:
+      type: integer
+      description: '#630。引いた後の呼び出した人の使える残高 (coins と同じ時だけ入る。共有アプリの参加者も自分の残高)'
     GenerateRequest:
       type: object
       required: [appId, text]
@@ -441,6 +611,8 @@ components:
           type: object
           description: 診断情報(model / attempts / usage など)。logicPass は 2 パス目を実行した時だけ入る
           properties:
+            coins: { $ref: '#/components/schemas/CoinsCharged' }
+            coinsBalance: { $ref: '#/components/schemas/CoinsBalance' }
             publicPersonalData:
               type: array
               description: |
@@ -465,6 +637,22 @@ components:
                 attempts: { type: integer }
                 claudeMs: { type: integer }
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            serverRules:
+              type: object
+              description: '#343。サーバーの自動の動き(serverRules)を書く別の呼び出しを実行した時だけ入る(env AI_SERVER_RULES=1 かつ、生成の serverNeed が none 以外か依頼の言葉が通知・定期・数えるなどを含む時)'
+              properties:
+                need: { type: string, enum: [none, push, timed, record], description: 生成の呼び出しが書いた serverNeed。無ければ省略 }
+                trigger: { type: string, enum: [model, regex, both], description: 'この呼び出しを始めたもの: model = serverNeed・regex = 依頼の言葉・both = 両方' }
+                applied: { type: boolean, description: serverRules が検証を通って変わった }
+                rules: { type: integer, description: 返した DSL のルールの数 }
+                attempts: { type: integer }
+                claudeMs: { type: integer }
+                declined: { type: string, description: 作れない依頼(外部への送信など)を断った 1 文。summary にも入る }
+                problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            serverNeed:
+              type: string
+              enum: [none, push, timed, record]
+              description: 'env AI_SERVER_RULES=1 の時だけ。生成の呼び出しが出力の最後に書いた、自動の動きの要否(serverRules を書く呼び出しを実行しなかった時も入る)。DSL には入らない'
             restricted:
               type: array
               items: { type: string }
@@ -486,13 +674,16 @@ components:
         #245。部品単位より細かく無効にする機能。既知の値: `fieldHealth`(Field.health を使わない。生成結果の health 属性は落とす)、
         `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)、
         `sharedData`(#451 G2。entity の scope shared / public・edit・marks を使わない = 記録はすべて private。生成結果は scope / edit / marks /
-        list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)。未知の値は無視。省略 = 何も無効にしない。
+        list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)、
+        `nearbyShare.passby`(#1955・Mac など、nearbyShare は描けるがすれ違い通信を動かせない端末。nearbyShare は send だけにし、mode passby・fields・limit・distance を使わない。
+        すれ違い通信を頼まれたら summary で「この端末ではすれ違い通信は使えない」と伝える。新しく作られた passby は作り直させ、残った passby の nearbyShare は部品ごと落とす。
+        この値を送らないクライアント(今の iOS)は今までどおり passby を作れる)。未知の値は無視。省略 = 何も無効にしない。
       example: [fieldHealth, cameraCapture, sharedData]
     SupportedFeatures:
       type: array
       items: { type: string }
       description: |
-        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)。
+        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値(iOS の ClientCapabilities.supportedFeatures と同じ並び): `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`matching`(#507・Entity.match・list.item.interest・matchList)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)、`singleEntity`(#267・Entity.single の 1 件を編集し、式 {"setting": …} を評価する。無い版には single / setting を使わず、生成されたら single を外して setting を agg latest に置き換える)、`dataRoles`(#272・field の member と visibleTo)、`addressedMessages`(#271・addressedTo と members)、`notification.near`(app.notifications[].near の場所に着いた時の通知と jitterMinutes を端末が扱う。無い版には near / jitterMinutes を使わず、生成されたら near の通知ごと・jitterMinutes のキーを落とす)、`aiButton.long`(length long)、`aiButton.inputPhoto`(写真を AI に見せる。サーバーの AI_TEXT_IMAGE が off の間はどの版にも使わない)、`aiButton.saveTo`、`aiButton.inputFeeds`(画面の feed の行を AI に読ませる)、`aiButton.outputs`(fields を項目ごとにフォームへ)、`action.lookupBook`(ボタン・toolbar ごと落とす)、`text.highlight`(text の highlight と {{fieldId}})、`feed.v2`(feed の provider warnings / pressure。feed ごと落とす)、`expr.addMinutes`(計算式の op addMinutes)、`aiChat.inputEntity`(aiChat の inputEntity と limit)、`component.bracket`(トーナメント表の部品 bracket)、`progressBar.settingTarget`(progressBar の target に {"setting": …}。生成されたら field の defaultValue の数に置き換え、無ければバーを落とす)、`photoField.illustrate`(photoField の illustrate・端末内の Image Playground でイラストを作る。審査用の版は送らない)、`component.callButton`(#447・通話の部品 callButton。無い版とサーバーの CALLS_ENABLED が off の間は callButton を使わず「通話はできない」と答える。審査用の版は送らない)、`field.encrypted`(#233・field の encrypted・端末で暗号化して保存する。審査用の版は送らない)、`openUrlButton.app`(openUrlButton の app / to と shareButton の shareTo x / mail・他のアプリを開く / 送る。無い版にはボタンごと外し、shareTo x / mail は共有シートに戻す)。無い版にはそれぞれ使わず、生成されたら外す。審査用の版(APP_STORE_REVIEW)は `matching`・`dataRoles`・`addressedMessages`・`photoField.illustrate`・`component.callButton`・`field.encrypted` を送らない(版の規則は docs/dsl/README.md §5)。
         `allowedComponents` を送るクライアント(v1.0 以降)がここに `recordRetention` を含めない時、AI は retentionDays を使わず「この版ではできない」と答え、生成結果からは落とす。
         `allowedComponents` も送らないクライアントは制限なし。未知の値は無視。
       example: [recordRetention]
@@ -538,10 +729,10 @@ components:
         freeInstruction: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた指示文 (「この機能なしで作る」で instruction の代わりに POST /generate へ)' }
     PaidFeature:
       type: object
-      description: '#77。有料機能 1 つ。一覧はサーバーの backend/internal/ai/paid_features.json (docs/backend/features/pro.md)'
+      description: '#77 #316。有料機能 1 つ。一覧はサーバーの backend/internal/paid/paid_features.json (docs/backend/features/pro.md)'
       required: [id, title, reason]
       properties:
-        id: { type: string, description: 'sharedData (みんなで共有するデータ) など' }
+        id: { type: string, description: 'sharedData (みんなで共有するデータ)・serverRules (サーバーの自動の動き)・onlineAI (アプリの中のオンラインの AI。402 だけ) など' }
         title: { type: string, description: 'カードに出す名前 (locale の言語)。例: みんなで共有するデータ' }
         reason: { type: string, description: なぜ有料か 1 文 (locale の言語) }
     ChatBrief:
@@ -579,7 +770,7 @@ components:
         turn: { type: integer, description: これまでのユーザー発話数 (1 始まり)。4 以上は必ず ready }
         brief: { $ref: '#/components/schemas/ChatBrief', description: create の ready の時だけ }
         transcript: { type: string, description: ready の時だけ。create = 要件を 1 段落にまとめた一人称の依頼文、edit = 変更指示。これを POST /generate の text に渡す }
-        requiresPro: { type: boolean, description: '#77。ready の transcript が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略・旧 iOS は無視してよい)。判定は transcript の語 (paid_features.json の keywords) で、edit で今のアプリが既に持つ機能は除く。課金の強制はしない (表示用)' }
+        requiresPro: { type: boolean, description: '#77。ready の transcript が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略・旧 iOS は無視してよい)。判定は transcript の語 (paid_features.json の keywords) で、edit で今のアプリが既に持つ機能は除く。サーバーは生成した DSL で同じ判定をし、Pro でなければ保存せず 402 (#316)' }
         paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
         freeTranscript: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた依頼文 (transcript + 無料版の指示)。「この機能なしで作る」で transcript の代わりに POST /generate へ' }
         confirmPublic:
@@ -600,3 +791,6 @@ components:
         meta:
           type: object
           description: 診断用 (model / attempts / usage)。question を先に返した時(#147)は usage が 0(残りは裏で生成)
+          properties:
+            coins: { $ref: '#/components/schemas/CoinsCharged' }
+            coinsBalance: { $ref: '#/components/schemas/CoinsBalance' }

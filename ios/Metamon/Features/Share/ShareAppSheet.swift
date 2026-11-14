@@ -2,6 +2,7 @@
 #if !APP_STORE_REVIEW
 import SwiftUI
 import CoreImage.CIFilterBuiltins
+import MetamonRenderer
 import MetamonServices
 
 /// 変身一覧の各カードから開くシェアシート(#49 / #50)。
@@ -22,6 +23,10 @@ struct ShareAppSheet: View {
     @State private var busy = false
     @State private var copied = false
     @State private var members: SharedMembersModel?
+    /// 表示できない言葉があった項目(#321 text_not_allowed の details.field)
+    @State private var flaggedField: String?
+    /// 公開の前の注意(Android #1297 と同じ)
+    @State private var confirmPublish = false
 
     var body: some View {
         ScrollView {
@@ -41,6 +46,9 @@ struct ShareAppSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task { await load() }
+        .sheet(isPresented: $confirmPublish) {
+            PublishConfirmSheet(appName: app.name) { Task { await publish() } }
+        }
         .task {
             guard let client = services.sharing as? any MembershipClient else { return }
             let model = SharedMembersModel(appId: app.id, client: client)
@@ -55,7 +63,7 @@ struct ShareAppSheet: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text("「\(app.name)」をシェア")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
                 Text(members?.isVisible == true
                      ? L10n.tr("受け取った人はリンクから参加して、記録を一緒に使えます")
                      : L10n.tr("受け取った人は自分のアプリとして使えます(記録は共有されません)"))
@@ -63,15 +71,7 @@ struct ShareAppSheet: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(Theme.Spacing.sm + 2)
-                    .background(Theme.Colors.surface, in: Circle())
-            }
-            .accessibilityLabel("閉じる")
-            .accessibilityIdentifier("share.close")
+            SheetCloseButton(identifier: "share.close") { dismiss() }
         }
     }
 
@@ -133,6 +133,7 @@ struct ShareAppSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Label("みんなに公開", systemImage: "globe.asia.australia")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             if !listingLoaded {
                 RoundedRectangle(cornerRadius: 6).fill(Theme.Colors.surfaceElevated).frame(height: 44)
             } else if let listing {
@@ -151,11 +152,13 @@ struct ShareAppSheet: View {
                 // 説明は複数行(return で改行)、タグは 1 行(return で閉じる)・#196
                 TextField("ひとこと説明(任意)", text: $desc, axis: .vertical)
                     .lineLimit(2...5)
-                    .metamonInputField()
+                    .metamonInputField(flagged: flaggedField == "description")
+                    .onChange(of: desc) { if flaggedField == "description" { flaggedField = nil } }
                 TextField("タグ(スペース区切り・任意) 例: 健康 習慣", text: $tags)
                     .submitLabel(.done)
-                    .metamonInputField()
-                Button { Task { await publish() } } label: {
+                    .metamonInputField(flagged: flaggedField == "tags")
+                    .onChange(of: tags) { if flaggedField == "tags" { flaggedField = nil } }
+                Button { confirmPublish = true } label: {
                     Text("公開する")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
@@ -190,7 +193,7 @@ struct ShareAppSheet: View {
             share = s
             print("[Metamon] share issued: \(s.url)")
         } catch {
-            shareError = SharedAccessDenial(error)?.message ?? L10n.tr("リンクを作れませんでした: \(error.localizedDescription)")
+            shareError = SharedAccessDenial(error)?.message ?? ErrorCopy.failure(L10n.tr("リンクを作れませんでした"), error, context: "ShareAppSheet")
         }
     }
 
@@ -204,21 +207,29 @@ struct ShareAppSheet: View {
             rt.toast = L10n.tr("リンクを取り消しました。もう開けません")
             await issue() // 新しいリンクを用意しておく
         } catch {
-            rt.toast = L10n.tr("取り消せませんでした: \(error.localizedDescription)")
+            rt.toast = ErrorCopy.failure(L10n.tr("取り消せませんでした"), error, context: "ShareAppSheet")
         }
     }
 
     private func publish() async {
         busy = true
         defer { busy = false }
-        let tagList = tags.split(whereSeparator: { $0 == " " || $0 == "　" || $0 == "," || $0 == "、" }).map(String.init)
+        let tagList = PublishCopy.tags(from: tags)
         do {
             listing = try await services.sharing?.publish(appId: app.id, description: desc, tags: tagList, authorName: nil)
+            flaggedField = nil
             rt.toast = L10n.tr("「探す」に公開しました")
+        } catch let api as APIError where api.isTextNotAllowed { // #321
+            ErrorLog.record(api, context: "ShareAppSheet publish")
+            flaggedField = api.field
+            rt.toast = Self.textNotAllowedMessage(field: api.field)
         } catch {
-            rt.toast = L10n.tr("公開できませんでした: \(error.localizedDescription)")
+            rt.toast = ErrorCopy.failure(L10n.tr("公開できませんでした"), error, context: "ShareAppSheet")
         }
     }
+
+    /// 公開の文字の項目(#321)。どの欄かを名前で出す
+    static func textNotAllowedMessage(field: String?) -> String { PublishCopy.textNotAllowedMessage(field: field) }
 
     private func unpublish() async {
         busy = true
@@ -228,7 +239,7 @@ struct ShareAppSheet: View {
             listing = nil
             rt.toast = L10n.tr("公開をやめました")
         } catch {
-            rt.toast = L10n.tr("非公開にできませんでした: \(error.localizedDescription)")
+            rt.toast = ErrorCopy.failure(L10n.tr("非公開にできませんでした"), error, context: "ShareAppSheet")
         }
     }
 }

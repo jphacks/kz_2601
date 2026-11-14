@@ -3,8 +3,9 @@ package appconfig
 // Reports, blocks and operator unpublishing (#321, App Review 1.2). Reports
 // are stored as reports/{id} and logged as "moderation: report" for the
 // operator's alert (docs/infra/moderation.md); the operator unpublishes with
-// cmd/moderate. Blocked users' listings and shared posts are left out of the
-// blocker's GET /public-apps and GET .../records.
+// cmd/moderate. Blocked users' listings are left out of the blocker's
+// GET /public-apps; shared posts of people blocked either way are left out
+// of GET .../records (sharedFilter).
 
 import (
 	"errors"
@@ -79,7 +80,7 @@ func (h *Handler) createReport(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "cannot report your own content"))
 		return
 	}
-	now := time.Now().UTC()
+	now := store.Now()
 	rep := store.Report{ID: store.ReportID(uid, body.Kind, target), ReporterUID: uid, Kind: body.Kind, TargetID: target,
 		TargetUID: owner, Reason: body.Reason, Status: "open", CreatedAt: now}
 	created, err := h.store.AddReport(r.Context(), rep, now.In(ratelimit.JST).Format(time.DateOnly), ReportsPerDay)
@@ -146,6 +147,16 @@ func (h *Handler) reportTarget(r *http.Request, kind, id, appID, entityID, recor
 		if err != nil {
 			// only posts in shared apps can be reported: private records are the caller's own
 			return "", "", mapStoreErr(err, "record")
+		}
+		if !canRead(nil, rec, uidOf(r)) { // #271: an addressed record the caller cannot read
+			return "", "", recordNotFound()
+		}
+		ok, err := h.sharedFilter(r, appID, entityID, []store.Record{*rec})
+		if err != nil {
+			return "", "", err
+		}
+		if !ok(rec) { // blocked either way / matched-only (#507)
+			return "", "", recordNotFound()
 		}
 		return appID + "/" + entityID + "/" + recordID, rec.Author, nil
 	}
@@ -230,7 +241,7 @@ func (h *Handler) createBlock(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "too many blocked users"))
 		return
 	}
-	b.CreatedAt = time.Now().UTC()
+	b.CreatedAt = store.Now()
 	if err := h.store.PutBlock(r.Context(), uidOf(r), b); err != nil {
 		fail(w, err)
 		return

@@ -240,6 +240,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	bctx := context.WithoutCancel(ctx)
 	callStart := time.Now()
 	canEarly := !force
+	untrack := tallyOf(ctx).track() // an early reply returns before this call ends (coins wait)
 	go func() {
 		var onEarly func(earlyFirst)
 		if canEarly {
@@ -251,7 +252,9 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 				}
 			}
 		}
-		done <- s.chatFirstAttempt(bctx, cfg, system, schema, prompt(nil), bgAR, onEarly)
+		a := s.chatFirstAttempt(bctx, cfg, system, schema, prompt(nil), bgAR, onEarly)
+		untrack()
+		done <- a
 	}()
 	var att firstAttempt
 	select {
@@ -505,6 +508,9 @@ func summarizeApp(a *dsl.App) string {
 		fmt.Fprintf(&b, "通知: %s\n", raw)
 	} else {
 		b.WriteString("通知: なし\n")
+	}
+	for i := range a.ServerRules { // #343: the server's automatic actions in plain words
+		fmt.Fprintf(&b, "自動の動き: %s\n", a.DescribeServerRule(&a.ServerRules[i]))
 	}
 	b.WriteString("\n### 記録の種類(entity)\n")
 	if len(a.Entities) == 0 {

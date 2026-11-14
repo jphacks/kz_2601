@@ -54,14 +54,23 @@ func FromEnv(getenv func(string) string) Target {
 // IsStaging reports whether appEnv names the staging environment.
 func IsStaging(appEnv string) bool { return appEnv == "stg" || appEnv == "staging" }
 
-// IsProd reports whether a staging process would use the production
-// project+database (real Firestore only; the emulator never counts).
-func IsProd(t Target, getenv func(string) string) bool {
-	if t.Project == "" || t.Emulator != "" || !IsStaging(t.AppEnv) {
+// IsProdDatabase reports whether t is the production project+database on
+// real Firestore, whatever APP_ENV says (tools that delete data, #293).
+func IsProdDatabase(t Target, getenv func(string) string) bool {
+	if t.Emulator != "" {
 		return false
 	}
 	return t.Project == orDefault(getenv("PROD_FIRESTORE_PROJECT"), ProdProject) &&
 		t.Database == orDefault(getenv("PROD_FIRESTORE_DATABASE"), DefaultDatabase)
+}
+
+// IsProd reports whether a staging process would use the production
+// project+database (real Firestore only; the emulator never counts).
+func IsProd(t Target, getenv func(string) string) bool {
+	if t.Project == "" || !IsStaging(t.AppEnv) {
+		return false
+	}
+	return IsProdDatabase(t, getenv)
 }
 
 // Check returns an error when a staging process would use the production

@@ -1,11 +1,16 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import AVFoundation
 import UniformTypeIdentifiers
 import CoreTransferable
 
 // 審査用ビルド(APP_STORE_REVIEW・#245)では撮影をバイナリから外す(ライブラリから選ぶ PickedMovie は残す)。
 #if !APP_STORE_REVIEW
+#if os(iOS)
 /// 動画撮影の `UIImagePickerController`(#206)。標準のカメラ UI に内カメ / 外カメの切り替えボタンがある。
 /// 録画の上限は `maxDuration` 秒、画質は中程度(`.typeMedium`)。権限は呼び出し側で `requestAccess()` を先に確認する。
 struct VideoCameraPicker: UIViewControllerRepresentable {
@@ -58,6 +63,26 @@ struct VideoCameraPicker: UIViewControllerRepresentable {
         }
     }
 }
+#else
+/// Mac(#1043): AVCaptureMovieFileOutput で撮る sheet。上限の秒数・中程度の画質は iOS と同じ。カメラが無い Mac は撮影のボタンを出さない。
+struct VideoCameraPicker: View {
+    var maxDuration: TimeInterval
+    var onVideo: (URL) -> Void
+
+    static var isAvailable: Bool { MacCameraSession.hasCamera }
+
+    /// カメラは必須。マイクは拒否されても無音で撮れる(iOS と同じ)
+    static func requestAccess() async -> Bool {
+        let camera = await CameraPicker.requestAccess()
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            _ = await AVCaptureDevice.requestAccess(for: .audio)
+        }
+        return camera
+    }
+
+    var body: some View { MacCameraSheet(mode: .video(maxDuration: maxDuration), onVideo: onVideo) }
+}
+#endif
 #endif
 
 /// PhotosPicker で選んだ動画を一時ファイルとして受け取る。

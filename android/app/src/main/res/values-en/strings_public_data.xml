@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="public_data_keep">Keep it public</string>
+    <string name="public_data_message">Anyone who opens the app can see %1$s.</string>
+    <string name="public_data_private">Make it private</string>
+    <string name="public_data_remove">Remove these fields</string>
+    <string name="public_data_title">Personal info will be public too</string>
+</resources>

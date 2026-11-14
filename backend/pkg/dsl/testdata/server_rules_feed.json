@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "頭痛と気圧", "voiceEntry": "none"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "conditions", "name": "体調", "titleField": "note", "fields": [
+      {"id": "day", "name": "日付", "type": "date", "required": true},
+      {"id": "headache", "name": "頭痛", "type": "boolean"},
+      {"id": "note", "name": "メモ", "type": "string"}
+    ]},
+    {"id": "pressure_log", "name": "気圧の記録", "titleField": "note", "fields": [
+      {"id": "day", "name": "日付", "type": "date", "required": true},
+      {"id": "note", "name": "気圧", "type": "string"},
+      {"id": "low", "name": "最低", "type": "number"},
+      {"id": "high", "name": "最高", "type": "number"},
+      {"id": "falling", "name": "急な低下", "type": "boolean"}
+    ]},
+    {"id": "weather_log", "name": "天気の記録", "titleField": "weather", "fields": [
+      {"id": "day", "name": "日付", "type": "date", "required": true},
+      {"id": "weather", "name": "天気", "type": "string"},
+      {"id": "low", "name": "最低気温", "type": "integer"},
+      {"id": "high", "name": "最高気温", "type": "integer"}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "気圧", "components": [
+      {"type": "list", "entity": "pressure_log", "item": {"title": "note", "subtitle": "day"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "daily_feed", "on": {"every": "daily", "time": "07:00"},
+     "do": [
+       {"saveFeed": {"provider": "pressure", "region": "130000", "entity": "pressure_log", "fields": {"date": "day", "summary": "note", "min": "low", "max": "high", "drop": "falling"}}},
+       {"saveFeed": {"provider": "weather", "region": "130000", "entity": "weather_log", "fields": {"date": "day", "summary": "weather", "min": "low", "max": "high"}}}
+     ]}
+  ]
+}

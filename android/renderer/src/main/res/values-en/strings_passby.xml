@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="passby_agree">Agree and start</string>
+    <string name="passby_anonymous">Someone nearby</string>
+    <string name="passby_cancel">Cancel</string>
+    <string name="passby_consent_anonymous_footer">When on, “Someone nearby” is shared instead of your display name.</string>
+    <string name="passby_consent_display_name">Display name</string>
+    <string name="passby_consent_fields_line">• Fields: %1$s</string>
+    <string name="passby_consent_intro">While on, you automatically connect with nearby people who have the same app open and share the following.</string>
+    <string name="passby_consent_name_line">• Display name: %1$s</string>
+    <string name="passby_consent_no_fields">(no fields to send)</string>
+    <string name="passby_consent_records">"Their records are added to this device. Photos, videos and other fields are not sent. "</string>
+    <string name="passby_consent_shared">What you share</string>
+    <string name="passby_consent_stops">It stops when you close this screen or move the app to the background.</string>
+    <string name="passby_consent_title">Start pass-by sharing?</string>
+    <string name="passby_distance_unsupported">This device can\'t measure distance and direction</string>
+    <string name="passby_hide_name">Hide my name</string>
+    <string name="passby_ios_not_supported">Can\'t connect to iOS devices (works between Android devices)</string>
+    <string name="passby_measuring">Measuring</string>
+    <string name="passby_no_encounters">You haven\'t passed anyone yet</string>
+    <string name="passby_no_fields">No fields to send</string>
+    <string name="passby_off_hint">When on, you swap %1$s with nearby people using the same app while this screen is open</string>
+    <string name="passby_paused">Paused</string>
+    <string name="passby_public_name">Name others see: %1$s</string>
+    <string name="passby_searching">Looking for people nearby</string>
+    <string name="passby_stops_note">Stops when you close this screen or leave the app</string>
+    <plurals name="passby_times">
+        <item quantity="one">%1$d time</item>
+        <item quantity="other">%1$d times</item>
+    </plurals>
+</resources>

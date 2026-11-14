@@ -4,6 +4,7 @@ import Foundation
 public struct PhotoAnalyze: Decodable, Sendable, Hashable {
     public enum Kind: String, Decodable, Sendable {
         case text, amount, date, classify, describe, jointAngle
+        case label, labels, barcode, peopleCount, color
         case unknown
 
         public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -26,7 +27,7 @@ public struct PhotoAnalyze: Decodable, Sendable, Hashable {
     /// 文字認識(OCR)が要るか。
     public var needsText: Bool { [.text, .amount, .date, .classify, .describe].contains(kind) }
     /// 画像分類のラベルが要るか。
-    public var needsLabels: Bool { kind == .classify || kind == .describe }
+    public var needsLabels: Bool { [.classify, .describe, .label, .labels].contains(kind) }
 }
 
 /// 読み取った 1 つの値。into の型に合わせて `jsonValue(for:)` で保存形式にする。
@@ -204,18 +205,106 @@ public enum PhotoClassifier {
         return best?.option
     }
 
-    /// ラベルの日本語(説明のフォールバック用)。知らないラベルは英語のまま。
+    /// ラベルの日本語(説明・label / labels 用)。知らないラベルは英語のまま(`_` は空白に)。
     public static func japanese(_ label: String) -> String {
-        let l = label.lowercased()
-        let words: [String: String] = [
-            "food": "食べ物", "meal": "食事", "dish": "料理", "fruit": "果物", "vegetable": "野菜", "drink": "飲み物", "coffee": "コーヒー",
-            "dog": "犬", "cat": "猫", "bird": "鳥", "fish": "魚", "flower": "花", "plant": "植物", "tree": "木",
-            "book": "本", "document": "書類", "paper": "紙", "text": "文字", "receipt": "レシート",
-            "people": "人", "person": "人", "adult": "大人", "child": "子ども", "car": "車", "train": "電車", "bicycle": "自転車",
-            "sky": "空", "mountain": "山", "sea": "海", "beach": "浜辺", "building": "建物", "outdoor": "屋外", "indoor": "屋内",
-            "shoe": "靴", "clothing": "服", "computer": "パソコン", "phone": "電話", "cake": "ケーキ", "bread": "パン",
-        ]
-        return words[l] ?? label.replacingOccurrences(of: "_", with: " ")
+        words[label.lowercased()] ?? label.replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// Vision の主なラベル → 日本語。物・動植物・料理を中心に、よく出るものだけ。
+    static let words: [String: String] = [
+        // 大まかな語
+        "food": "食べ物", "meal": "食事", "dish": "料理", "fruit": "果物", "vegetable": "野菜", "drink": "飲み物", "beverage": "飲み物",
+        "plant": "植物", "flower": "花", "tree": "木", "animal": "動物", "mammal": "哺乳類", "people": "人", "person": "人",
+        "adult": "大人", "child": "子ども", "baby": "赤ちゃん", "document": "書類", "paper": "紙", "text": "文字", "receipt": "レシート",
+        "outdoor": "屋外", "indoor": "屋内", "structure": "建造物", "building": "建物",
+        // 料理・食材
+        "sushi": "寿司", "ramen": "ラーメン", "noodles": "麺", "rice": "ご飯", "curry": "カレー", "pizza": "ピザ", "hamburger": "ハンバーガー",
+        "sandwich": "サンドイッチ", "salad": "サラダ", "soup": "スープ", "pasta": "パスタ", "spaghetti": "スパゲッティ", "steak": "ステーキ",
+        "meat": "肉", "fried_chicken": "唐揚げ", "egg": "卵", "tempura": "天ぷら", "dumpling": "餃子",
+        "bread": "パン", "cake": "ケーキ", "cookie": "クッキー", "chocolate": "チョコレート", "ice_cream": "アイスクリーム", "dessert": "デザート",
+        "donut": "ドーナツ", "pancake": "パンケーキ", "cheese": "チーズ", "milk": "牛乳", "yogurt": "ヨーグルト", "tofu": "豆腐",
+        "apple": "りんご", "banana": "バナナ", "orange": "オレンジ", "strawberry": "いちご", "grape": "ぶどう", "lemon": "レモン",
+        "watermelon": "すいか", "peach": "もも", "cherry": "さくらんぼ", "tomato": "トマト", "carrot": "にんじん", "cabbage": "キャベツ",
+        "lettuce": "レタス", "onion": "たまねぎ", "potato": "じゃがいも", "broccoli": "ブロッコリー", "cucumber": "きゅうり",
+        "mushroom": "きのこ", "corn": "とうもろこし", "eggplant": "なす", "pumpkin": "かぼちゃ", "pepper": "ピーマン",
+        "coffee": "コーヒー", "tea": "お茶", "beer": "ビール", "wine": "ワイン", "juice": "ジュース", "water": "水",
+        // 植物・花
+        "rose": "バラ", "tulip": "チューリップ", "sunflower": "ひまわり", "cherry_blossom": "桜", "daisy": "デイジー", "lily": "ユリ",
+        "orchid": "ラン", "hydrangea": "アジサイ", "lotus": "ハス", "dandelion": "タンポポ", "cactus": "サボテン", "succulent": "多肉植物",
+        "houseplant": "観葉植物", "bonsai": "盆栽", "fern": "シダ", "moss": "コケ", "grass": "草", "leaf": "葉", "maple": "もみじ",
+        "bamboo": "竹", "pine": "松",
+        // 動物
+        "dog": "犬", "cat": "猫", "bird": "鳥", "fish": "魚", "rabbit": "うさぎ", "hamster": "ハムスター", "horse": "馬", "cow": "牛",
+        "pig": "豚", "sheep": "羊", "duck": "アヒル", "insect": "虫", "butterfly": "チョウ", "bee": "ハチ",
+        "turtle": "カメ", "frog": "カエル", "deer": "シカ",
+        // 物
+        "book": "本", "notebook": "ノート", "pen": "ペン", "bottle": "ボトル", "cup": "カップ", "can": "缶", "plastic_bag": "ビニール袋",
+        "cardboard": "段ボール", "box": "箱", "bag": "かばん", "shoe": "靴", "clothing": "服", "shirt": "シャツ", "jacket": "ジャケット",
+        "computer": "パソコン", "laptop": "ノートパソコン", "phone": "電話", "television": "テレビ", "camera": "カメラ", "watch": "腕時計",
+        "chair": "いす", "table": "テーブル", "bed": "ベッド", "car": "車", "bicycle": "自転車", "train": "電車", "bus": "バス",
+        "airplane": "飛行機", "boat": "船",
+        // 風景・場所
+        "sky": "空", "cloud": "雲", "mountain": "山", "sea": "海", "beach": "浜辺", "river": "川", "lake": "湖", "forest": "森",
+        "park": "公園", "temple": "寺", "shrine": "神社", "castle": "城", "bridge": "橋", "tower": "塔", "street": "通り",
+    ]
+
+    /// label / labels で飛ばす大まかな語(Vision は「food」と「sushi」の両方を返す)。具体的なラベルが無ければ使う。
+    static let generic: Set<String> = [
+        "food", "meal", "dish", "drink", "beverage", "plant", "animal", "mammal", "people", "adult", "structure", "material",
+        "outdoor", "indoor", "consumables", "container", "conveyance", "vegetation", "liquid", "furniture", "machine", "tool",
+        "produce", "document", "text", "clothing", "art", "land", "water_body", "sky",
+    ]
+
+    /// 写っている物の名前(信頼度順のラベルから大まかな語を除き、日本語に直して重複を除く)。最大 max 個。
+    public static func names(labels: [String], max: Int) -> [String] {
+        let specific = labels.filter { !generic.contains($0.lowercased()) }
+        var out: [String] = []
+        for name in (specific.isEmpty ? labels : specific).map(japanese) where !out.contains(name) {
+            out.append(name)
+            if out.count == max { break }
+        }
+        return out
+    }
+}
+
+// MARK: - 主な色
+
+/// 画素の色を 12 色の名前に振り分ける(純関数・テスト対象)。
+public enum PhotoColor {
+    /// 0〜1 の RGB → 色の名前。
+    public static func name(r: Double, g: Double, b: Double) -> String {
+        let maxC = Swift.max(r, g, b), minC = Swift.min(r, g, b)
+        let v = maxC, d = maxC - minC
+        let s = maxC > 0 ? d / maxC : 0
+        if v < 0.2 { return "黒" }
+        if s < 0.18 { return v > 0.85 ? "白" : "灰色" }
+        var h: Double
+        switch maxC {
+        case r: h = 60 * ((g - b) / d)
+        case g: h = 60 * ((b - r) / d + 2)
+        default: h = 60 * ((r - g) / d + 4)
+        }
+        if h < 0 { h += 360 }
+        switch h {
+        case ..<15, 330...:
+            return v < 0.55 && s > 0.4 ? "茶色" : (s < 0.5 && v > 0.75 ? "ピンク" : "赤")
+        case ..<45:
+            return v < 0.6 ? "茶色" : "オレンジ"
+        case ..<70: return v < 0.5 ? "茶色" : "黄色"
+        case ..<165: return "緑"
+        case ..<200: return "水色"
+        case ..<255: return "青"
+        case ..<290: return "紫"
+        default: return "ピンク"
+        }
+    }
+
+    /// 画素の中でいちばん多い色の名前(画素が無ければ nil)。
+    public static func dominant(pixels: [(r: Double, g: Double, b: Double)]) -> String? {
+        var counts: [String: Int] = [:]
+        for p in pixels { counts[name(r: p.r, g: p.g, b: p.b), default: 0] += 1 }
+        // 同数は名前順で決める(結果を毎回同じに)
+        return counts.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key
     }
 }
 

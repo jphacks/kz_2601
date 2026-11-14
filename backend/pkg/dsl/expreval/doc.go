@@ -27,7 +27,10 @@ package expreval
 //     DST day counts as one), addDays keeps the wall-clock time (a time in a
 //     DST gap moves forward by the gap, as Foundation does), hoursBetween reads the
 //     local clock of datetimes (so a DST night shows wall-clock hours),
-//     thisWeek is Monday 0:00 to the next Monday 0:00.
+//     thisWeek is Monday 0:00 to the next Monday 0:00. addMinutes adds elapsed
+//     minutes to a date / datetime (a "YYYY-MM-DD" is its local start of day;
+//     across DST the wall clock moves by the offset change) and wraps a
+//     "HH:mm" time within the day, answering "HH:mm".
 //   - Datetime computed values merged into records (agg over a computed field)
 //     are written as RFC 3339 in UTC, like ISO8601DateFormatter's default.
 //   - len counts grapheme clusters like Swift's String.count, approximated

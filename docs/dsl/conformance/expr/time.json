@@ -23,14 +23,14 @@
       "expected": {"type": "number", "value": 0.008333333333333333, "text": "0.008333333333333333"}
     },
     {
-      "name": "hoursBetween/24-00-start",
+      "name": "hoursBetween/24-00-start-invalid",
       "expr": {"op": "hoursBetween", "args": ["24:00", "01:00"]},
-      "expected": {"type": "number", "value": 1, "text": "1"}
+      "expected": {"type": "nil"}
     },
     {
-      "name": "hoursBetween/24-00-end",
+      "name": "hoursBetween/24-00-end-invalid",
       "expr": {"op": "hoursBetween", "args": ["00:00", "24:00"]},
-      "expected": {"type": "number", "value": 24, "text": "24"}
+      "expected": {"type": "nil"}
     },
     {
       "name": "hoursBetween/24-30-invalid",
@@ -130,6 +130,26 @@
       "timeZone": "America/New_York",
       "expr": {"op": "hoursBetween", "args": ["2026-11-01T05:00:00Z", "2026-11-01T08:00:00Z"]},
       "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "hoursBetween/23-59-end",
+      "expr": {"op": "hoursBetween", "args": ["00:00", "23:59"]},
+      "expected": {"type": "number", "value": 23.983333333333334, "text": "23.983333333333334"}
+    },
+    {
+      "name": "hoursBetween/23-59-59-end",
+      "expr": {"op": "hoursBetween", "args": ["00:00", "23:59:59"]},
+      "expected": {"type": "number", "value": 23.99972222222222, "text": "23.99972222222222"}
+    },
+    {
+      "name": "hoursBetween/24-30-end-invalid",
+      "expr": {"op": "hoursBetween", "args": ["01:00", "24:30"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/25-00-invalid",
+      "expr": {"op": "hoursBetween", "args": ["25:00", "01:00"]},
+      "expected": {"type": "nil"}
     }
   ]
 }

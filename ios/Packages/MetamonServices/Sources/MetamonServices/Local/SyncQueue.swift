@@ -29,23 +29,54 @@ public struct SyncOperation: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
-/// キューから UI(AppRuntime)への通知。
+/// キューから UI(AppRuntime)への通知。断られた操作の `recordId` は積んだ時の id(作成なら仮 id `local-…`)。
 public enum SyncEvent: Sendable, Equatable {
     /// 1 操作がサーバーに反映された。ローカル DB は更新済みなので entity を読み直せばよい
     case sent(appId: String, entity: String)
     /// 競合(404/409 等)。サーバー優先でローカルの未送信印を落とした。entity をサーバーから引き直すこと
     case conflict(appId: String, entity: String, message: String)
     /// サーバーが内容を拒否(400/422)。操作は破棄し、create はローカル行も消した。`field` は弾かれた Field.id(`details.field`)
-    case rejected(appId: String, entity: String, message: String, field: String? = nil)
+    case rejected(appId: String, entity: String, message: String, field: String? = nil, recordId: String? = nil)
     /// 共有レコードを作った人以外が変えようとした(403・#249)。操作は破棄して未送信印を落とした。
     /// ローカルには楽観的に書いた値が残るので、entity をサーバーから引き直すこと
-    case forbidden(appId: String, entity: String)
+    case forbidden(appId: String, entity: String, recordId: String? = nil)
     /// 連続失敗が上限に達し、次のトリガー(オンライン復帰 / 前面復帰 / 今すぐ同期)まで停止
     case paused(pending: Int)
     /// キューが空になった
     case drained
     /// 共有(scope:shared)のデータに参加していない(403 `not_member`・#254)。操作は破棄し、create はローカル行も消した
-    case notMember(appId: String, entity: String)
+    case notMember(appId: String, entity: String, recordId: String? = nil)
+    /// 共有の記録の書き込みに Tailor It Pro が要る(402 `pro_required`・#316)。アプリの作成者が Pro でない。
+    /// 操作は破棄し、create はローカル行も消した。`pro.creatorNeedsPro` = 呼び出した人は参加者(払っても直らない)
+    case proRequired(appId: String, entity: String, pro: ProRequired, recordId: String? = nil)
+    /// アプリの決まりで断られた(#272 管理者だけ・#273 同じ内容の記録)。操作は破棄し、create はローカル行も消した。
+    /// 楽観的に書いた値が残るので、entity をサーバーから引き直すこと
+    case denied(appId: String, entity: String, denial: RecordWriteDenial, recordId: String? = nil)
+    /// プランの上限(403 `plan_limit_reached`・#317)。操作は破棄し、create はローカル行も消した
+    case planLimit(appId: String, entity: String, limit: PlanLimit, recordId: String? = nil)
+    /// 運営がアプリの自動の動きを止めている(403 `app_stopped`・#346)。操作は破棄し、create はローカル行も消した
+    case appStopped(appId: String, entity: String, recordId: String? = nil)
+    /// 他の人に見える文字に表示できない言葉がある(422 `text_not_allowed`・#321)。`field` は直す Field.id(authorName もありうる)
+    case textNotAllowed(appId: String, entity: String, field: String?, recordId: String? = nil)
+    /// 仲間探しのプロフィールの投稿に 18 歳以上の申告が要る(400 `age_unconfirmed`・#507)。操作は破棄し、ローカル行も消した。
+    /// `data` は送ろうとした値(申告のあとに投稿し直す)
+    case ageUnconfirmed(appId: String, entity: String, data: [String: JSONValue], recordId: String? = nil)
+}
+
+extension SyncEvent {
+    /// サーバーが書き込みを断った(操作を破棄した)イベントなら、その書き込み先。送れた・競合・停止などは nil。
+    public var refusedWrite: (appId: String, entity: String, recordId: String?)? {
+        switch self {
+        case .forbidden(let appId, let entity, let id), .rejected(let appId, let entity, _, _, let id),
+             .notMember(let appId, let entity, let id), .denied(let appId, let entity, _, let id),
+             .proRequired(let appId, let entity, _, let id), .planLimit(let appId, let entity, _, let id),
+             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id),
+             .ageUnconfirmed(let appId, let entity, _, let id):
+            return (appId, entity, id)
+        case .sent, .conflict, .paused, .drained:
+            return nil
+        }
+    }
 }
 
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
@@ -184,27 +215,56 @@ public actor SyncQueue {
                 emit(.sent(appId: op.appId, entity: op.entity))
             } catch {
                 if SharedAccessDenial(error) == .notMember { // #378 の「作った人だけ」の 403 より先に見分ける
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) not a member")
-                    emit(.notMember(appId: op.appId, entity: op.entity))
+                    emit(.notMember(appId: op.appId, entity: op.entity, recordId: op.recordId))
+                    continue
+                }
+                if op.kind == .create, (error as? APIError)?.isAgeUnconfirmed == true { // #507: 4xx の rejected より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
+                    finish(op)
+                    print("[Metamon] sync create \(op.entity)/\(op.recordId) needs the 18+ declaration")
+                    emit(.ageUnconfirmed(appId: op.appId, entity: op.entity, data: op.data, recordId: op.recordId))
+                    continue
+                }
+                if let event = Self.refusal(error, appId: op.appId, entity: op.entity, recordId: op.recordId) { // 403 forbidden / 4xx rejected より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) refused: \(event)")
+                    emit(event)
+                    continue
+                }
+                if let denial = RecordWriteDenial(error) { // #272 #273: 「作った人だけ」の 403・競合の 409 より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) denied: \(denial)")
+                    emit(.denied(appId: op.appId, entity: op.entity, denial: denial, recordId: op.recordId))
+                    continue
+                }
+                if let pro = ProRequired(error) { // #316: 4xx の rejected より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) needs Pro (creator=\(pro.creatorNeedsPro))")
+                    emit(.proRequired(appId: op.appId, entity: op.entity, pro: pro, recordId: op.recordId))
                     continue
                 }
                 switch Self.classify(error) {
                 case .conflict:
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     emit(.conflict(appId: op.appId, entity: op.entity, message: (error as? APIError)?.errorDescription ?? "\(error)"))
                 case .forbidden:
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) forbidden (not the author)")
-                    emit(.forbidden(appId: op.appId, entity: op.entity))
+                    emit(.forbidden(appId: op.appId, entity: op.entity, recordId: op.recordId))
                 case .rejected(let message):
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) rejected: \(message)")
-                    emit(.rejected(appId: op.appId, entity: op.entity, message: message, field: (error as? APIError)?.field))
+                    emit(.rejected(appId: op.appId, entity: op.entity, message: message, field: (error as? APIError)?.field,
+                                   recordId: op.recordId))
                 case .transient:
                     ops[0].attempts += 1
                     persist()
@@ -234,22 +294,32 @@ public actor SyncQueue {
         case .create:
             let rec = try await client.create(appId: op.appId, entity: op.entity, data: data, clientId: op.id, authorName: op.authorName)
             aliases[op.recordId] = rec.id
-            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
+            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec,
+                                   keepingLocalChanges: hasLaterUpdate(after: op))
         case .update:
             let rec = try await client.update(appId: op.appId, entity: op.entity, id: serverId, data: data)
-            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
+            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec,
+                                   keepingLocalChanges: hasLaterUpdate(after: op))
         case .delete:
             do {
                 try await client.delete(appId: op.appId, entity: op.entity, id: serverId)
             } catch let e as APIError where e.status == 404 {
                 // もう無い = 目的は達成
             }
-            await store.remove(appId: op.appId, entity: op.entity, recordId: op.recordId)
+            await store.remove(appId: op.appId, entity: op.entity, recordId: serverId)
             aliases[op.recordId] = nil
         case .none:
             break
         }
     }
+
+    /// 送っている間に同じ行をもう一度書いた(後ろに update が積まれている)。サーバーの応答で端末の内容を戻さない(#3667)
+    private func hasLaterUpdate(after op: SyncOperation) -> Bool {
+        ops.contains { $0.id != op.id && $0.kind == .update && rowId($0) == rowId(op) }
+    }
+
+    /// 操作が指すローカル行の id。積んだ後に作成が届くと、行は仮 id からサーバー id に替わっている。
+    private func rowId(_ op: SyncOperation) -> String { aliases[op.recordId] ?? op.recordId }
 
     /// 値に残った仮 id(`local-<clientId>`)を送信済みのサーバー id に差し替える。
     /// 未送信のメンバーを選んだ支出の type=ref(払った人)などは、積んだ時点では仮 id のまま入っている。
@@ -258,6 +328,15 @@ public actor SyncQueue {
             if case .string(let s) = v, s.hasPrefix("local-"), let real = aliases[s] { return .string(real) }
             return v
         }
+    }
+
+    /// 文言を分ける拒否(#317 / #346 / #321)。どれも再試行では直らない
+    static func refusal(_ error: Error, appId: String, entity: String, recordId: String? = nil) -> SyncEvent? {
+        guard let api = error as? APIError else { return nil }
+        if let limit = PlanLimit(api) { return .planLimit(appId: appId, entity: entity, limit: limit, recordId: recordId) }
+        if api.isAppStopped { return .appStopped(appId: appId, entity: entity, recordId: recordId) }
+        if api.isTextNotAllowed { return .textNotAllowed(appId: appId, entity: entity, field: api.field, recordId: recordId) }
+        return nil
     }
 
     enum Outcome: Equatable { case transient, conflict, forbidden, rejected(String) }

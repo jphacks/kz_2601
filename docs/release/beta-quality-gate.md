@@ -79,6 +79,7 @@ scripts/beta-weekly.sh prod --dry-run  # 実行せずに Logs Explorer のフィ
 | `validation_passed` | `outcome` が `validated` / `regenerated` / `unchanged` の時 true |
 | `first_generation` | 空のアプリ(声だけの初期状態)への create の時 true |
 | `stream` | `?stream=1` の呼び出しか |
+| `model` / `prompt_version` | 生成に使ったモデルと、プロンプトの版(`p-` + プロンプト本文の sha256 の先頭 12 桁・#372)。段階的なリリースで新旧を分けて見る時に使う |
 | `duration_ms` | サーバーで受け付けてから結果を返すまで(失敗も含む) |
 | `claude_ms` | 成功時だけ。そのうち Claude を待った時間 |
 | `attempts` / `regenerations` / `area_fallback` / `downgraded_to_full` / `lint_retried` | 成功時は `Meta` の値。失敗時は `attempts` だけ |

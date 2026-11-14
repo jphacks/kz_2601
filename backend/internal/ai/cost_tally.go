@@ -15,12 +15,81 @@ type costTally struct {
 	unpriced int
 	usd      float64
 	usage    Usage
+	// pending counts Claude calls still running after the response (an
+	// early chat reply, track); idle is closed when it drops to 0.
+	pending int
+	idle    chan struct{}
+}
+
+// track counts a call that may outlive the response until done is called
+// (the coin charge waits for it). No-op on a nil tally.
+func (t *costTally) track() (done func()) {
+	if t == nil {
+		return func() {}
+	}
+	t.mu.Lock()
+	t.pending++
+	t.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			t.mu.Lock()
+			defer t.mu.Unlock()
+			if t.pending--; t.pending == 0 && t.idle != nil {
+				close(t.idle)
+				t.idle = nil
+			}
+		})
+	}
+}
+
+// busy reports whether a tracked call is still running.
+func (t *costTally) busy() bool {
+	if t == nil {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.pending > 0
+}
+
+// wait blocks until no tracked call is running or ctx ends.
+func (t *costTally) wait(ctx context.Context) {
+	t.mu.Lock()
+	if t.pending == 0 {
+		t.mu.Unlock()
+		return
+	}
+	if t.idle == nil {
+		t.idle = make(chan struct{})
+	}
+	idle := t.idle
+	t.mu.Unlock()
+	select {
+	case <-idle:
+	case <-ctx.Done():
+	}
+}
+
+// total is the cost so far: calls made, their USD and whether every call
+// had a price (EstimateCostUSD ok).
+func (t *costTally) total() (calls int, usd float64, priced bool) {
+	if t == nil {
+		return 0, 0, true
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.calls, t.usd, t.unpriced == 0
 }
 
 type costTallyKey struct{}
 
-// withCostTally attaches a fresh tally that Client.logUsage adds to.
+// withCostTally attaches a fresh tally that Client.logUsage adds to. A ctx
+// that already has one (the coin charge of the request) keeps it.
 func withCostTally(ctx context.Context) context.Context {
+	if tallyOf(ctx) != nil {
+		return ctx
+	}
 	return context.WithValue(ctx, costTallyKey{}, &costTally{})
 }
 

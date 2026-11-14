@@ -82,6 +82,34 @@ final class MatchingClientTests: XCTestCase {
         XCTAssertEqual(body(r[4])?["ageConfirmed"] as? Bool, true)
     }
 
+    func testAgeConfirmationEndpoints() async throws {
+        StubURLProtocol.reset([
+            .init(status: 200, body: #"{"ageConfirmed":false}"#),
+            .init(status: 200, body: #"{"ageConfirmed":true}"#),
+        ])
+        let before = try await client.ageConfirmation()
+        XCTAssertFalse(before)
+        try await client.confirmAge()
+        let r = requests
+        XCTAssertEqual(r.map { "\($0.httpMethod ?? "") \($0.url?.path ?? "")" }, [
+            "GET /v1/me/age-confirmation",
+            "PUT /v1/me/age-confirmation",
+        ])
+        XCTAssertEqual(body(r[1]).map { $0.keys.sorted() }, ["ageConfirmed"], "年齢そのものは送らない")
+        XCTAssertEqual(body(r[1])?["ageConfirmed"] as? Bool, true)
+    }
+
+    func testAgeUnconfirmedOnListIsRecognized() async throws {
+        StubURLProtocol.reset([.init(status: 400, body: #"{"error":{"code":"bad_request","message":"confirm","details":{"reason":"age_unconfirmed"}}}"#)])
+        do {
+            _ = try await client.list(appId: "app1", box: .matches)
+            XCTFail("must throw")
+        } catch let error as APIError {
+            XCTAssertTrue(error.isAgeUnconfirmed)
+        }
+        XCTAssertFalse(APIError.server(status: 400, code: "bad_request", message: "x", details: ["reason": .string("blocked")]).isAgeUnconfirmed)
+    }
+
     func testAgeUnconfirmedSurfacesReason() async throws {
         StubURLProtocol.reset([.init(status: 400, body: #"{"error":{"code":"bad_request","message":"confirm","details":{"reason":"age_unconfirmed"}}}"#)])
         do {
@@ -123,6 +151,15 @@ final class FakeMatchingClient: MatchingClient, @unchecked Sendable {
     }
     func decline(appId: String, uid: String) async throws { try await record("decline \(uid)") }
     func unmatch(appId: String, uid: String) async throws { try await record("unmatch \(uid)") }
+    var serverAgeConfirmed = false
+    func ageConfirmation() async throws -> Bool {
+        try await record("get age")
+        return serverAgeConfirmed
+    }
+    func confirmAge() async throws {
+        try await record("put age")
+        serverAgeConfirmed = true
+    }
 }
 
 /// #507: 楽観的に反映し、失敗したら操作前に戻す。
@@ -247,9 +284,64 @@ final class MatchingStoreTests: XCTestCase {
         XCTAssertFalse(gate.isConfirmed)
         gate.confirm()
         XCTAssertTrue(gate.isConfirmed)
-        XCTAssertEqual(defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("matching") }, [MatchingAgeGate.key], "年齢・生年月日は保存しない")
+        gate.markSent(uid: "u1")
+        XCTAssertEqual(Set(defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("matching") }),
+                       [MatchingAgeGate.key, MatchingAgeGate.sentKey], "年齢・生年月日は保存しない")
         gate.reset()
         XCTAssertFalse(gate.isConfirmed)
+        XCTAssertFalse(gate.isSent(uid: "u1"), "サーバーが聞き直したら送った記録も消す")
+    }
+
+    private func freshGate(_ name: String) throws -> MatchingAgeGate {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defaults.removePersistentDomain(forName: name)
+        return MatchingAgeGate(defaults: defaults)
+    }
+
+    /// 端末で確認済み・まだ送っていない → PUT。送った後は何も呼ばない。アカウントが替わればまた送る。
+    func testAgeSyncSendsTheDeviceDeclarationOnce() async throws {
+        let gate = try freshGate("MatchingAgeSync1")
+        let fake = FakeMatchingClient()
+        gate.confirm()
+        let first = try await gate.sync(uid: "u1", client: fake)
+        XCTAssertTrue(first)
+        XCTAssertEqual(fake.calls, ["put age"])
+        let again = try await gate.sync(uid: "u1", client: fake)
+        XCTAssertTrue(again)
+        XCTAssertEqual(fake.calls, ["put age"], "送った後は送らない")
+        _ = try await gate.sync(uid: "u2", client: fake)
+        XCTAssertEqual(fake.calls, ["put age", "put age"], "別のアカウントにはまた送る")
+        gate.forgetSent()
+        XCTAssertFalse(gate.isSent(uid: "u2"))
+        XCTAssertTrue(gate.isConfirmed, "サインアウトで消すのは送った記録だけ")
+    }
+
+    /// 端末に確認が無い: サーバーに申告があれば端末にも覚える・無ければ false(本人に聞く)。
+    func testAgeSyncReadsTheServerWithoutDeviceDeclaration() async throws {
+        let gate = try freshGate("MatchingAgeSync2")
+        let fake = FakeMatchingClient()
+        let none = try await gate.sync(uid: "u1", client: fake)
+        XCTAssertFalse(none)
+        XCTAssertFalse(gate.isSent(uid: "u1"))
+        XCTAssertFalse(gate.isConfirmed)
+        fake.serverAgeConfirmed = true
+        let other = try await gate.sync(uid: "u1", client: fake)
+        XCTAssertTrue(other, "別の端末で申告済み")
+        XCTAssertTrue(gate.isConfirmed)
+        XCTAssertTrue(gate.isSent(uid: "u1"))
+        XCTAssertEqual(fake.calls, ["get age", "get age"])
+    }
+
+    func testAgeSyncFailureKeepsItUnsent() async throws {
+        let gate = try freshGate("MatchingAgeSync3")
+        let fake = FakeMatchingClient()
+        gate.confirm()
+        fake.error = URLError(.notConnectedToInternet)
+        do { _ = try await gate.sync(uid: "u1", client: fake); XCTFail("must throw") } catch {}
+        XCTAssertFalse(gate.isSent(uid: "u1"), "送れなければ次に開いた時にまた送る")
+        fake.error = nil
+        try await gate.declare(uid: "u1", client: fake)
+        XCTAssertTrue(gate.isSent(uid: "u1"))
     }
 }
 #endif

@@ -1,5 +1,6 @@
 import AVFoundation
 import Observation
+import MetamonRenderer
 
 /// 挨拶・生成完了の summary・生成前の対話(AI の質問)を読み上げる(#43)。
 ///
@@ -23,7 +24,6 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
 
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
     @ObservationIgnored private var micBusy = false
-    @ObservationIgnored private var voices: [String: AVSpeechSynthesisVoice] = [:]
 
     private override init() {
         super.init()
@@ -49,8 +49,7 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
         }
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = voice(for: language)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        SpeechVoice.configure(utterance, language: language) // 設定の声・速さ(#2229)
         print("[Metamon] speech: start lang=\(language) voice=\(utterance.voice?.identifier ?? "-") text=\(text)")
         synthesizer.speak(utterance)
     }
@@ -65,6 +64,7 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
     /// マイクタップ時: 即停止し、録音が終わるまで読み上げを抑止する。止まり切るまで最大 0.3 秒待つ(TTS の尾をマイクが拾わないように)。
     func stopForRecording() async {
         micBusy = true
+        LeafSpeech.shared.stopForRecording() // 生成したアプリの speakButton も止める
         guard synthesizer.isSpeaking else { return }
         synthesizer.stopSpeaking(at: .immediate)
         print("[Metamon] speech: stop (mic tapped)")
@@ -76,17 +76,7 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
     /// 録音終了(成功・失敗とも)。読み上げの抑止を解く。
     func recordingFinished() {
         micBusy = false
-    }
-
-    /// 指定言語の最高品質ボイス(premium > enhanced > default)。無ければ言語指定のみ。
-    private func voice(for language: String) -> AVSpeechSynthesisVoice? {
-        if let cached = voices[language] { return cached }
-        let best = AVSpeechSynthesisVoice.speechVoices()
-            .filter { $0.language == language }
-            .max { $0.quality.rawValue < $1.quality.rawValue }
-            ?? AVSpeechSynthesisVoice(language: language)
-        voices[language] = best
-        return best
+        LeafSpeech.shared.recordingFinished()
     }
 
     // MARK: - AVSpeechSynthesizerDelegate(ログのみ)

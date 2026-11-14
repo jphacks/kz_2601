@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 英語 -->
+<resources>
+    <string name="share_add_cancel">Not now</string>
+    <string name="share_add_confirm">Add</string>
+    <string name="share_add_note">Adding it switches to this app.</string>
+    <string name="share_add_title">Add “%1$s”?</string>
+    <string name="share_add_title_unnamed">Add the shared app?</string>
+</resources>

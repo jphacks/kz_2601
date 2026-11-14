@@ -248,3 +248,20 @@ func TestNoRefundWhenNothingCharged(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The handler sees the verified identity, anonymous too (#630: an anonymous
+// account gets no initial coins).
+func TestMiddlewareKeepsAnonymous(t *testing.T) {
+	l, _ := newRefundLimiter()
+	for uid, want := range map[string]bool{"anon-1": true, "u1": false} {
+		var got, seen bool
+		h := l.Middleware(auth.DevVerifier{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got, seen = auth.Anonymous(r.Context()), auth.UID(r.Context()) == uid
+			w.WriteHeader(http.StatusOK)
+		}))
+		serve(t, h, "POST", "/v1/chat", uid, `{}`)
+		if !seen || got != want {
+			t.Errorf("%s: anonymous %v (seen %v), want %v", uid, got, seen, want)
+		}
+	}
+}

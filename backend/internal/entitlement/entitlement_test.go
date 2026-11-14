@@ -91,6 +91,28 @@ func TestSubmitBindsAndGrantsPro(t *testing.T) {
 	})
 }
 
+// The Pro returned by a submit equals what a later read returns (Firestore
+// keeps microseconds; the clock here has nanoseconds).
+func TestSubmitResultMatchesReadBack(t *testing.T) {
+	stores(t, func(t *testing.T, st Store) {
+		e := newEnv(t, st)
+		e.now = e.now.Truncate(time.Second).Add(123456789)
+		ctx := context.Background()
+		alice, otid := uid(t, "alice"), uid(t, "otid")
+		got, err := e.svc.SubmitApple(ctx, alice, e.jws(t, appstoretest.Monthly(bundle, product, otid, e.now)))
+		if err != nil || got.Pro == nil {
+			t.Fatalf("submit: %+v %v", got, err)
+		}
+		again, err := e.svc.Get(ctx, alice)
+		if err != nil || again.Pro == nil {
+			t.Fatalf("get: %+v %v", again, err)
+		}
+		if !got.Pro.UpdatedAt.Equal(again.Pro.UpdatedAt) || !got.Pro.ExpiresAt.Equal(again.Pro.ExpiresAt) {
+			t.Fatalf("submit returned %+v, read returned %+v", got.Pro, again.Pro)
+		}
+	})
+}
+
 func TestSubmitRejectsOtherActiveAccount(t *testing.T) {
 	stores(t, func(t *testing.T, st Store) {
 		e := newEnv(t, st)
@@ -193,6 +215,8 @@ func TestPurgeUser(t *testing.T) {
 
 func TestHandler(t *testing.T) {
 	e := newEnv(t, NewMemory())
+	var changed []string
+	e.svc.Changed = func(uid string) { changed = append(changed, uid) }
 	mux := http.NewServeMux()
 	Register(mux, e.svc)
 	h := auth.Middleware(auth.DevVerifier{}, auth.ModeDev)(mux)
@@ -225,9 +249,15 @@ func TestHandler(t *testing.T) {
 		!strings.Contains(w.Body.String(), `"reason":"signature"`) || !strings.Contains(w.Body.String(), httpx.CodeInvalidTransaction) {
 		t.Fatalf("tampered: %d %s", w.Code, w.Body)
 	}
+	if len(changed) != 0 {
+		t.Fatalf("Changed after a rejected transaction: %v", changed)
+	}
 	w := do("u1", "POST", "/v1/me/entitlements/apple", map[string]string{"signedTransaction": good})
 	if w.Code != 200 {
 		t.Fatalf("ok: %d %s", w.Code, w.Body)
+	}
+	if len(changed) != 1 || changed[0] != "u1" { // #316: the cached "not Pro" is dropped
+		t.Fatalf("Changed: %v", changed)
 	}
 	var st Status
 	if err := json.Unmarshal(w.Body.Bytes(), &st); err != nil || !st.IsPro || st.Pro.ProductID != product {
@@ -254,6 +284,11 @@ func TestProChecker(t *testing.T) {
 	if c.IsPro(ctx, "u") {
 		t.Fatal("negative result is cached for NegTTL")
 	}
+	c.Forget("u") // a purchase was just stored (#316)
+	if !c.IsPro(ctx, "u") {
+		t.Fatal("pro right after Forget")
+	}
+	c.Forget("u")
 	now = now.Add(16 * time.Second)
 	if !c.IsPro(ctx, "u") {
 		t.Fatal("pro after NegTTL")

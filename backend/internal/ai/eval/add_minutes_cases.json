@@ -1,0 +1,6 @@
+[
+  {"id": "addmin_depart_transit", "kind": "create", "group": "addminutes", "transcript": "着きたい時刻と電車の移動時間を入れたら、何時に家を出ればいいか出してくれるアプリ。乗換案内もすぐ開けるようにしたい", "note": "sp_2403 / OL_2331。arrive(timePicker string) + travel_min(integer) → depart = addMinutes(arrive, −travel_min)・openUrlButton で乗換案内", "expect": {"has": ["openUrlButton"], "computed": true, "addMinutes": true, "unreachable": 0}},
+  {"id": "addmin_shuttle", "kind": "create", "group": "addminutes", "transcript": "シャトルバスの時刻から、バス停まで歩く分数を引いて出発時刻を出したい", "note": "bus_time(string HH:mm) − walk_min → addMinutes", "expect": {"computed": true, "addMinutes": true}},
+  {"id": "addmin_end_time", "kind": "create", "group": "addminutes", "transcript": "会議の開始時刻と所要時間(分)から終わる時刻を一覧に出す", "note": "end = addMinutes(start, duration_min)", "expect": {"computed": true, "addMinutes": true}},
+  {"id": "addmin_hours_only", "kind": "create", "group": "addminutes", "transcript": "バイトの開始と終了の時刻から働いた時間を出す", "note": "時間の差は hoursBetween(addMinutes を使わない)", "expect": {"computed": true, "addMinutes": false}}
+]

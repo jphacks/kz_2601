@@ -5,6 +5,8 @@ import PackageDescription
 
 let package = Package(
     name: "MetamonDSL",
+    // 固定文言は Resources/Localizable.xcstrings(日本語がソース・英訳を併記)。`Bundle.module` で引く
+    defaultLocalization: "ja",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "MetamonDSL", targets: ["MetamonDSL"]),
@@ -13,6 +15,7 @@ let package = Package(
         .target(
             name: "MetamonDSL",
             dependencies: [],
+            resources: [.process("Resources")],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency=targeted")]
         ),
         .testTarget(

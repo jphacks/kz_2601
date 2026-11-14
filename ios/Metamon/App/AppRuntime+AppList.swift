@@ -18,10 +18,11 @@ extension AppRuntime {
             if let j = apps.firstIndex(where: { $0.id == app.id }) {
                 apps[j] = saved.withSortIndex(apps[j].sortIndex)
             }
+            await spotlight.sync(apps) // Spotlight の名前も変える(#1996)
         } catch {
             print("[Metamon] renameApp failed: \(error)")
             if let j = apps.firstIndex(where: { $0.id == app.id }) { apps[j].name = before.name }
-            toast = L10n.tr("名前を変えられませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("名前を変えられませんでした"), error, context: "rename app")
         }
     }
 
@@ -32,6 +33,7 @@ extension AppRuntime {
         do {
             let copy = try await services.appConfig.duplicateApp(appId: app.id, name: name)
             apps.append(copy)
+            await spotlight.sync(apps) // #1996
             toast = L10n.pick(L10n.tr("「\(copy.name)」を作りました"), review: L10n.tr("「\(copy.name)」を用意しました"))
             if visibleApps.contains(where: { $0.sortIndex != nil }), let at = order.firstIndex(of: app.id) {
                 var next = order
@@ -39,8 +41,12 @@ extension AppRuntime {
                 await saveOrder(next, rollbackTo: apps)
             }
         } catch {
+            if let limit = AppLimit(error) { // #630 持てるアプリの数: 置き換えてから複製し直す
+                presentAppLimit(limit) { [weak self] in await self?.duplicateApp(app) }
+                return
+            }
             print("[Metamon] duplicateApp failed: \(error)")
-            toast = L10n.tr("「\(app.name)」を複製できませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("「\(app.name)」を複製できませんでした"), error, context: "duplicate app")
         }
     }
 
@@ -60,7 +66,7 @@ extension AppRuntime {
         } catch {
             print("[Metamon] reorderApps failed: \(error)")
             apps = previous
-            toast = L10n.tr("並び順を保存できませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("並び順を保存できませんでした"), error, context: "reorder apps")
         }
     }
 }

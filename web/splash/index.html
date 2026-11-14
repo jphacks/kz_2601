@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tailor It Splash</title>
+<meta name="description" content="Tailor It の起動スプラッシュ(iOS の SplashView と同じ並び)を 16:9 で。?rec で操作ボタンを隠す。">
+<style>
+/* iOS の SplashView(ios/Metamon/App/SplashView.swift)と同じ色・同じ順番。
+   0s 紺の無地 → 赤い糸が画面を横切って縫い、アイコンの枠を一周 → アイコン(ばね) → Tailor It → ひと声で、あなた仕立て。 */
+:root{
+  --bg:#2C4A5F; --thread:#D6383D; --cream:#F6F2EA; --tag:#B7C6D1;
+  --t-stitch:.95s; --t-icon:.30s; --t-word:1.05s; --t-tag:1.50s;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center}
+/* 1920×1080 の舞台をウィンドウに合わせて縮める */
+#stage{position:relative;width:1920px;height:1080px;flex:none;transform-origin:center;background:var(--bg);overflow:hidden;
+  font-family:"Inter","Helvetica Neue",Arial,"Hiragino Sans","Noto Sans JP",sans-serif;color:var(--cream)}
+.amb{position:absolute;inset:0;opacity:0;animation:fade .6s ease-out forwards}
+.amb.grad{background:linear-gradient(to bottom,rgba(255,255,255,.06),rgba(0,0,0,.22))}
+.amb.glow{background:radial-gradient(ellipse 60% 75% at 50% 42%,rgba(92,140,168,.38),rgba(92,140,168,0) 70%)}
+.amb.twill{background:repeating-linear-gradient(-45deg,rgba(255,255,255,.025) 0 1.5px,transparent 1.5px 10px)}
+svg.seam{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible}
+.seam .run{fill:none;stroke:var(--thread);stroke-width:6;stroke-linecap:round;stroke-dasharray:22 17;filter:drop-shadow(0 0 6px rgba(214,56,61,.45))}
+.seam .m{fill:none;stroke:#fff;stroke-width:40;stroke-dasharray:1 1;stroke-dashoffset:1}
+.seam .m.across{animation:draw .8s cubic-bezier(.55,0,.35,1) forwards}
+.seam .m.frame{animation:draw var(--t-stitch) ease-in-out .15s forwards}
+.mark{position:absolute;left:50%;top:430px;width:340px;height:340px;margin:-170px 0 0 -170px}
+.icon{position:absolute;inset:0;border-radius:22.5%;overflow:hidden;opacity:0;transform:scale(.86);
+  box-shadow:0 26px 50px rgba(0,0,0,.30);animation:icon .7s cubic-bezier(.34,1.45,.55,1) var(--t-icon) forwards}
+.icon img{width:100%;height:100%;display:block}
+.word{position:absolute;left:0;right:0;top:700px;text-align:center;font-weight:800;font-size:132px;letter-spacing:-.02em;line-height:1;
+  opacity:0;transform:translateY(22px);animation:rise .6s cubic-bezier(.3,1.25,.5,1) var(--t-word) forwards}
+.tag{position:absolute;left:0;right:0;top:868px;text-align:center;font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
+  font-weight:700;font-size:44px;letter-spacing:.08em;color:var(--tag);opacity:0;animation:fade .45s ease-out var(--t-tag) forwards}
+@keyframes fade{to{opacity:1}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes icon{to{opacity:1;transform:none}}
+@keyframes rise{to{opacity:1;transform:none}}
+/* 録画では読み込みが済むまで止めておく */
+.hold *, .hold .amb{animation-play-state:paused!important}
+#replay{position:fixed;right:20px;bottom:20px;font:600 14px/1 -apple-system,sans-serif;color:#fff;background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:10px 16px;cursor:pointer}
+.rec #replay{display:none}
+@media (prefers-reduced-motion: reduce){
+  .amb,.icon,.word,.tag{animation:fade .4s ease forwards;transform:none}
+  .seam .m{animation:none!important;stroke-dashoffset:0}
+}
+</style>
+</head>
+<body>
+<div id="stage" class="hold" aria-label="Tailor It">
+  <div class="amb grad"></div><div class="amb glow"></div><div class="amb twill"></div>
+  <svg class="seam" viewBox="0 0 1920 1080" aria-hidden="true">
+    <defs>
+      <!-- 糸が左端から右端へ横切る(アイコンの後ろを通る) -->
+      <mask id="mAcross" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+        <path class="m across" pathLength="1" d="M-40 430 C 400 380, 700 480, 960 430 S 1520 380, 1960 430"/>
+      </mask>
+      <!-- アイコンの枠を一周(iOS と同じく上の中央から時計回り) -->
+      <mask id="mFrame" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+        <path class="m frame" pathLength="1" d="M960 230 H1063 A97 97 0 0 1 1160 327 V533 A97 97 0 0 1 1063 630 H857 A97 97 0 0 1 760 533 V327 A97 97 0 0 1 857 230 Z"/>
+      </mask>
+    </defs>
+    <path class="run" mask="url(#mAcross)" d="M-40 430 C 400 380, 700 480, 960 430 S 1520 380, 1960 430"/>
+    <path class="run" mask="url(#mFrame)" d="M960 230 H1063 A97 97 0 0 1 1160 327 V533 A97 97 0 0 1 1063 630 H857 A97 97 0 0 1 760 533 V327 A97 97 0 0 1 857 230 Z"/>
+  </svg>
+  <div class="mark"><div class="icon"><img src="assets/icon.png" alt=""></div></div>
+  <div class="word">Tailor It</div>
+  <div class="tag">ひと声で、あなた仕立て。</div>
+</div>
+<button id="replay" type="button">もう一度</button>
+<script>
+let stage = document.getElementById('stage');
+const rec = new URLSearchParams(location.search).has('rec');
+if (rec) document.documentElement.classList.add('rec');
+function fit(){ const s = Math.min(innerWidth/1920, innerHeight/1080); stage.style.transform = `scale(${s})`; }
+addEventListener('resize', fit); fit();
+function play(){ const c = stage.cloneNode(true); c.classList.remove('hold'); stage.replaceWith(c); stage = c; fit(); }
+document.getElementById('replay').onclick = play;
+// 録画(?rec)は外から動かす(window.__ready で待ち、アニメの時刻を直接合わせる)。ふだんは読み込み後すぐ再生
+const img = stage.querySelector('img');
+const ready = (img.complete ? Promise.resolve() : new Promise(r => img.onload = r)).then(() => document.fonts.ready);
+ready.then(() => { window.__ready = true; if (!rec) stage.classList.remove('hold'); });
+</script>
+</body>
+</html>

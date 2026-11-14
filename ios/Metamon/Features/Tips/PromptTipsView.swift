@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonRenderer
 
 /// 「頼み方のコツ」(#415)。例をタップすると `onPick` に文を渡す(送らない。呼び出し側が入力欄に入れる)。
 /// 設定からは push、音声画面の「頼み方のコツ」からは `PromptTipsSheet` で開く。
@@ -38,6 +39,11 @@ struct PromptTipsView: View {
                 } header: {
                     Label(category.title, systemImage: category.symbol)
                         .accessibilityIdentifier("tips.category.\(category.id)")
+                } footer: {
+                    if category.id == "fix" {
+                        Text(PromptTips.fixRequest)
+                            .accessibilityIdentifier("tips.fixRequest")
+                    }
                 }
             }
         }
@@ -56,7 +62,7 @@ struct PromptTipsSheet: View {
         NavigationStack {
             PromptTipsView(onPick: onPick)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } }
+                    SheetCloseToolbarItem { dismiss() }
                 }
         }
         .presentationDetents([.medium, .large])

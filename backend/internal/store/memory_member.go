@@ -62,6 +62,18 @@ func (m *Memory) ListMembers(_ context.Context, appID string, limit int) ([]Memb
 	return out, nil
 }
 
+// SetMemberAdmin implements Store.
+func (m *Memory) SetMemberAdmin(_ context.Context, appID, uid string, admin bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	mem, ok := m.members[appID][uid]
+	if !ok {
+		return ErrNotFound
+	}
+	mem.Admin = admin
+	return nil
+}
+
 // RemoveMember implements Store.
 func (m *Memory) RemoveMember(_ context.Context, appID, uid string) error {
 	m.mu.Lock()

@@ -16,6 +16,7 @@ private final class FakeMembers: MembershipClient, @unchecked Sendable {
     var writeError: Error?
     private(set) var removed: [String] = []
     private(set) var left = 0
+    private(set) var admins: [String: Bool] = [:]
 
     func previewShare(token: String) async throws -> ShareLinkPreview { ShareLinkPreview(token: token, name: "n", sharedData: true) }
     func importShare(token: String, displayName: String) async throws -> InstalledApp { InstalledApp(appId: "a", name: "n", member: true) }
@@ -31,6 +32,10 @@ private final class FakeMembers: MembershipClient, @unchecked Sendable {
     func leave(appId: String) async throws {
         if let writeError { throw writeError }
         lock.withLock { left += 1 }
+    }
+    func setAdmin(appId: String, uid: String, admin: Bool) async throws {
+        if let writeError { throw writeError }
+        lock.withLock { admins[uid] = admin }
     }
 }
 
@@ -111,6 +116,19 @@ final class SharedMembersTests: XCTestCase {
         let err = await model2.leave()
         XCTAssertNotNil(err)
         XCTAssertEqual(model2.phase, .loaded, "失敗したら一覧に戻す")
+    }
+
+    /// 上限(100 人)に達したら共有シートに案内を出す(Android #1298 と同じ)
+    func testMemberListFullAtLimit() {
+        let members = (0..<SharedMemberList.memberLimit).map { SharedMember(uid: "m\($0)") }
+        XCTAssertEqual(SharedMemberList.memberLimit, 100)
+        XCTAssertFalse(SharedMemberList(items: Array(members.dropLast()), role: .owner).isFull)
+        XCTAssertTrue(SharedMemberList(items: members, role: .owner).isFull)
+        // 一覧には作成者も 1 行あるが、backend の上限は作成者を除いた参加者の数
+        let owner = SharedMember(uid: "o", role: .owner)
+        XCTAssertFalse(SharedMemberList(items: [owner] + members.dropLast(), role: .owner).isFull,
+                       "作成者 + 99 人なら、まだ 1 人参加できる")
+        XCTAssertTrue(SharedMemberList(items: [owner] + members, role: .member).isFull)
     }
 
     func testMemberLabel() {

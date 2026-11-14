@@ -16,12 +16,14 @@ public enum DSLExamples {
             "gallery-web",
             "warikan",
             "bmi",
+            "adaptive_study",
             "shopping",
             "navigation",
             "post_comments",
             "diary_ai",
             "ai_ideas",
             "medicine",
+            "file_import",
             "attendance_nearby",
             "water",
             "walk_route",
@@ -32,6 +34,7 @@ public enum DSLExamples {
             "dinner",
             "board",
             "recipes",
+            "timeline",
             "drive",
             "dashcam",
             "sensors",
@@ -40,6 +43,10 @@ public enum DSLExamples {
             "form_check",
             "drive_music",
             "vocab",
+            "tournament",
+            "ai_counselor",
+            "nearby_spots",
+            "schedule_poll",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }
@@ -49,9 +56,10 @@ public enum DSLExamples {
     }()
 
     /// 審査用ビルド(APP_STORE_REVIEW・#245)で外した部品(nearbyShare / locationTracker / healthStat / dashcam / sensorValue / webView / chatThread)を使う例と、
-    /// 共有・公開の記録(entity の scope shared / public・#451 G2)を使う例。
+    /// 共有・公開の記録(entity の scope shared / public・#451 G2)を使う例。aiChat はオンライン AI(審査用の版に無い)だけで動く。
     public static let reviewExcluded: Set<String> = ["attendance_nearby", "walk_route", "health", "dashcam", "sensors", "gallery-web",
-                                                     "chat", "board", "ranking", "post_comments", "recipes"]
+                                                     "chat", "board", "ranking", "post_comments", "recipes", "timeline", "ai_counselor",
+                                                     "schedule_poll"]
 
     /// 初期状態(音声画面のみ)の DSL 名。
     /// 開発用: 環境変数 `METAMON_INITIAL_EXAMPLE`(simctl は `SIMCTL_CHILD_` 接頭辞)で同梱例を直接起動できる(ギャラリー確認用)。

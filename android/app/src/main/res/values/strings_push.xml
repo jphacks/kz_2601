@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 他の人の行動で届く通知(FCM・#887)。チャンネルの名前は端末の設定 > 通知 に出る -->
+<resources>
+    <string name="push_channel_others">他の人の行動</string>
+    <string name="push_channel_others_description">共有したアプリで、他の人が記録を足した時などのお知らせ</string>
+    <string name="push_consent_failed">変更できませんでした。元に戻しました</string>
+    <string name="push_consent_footer">他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。</string>
+    <string name="push_consent_header">他の人の行動で届く通知</string>
+    <string name="push_consent_toggle">このアプリの通知を受け取る</string>
+</resources>

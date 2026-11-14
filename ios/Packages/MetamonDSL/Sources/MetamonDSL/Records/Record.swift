@@ -12,9 +12,11 @@ public struct Record: Decodable, Identifiable, Hashable, Sendable {
     public var authorName: String?
     /// 印の状態(#255・marks のある共有 entity だけ backend が付ける)。nil = サーバーが返していない
     public var marks: [String: MarkState]?
+    /// 端末で作ってまだサーバーに届いていない(送信待ちの新規)。ローカル DB の行だけが立てる(JSON には無い)。
+    public var unsent: Bool
 
     public init(id: String, data: [String: JSONValue], createdAt: String? = nil, updatedAt: String? = nil,
-                author: String? = nil, authorName: String? = nil, marks: [String: MarkState]? = nil) {
+                author: String? = nil, authorName: String? = nil, marks: [String: MarkState]? = nil, unsent: Bool = false) {
         self.id = id
         self.data = data
         self.createdAt = createdAt
@@ -22,6 +24,7 @@ public struct Record: Decodable, Identifiable, Hashable, Sendable {
         self.author = author
         self.authorName = authorName
         self.marks = marks
+        self.unsent = unsent
     }
 
     private enum Keys: String, CodingKey { case id, data, createdAt, updatedAt, author, authorName, marks }
@@ -35,6 +38,7 @@ public struct Record: Decodable, Identifiable, Hashable, Sendable {
         author = try? c.decodeIfPresent(String.self, forKey: .author)
         authorName = try? c.decodeIfPresent(String.self, forKey: .authorName)
         marks = try? c.decodeIfPresent([String: MarkState].self, forKey: .marks)
+        unsent = false
     }
 
     /// field の値。予約値 `$author` は表示名、`$createdAt` は作成日時(#250)、`$marks.<id>` は印の件数(#255)。

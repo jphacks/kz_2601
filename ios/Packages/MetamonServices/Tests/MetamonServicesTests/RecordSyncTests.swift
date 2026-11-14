@@ -114,8 +114,10 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertEqual(pending, 2)
 
         await store.markSynced(appId: "a", entity: "e", localId: "local-x", server: Record(id: "srv", data: ["n": 1], createdAt: "9"))
+        XCTAssertEqual(shown.map(\.unsent), [true, false], "未送信 create だけ Record.unsent(aiChat の自分の記録の判定)")
         let after = await store.records(appId: "a", entity: "e")
         XCTAssertEqual(Set(after.map(\.id)), ["srv", "s1"])
+        XCTAssertFalse(after.contains(where: \.unsent), "送信済みになったら外れる")
         let synced = await store.row(appId: "a", entity: "e", recordId: "srv")
         XCTAssertEqual(synced?.pendingOp, PendingOp.none)
         XCTAssertEqual(synced?.clientId, "x")
@@ -264,10 +266,10 @@ final class RecordSyncTests: XCTestCase {
         await queue.drain()
         var it = events.makeAsyncIterator()
         let first = await it.next()
-        guard case .rejected(let appId, let entity, let message, let field)? = first else {
+        guard case .rejected(let appId, let entity, let message, let field, let recordId)? = first else {
             return XCTFail("expected rejected, got \(String(describing: first))")
         }
-        XCTAssertEqual([appId, entity, field], ["a", "expenses", "payer"])
+        XCTAssertEqual([appId, entity, field, recordId], ["a", "expenses", "payer", "local-e1"], "断られた操作の仮 id を渡す(どのフォームの保存か)")
         XCTAssertEqual(message, "field \"payer\" is required")
         let count = await queue.count
         XCTAssertEqual(count, 0, "拒否された操作は再送しない(キューに詰まらない)")
@@ -287,10 +289,10 @@ final class RecordSyncTests: XCTestCase {
         await queue.drain()
         var it = events.makeAsyncIterator()
         let first = await it.next()
-        guard case .forbidden(let appId, let entity)? = first else {
+        guard case .forbidden(let appId, let entity, let recordId)? = first else {
             return XCTFail("expected forbidden, got \(String(describing: first))")
         }
-        XCTAssertEqual([appId, entity], ["a", "chores"])
+        XCTAssertEqual([appId, entity, recordId], ["a", "chores", "r1"])
         let count = await queue.count
         XCTAssertEqual(count, 0, "403 は再送しない(送信待ちに積まない)")
         let calls = await client.calls
@@ -298,6 +300,41 @@ final class RecordSyncTests: XCTestCase {
         let row = await store.row(appId: "a", entity: "chores", recordId: "r1")
         XCTAssertEqual(row?.pendingOp, PendingOp.none, "未送信印を落とす(次の pull でサーバーの値に戻る)")
         XCTAssertEqual(row?.author, "other")
+    }
+
+    /// #316: 作成者が Pro でない共有アプリへの書き込みは 402 `pro_required`。再送せず、ローカル行を戻し、誰の Pro が要るかを UI に渡す。
+    func testSyncQueueProRequiredDropsCreateAndEmits() async throws {
+        let client = RecordingClient()
+        await client.setRejectCreate("posts", APIError.server(status: 402, code: "pro_required", message: "this needs Tailor It Pro: sharedData",
+                                                             details: ["features": .array([.object(["id": .string("sharedData"), "title": .string("みんなで共有するデータ"), "reason": .string("r")])]),
+                                                                       "reason": .string("creator_needs_pro")]))
+        let store = RecordStore(directory: dir)
+        let queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
+        await store.upsert(LocalRecord(appId: "a", entity: "posts", recordId: "local-p1", data: ["text": "こんにちは"], pendingOp: .create, clientId: "p1"))
+        let events = await queue.events()
+        await queue.enqueue(SyncOperation(id: "p1", appId: "a", entity: "posts", recordId: "local-p1", kind: .create, data: ["text": "こんにちは"]))
+        await queue.drain()
+        var it = events.makeAsyncIterator()
+        let first = await it.next()
+        guard case .proRequired(let appId, let entity, let pro, let recordId)? = first else {
+            return XCTFail("expected proRequired, got \(String(describing: first))")
+        }
+        XCTAssertEqual([appId, entity, recordId], ["a", "posts", "local-p1"])
+        XCTAssertEqual(pro, ProRequired(features: [PaidFeature(id: "sharedData", title: "みんなで共有するデータ", reason: "r")], creatorNeedsPro: true))
+        let count = await queue.count
+        XCTAssertEqual(count, 0, "402 は再送しない")
+        let rows = await store.records(appId: "a", entity: "posts")
+        XCTAssertTrue(rows.isEmpty, "書けなかった create のローカル行は消える")
+    }
+
+    func testProRequiredParsing() {
+        XCTAssertNil(ProRequired(APIError.server(status: 403, code: "forbidden", message: "")))
+        XCTAssertNil(ProRequired(APIError.server(status: 402, code: "other", message: "")))
+        let own = ProRequired(APIError.server(status: 402, code: "pro_required", message: "",
+                                              details: ["features": .array([.object(["id": .string("serverRules")])])]))
+        XCTAssertEqual(own?.features.map(\.id), ["serverRules"])
+        XCTAssertEqual(own?.features.first?.title, "serverRules", "title が無ければ id")
+        XCTAssertEqual(own?.creatorNeedsPro, false)
     }
 
     func testClassify() {
@@ -344,6 +381,30 @@ final class RecordSyncTests: XCTestCase {
         // pull で置換しても同じ
         let pulled = try await engine.pull(appId: "a", entity: "expense")
         XCTAssertEqual(pulled.map(\.id), server.map(\.id))
+        engine.stop()
+    }
+
+    /// `write` は書いた行の id を返す(作成は仮 id = 断られた時の SyncEvent の recordId)。同じ秒に続けて作っても作った順に並ぶ。
+    @MainActor
+    func testEngineWriteReturnsQueuedIdAndKeepsCreationOrder() async throws {
+        let gated = OfflineSimulatingAppConfigClient(inner: InMemoryAppConfigClient())
+        gated.setOffline(true)
+        let store = RecordStore(directory: dir)
+        let queue = SyncQueue(directory: dir, store: store, client: gated, policy: .immediate)
+        let engine = RecordSyncEngine(store: store, queue: queue, client: gated, connectivity: ManualConnectivity(online: false))
+        engine.start()
+        var ids: [String] = []
+        for n in 0..<6 {
+            let written = await engine.write(appId: "a", entity: "turn", recordId: nil, data: ["n": .number(Double(n))])
+            XCTAssertTrue(written.recordId.hasPrefix("local-"))
+            XCTAssertTrue(written.records.contains { $0.id == written.recordId })
+            ids.append(written.recordId)
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        let rows = await engine.cached(appId: "a", entity: "turn")
+        XCTAssertEqual(ChatThread.ordered(rows).map(\.id), ids, "小数秒まで持つので id の並びに頼らない")
+        let updated = await engine.write(appId: "a", entity: "turn", recordId: ids[0], data: ["n": 9])
+        XCTAssertEqual(updated.recordId, ids[0])
         engine.stop()
     }
 

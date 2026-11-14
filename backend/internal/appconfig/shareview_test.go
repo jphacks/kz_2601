@@ -1,6 +1,8 @@
 package appconfig
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"html/template"
 	"net/http"
@@ -212,6 +214,29 @@ func TestSharePageHiddenAndRevoked(t *testing.T) {
 	}
 }
 
+// failingPublicApps is a store whose moderation lookup is down.
+type failingPublicApps struct{ store.Store }
+
+func (failingPublicApps) GetPublicApp(context.Context, string) (*store.PublicApp, error) {
+	return nil, errors.New("unavailable")
+}
+
+// #321: when the moderation lookup fails the page is not shown (fail closed),
+// so an unpublished app never leaks while the store is down.
+func TestSharePageHiddenLookupFailsClosed(t *testing.T) {
+	st := store.NewMemory()
+	if err := st.CreateShare(t.Context(), store.Share{Token: "tok_f", Name: "n", AppID: "a", OwnerUID: "o"}); err != nil {
+		t.Fatal(err)
+	}
+	if rr := getSharePage(t, st, "tok_f"); rr.Code != http.StatusOK {
+		t.Fatalf("not published: %d", rr.Code)
+	}
+	rr := getSharePage(t, failingPublicApps{st}, "tok_f")
+	if rr.Code != http.StatusNotFound || !strings.Contains(rr.Body.String(), "リンクが無効です") {
+		t.Errorf("lookup failure: %d", rr.Code)
+	}
+}
+
 // #264: flashcards stays a placeholder ("アプリで見られます") that names the
 // front / back fields and never the cards.
 func TestSharePageFlashcardsPlaceholder(t *testing.T) {
@@ -223,7 +248,7 @@ func TestSharePageFlashcardsPlaceholder(t *testing.T) {
 	var got *webNode
 	for _, s := range p.Screens {
 		for i := range s.Grid {
-			if strings.HasPrefix(s.Grid[i].Title, "カード") {
+			if s.Grid[i].Kind == "flashcards" {
 				got = &s.Grid[i]
 			}
 		}
@@ -231,7 +256,17 @@ func TestSharePageFlashcardsPlaceholder(t *testing.T) {
 	if got == nil {
 		t.Fatal("no flashcards node on the share page")
 	}
-	if got.Kind != "placeholder" || got.Title != "カード(表: 単語 / 裏: 意味)" || len(got.Rows) != 0 {
+	if strings.Join(got.Items, "/") != "単語/意味" || len(got.Rows) != 0 {
 		t.Errorf("flashcards node = %+v", *got)
+	}
+	for lang, want := range map[string]string{"ja": "カード(表: 単語 / 裏: 意味)<br>アプリで見られます", "en": "Cards (front: 単語 / back: 意味)<br>Shown in the app"} {
+		p.Lang, p.Nonce = lang, "n"
+		body, err := renderSharePage(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(body), `<div class="ph">`+want+`</div>`) {
+			t.Errorf("%s: flashcards placeholder %q missing", lang, want)
+		}
 	}
 }

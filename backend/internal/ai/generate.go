@@ -20,6 +20,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -76,17 +77,45 @@ type Meta struct {
 	OutputChars      int        `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
 	LastProblems     []string   `json:"lastProblems,omitempty"`
 	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
+	// ServerRules is set when the server-rules pass ran (#343).
+	ServerRules *ServerRulesMeta `json:"serverRules,omitempty"`
+	// ServerNeed is the main call's serverNeed (AI_SERVER_RULES=1 only; set
+	// even when the pass did not run, "" = the field was missing).
+	ServerNeed string `json:"serverNeed,omitempty"`
 	// LintRetried: the first valid output had content warnings (dsl.Lint) and
 	// was regenerated once with them; Lint lists the warnings left in the
 	// returned document (create) or added by the patch (edit).
 	LintRetried bool     `json:"lintRetried,omitempty"`
 	Lint        []string `json:"lint,omitempty"`
+	// RetryReasons: why each rejected attempt was rejected, in order
+	// (retry_reasons of ai.generate). Labels only; never sent to the client.
+	RetryReasons []string `json:"-"`
+	// ValidationCodes: the dsl problem code of every problem of the attempts
+	// rejected by validation (validation_codes of ai.generate, #1772).
+	ValidationCodes []string `json:"-"`
 	// Omissions (#257): requested parts the app does not do and the model did
 	// not mention; the summary got a fixed sentence for each.
 	Omissions []string `json:"omissions,omitempty"`
 	// Restricted (#245): what the build restriction removed from the output
 	// after generation (disallowed parts, Field.health, camera sources).
 	Restricted []string `json:"restricted,omitempty"`
+	// Recipes: the on-demand recipes sent with the request (on_demand_rules.go),
+	// RecipeSources who picked each (keyword|selector|both), RecipeSelector the
+	// selector's outcome (ok|timeout|error|invalid) and RecipeSelectorMs its wait.
+	Recipes          []string          `json:"recipes,omitempty"`
+	RecipeSources    map[string]string `json:"recipeSources,omitempty"`
+	RecipeSelector   string            `json:"recipeSelector,omitempty"`
+	RecipeSelectorMs int64             `json:"recipeSelectorMs,omitempty"`
+	// Coins / CoinsBalance (#630): what this call charged and the payer's
+	// balance after it. Only with COIN_BILLING_MODE=enforce once charged
+	// (omitted when the charge is settled after the response: chat).
+	CoinCharge
+}
+
+// CoinCharge is the coin charge of one call (#630, coins.go).
+type CoinCharge struct {
+	Coins        *int64 `json:"coins,omitempty"`
+	CoinsBalance *int64 `json:"coinsBalance,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -95,13 +124,16 @@ type Meta struct {
 // line), edit turns send `summary`. iOS can show and read them out while the
 // rest of the DSL is still being generated.
 type Event struct {
-	Type        string   `json:"type"` // app|summary
+	Type        string   `json:"type"` // app|summary|component|restart
 	Attempt     int      `json:"attempt"`
 	Locale      Locale   `json:"locale"`
 	Name        string   `json:"name,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Tabs        []string `json:"tabs,omitempty"`
 	Summary     string   `json:"summary,omitempty"`
+	// component (#636): one part of the first visible screen, provisional
+	Screen    string          `json:"screen,omitempty"`
+	Component *ComponentEvent `json:"component,omitempty"`
 }
 
 // Sink receives Events in order, on the calling goroutine.
@@ -135,6 +167,8 @@ type Error struct {
 	Message  string
 	Problems []string
 	Attempts int
+	// Details are extra error.details keys (402 pro_required: features).
+	Details map[string]any
 }
 
 func (e *Error) Error() string { return fmt.Sprintf("%s: %s", e.Code, e.Message) }
@@ -149,6 +183,9 @@ type Service struct {
 	// LogicPass enables the second "calculations only" call after a create
 	// (env AI_LOGIC_PASS=1; Request.LogicPass overrides per request).
 	LogicPass bool
+	// ServerRulesPass enables the server-rules call (#343) after a create or
+	// edit whose request asks for an automatic action (env AI_SERVER_RULES=1).
+	ServerRulesPass bool
 	// LintRetry regenerates once when the first valid output has content
 	// warnings (dsl.Lint). Off by default: warnings are only reported in
 	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
@@ -160,6 +197,40 @@ type Service struct {
 	// nil = no caller is ever verified (DELETE answers 401).
 	Verifier auth.TokenVerifier
 	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
+
+	// Pro checks Tailor It Pro (#316): saving a DSL that adds a paid feature
+	// and POST /v1/text answer 402 pro_required for others. nil = no check
+	// here (local runs; appconfig still checks the save).
+	Pro paid.ProChecker
+	// ProMode is PRO_GATE_MODE: enforce ("" too) / log / off.
+	ProMode paid.Mode
+	// NoBookLookup: the book lookup is off on appconfig (BOOK_LOOKUP_ENABLED
+	// unset), so the AI does not generate lookupBook (clientRestriction).
+	NoBookLookup bool
+	// NoCalls: appconfig has CALLS_ENABLED off (#447), so the AI does not
+	// generate callButton and declines calls (clientRestriction).
+	NoCalls bool
+	// OnDemandRules sends the JPHACKS product recipes only when the request
+	// needs them: keywords + the selector call (on_demand_rules.go; cmd/ai: on
+	// unless AI_ON_DEMAND_RULES=0). Off = the whole systemPrompt, as before.
+	OnDemandRules bool
+	// RecipeModel / RecipeTimeout are the selector's model and hard timeout
+	// (recipe_selector.go; env AI_RECIPE_MODEL). Zero = the defaults there.
+	RecipeModel   string
+	RecipeTimeout time.Duration
+	// TextImage accepts the photo of aiButton inputPhoto on /v1/text
+	// (text_image.go; env AI_TEXT_IMAGE=1). Off = 403.
+	TextImage bool
+	// Members looks up shared-app membership: a participant's POST /v1/text
+	// with appId is covered by the creator's Pro (text_payer.go). nil = the
+	// caller's own Pro only.
+	Members AppMembers
+	// CreatorPaid caps the creator-paid /v1/text calls per app and day
+	// (text_payer_scope.go). nil = not counted.
+	CreatorPaid *CreatorPaidCap
+	// Coins charges the AI calls in coins (#630, coins.go). nil = off.
+	Coins  CoinBiller
+	scopes scopeCache // compiled published DSL per appId (text_payer_scope.go)
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger
@@ -187,6 +258,12 @@ type attemptResult struct {
 	// forceFull: the DSL was changed after the patch (build restriction), so
 	// it is saved as a full document instead of the model's ops.
 	forceFull bool
+	// before: the app as it was before this turn (edit); nil on create.
+	before []byte
+	// serverNeed: the model's root serverNeed (AI_SERVER_RULES=1); needSeen:
+	// the accepted output had the key (server_need.go).
+	serverNeed string
+	needSeen   bool
 }
 
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
@@ -207,12 +284,15 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	if err == nil {
 		// mode=auto is charged as create; the limiter refunds the rest (#548)
 		ratelimit.ReportMode(ctx, tr.mode)
+		if res != nil && res.Unchanged {
+			ratelimit.ReportUnchanged(ctx) // nothing changed: the charge comes back (daily cap)
+		}
 	}
 	return res, err
 }
 
 func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, started time.Time, tr *genTrace) (*Result, error) {
-	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
+	restrict := s.clientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
@@ -221,6 +301,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if req.AppID == "" || transcript == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId and transcript are required"}
 	}
+	ctx = withServerPush(ctx, s.serverRulesOn(ctx, transcript)) // push wording + serverNeed (server_need.go)
 	loc, err := resolveLocale(req.Locale, transcript)
 	if err != nil {
 		return nil, err
@@ -248,6 +329,14 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if mode == ModeUndo {
 		return s.undo(ctx, req.AppID, transcript, env, started, loc)
 	}
+	if s.OnDemandRules && (mode == ModeCreate || mode == ModeEdit) {
+		// as soon as the app is known: generation waits for it (at most RecipeTimeout)
+		var app []byte
+		if !isInitial(current) {
+			app = env.DSL
+		}
+		ctx = withRecipePick(ctx, s.startRecipePick(ctx, transcript, app))
+	}
 
 	var ar *attemptResult
 	logic := s.logicEnabled(req)
@@ -268,6 +357,8 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 		if err == nil {
+			// the server-rules pass compares notifications with it
+			ar.before = env.DSL
 			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
 			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}
@@ -280,6 +371,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if err := applyRestriction(ar, restrict, mode == ModeCreate, loc); err != nil {
 		return nil, err
 	}
+	s.applyServerRulesPass(ctx, transcript, ar, loc) // #343: after the final UI, before the omission notes
 
 	s.noteOmissions(transcript, ar, loc)
 
@@ -296,7 +388,12 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 			LatencyMs: Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()},
 		}, nil
 	}
-	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model}
+	// #316: an app with a paid feature it did not have needs Pro (after
+	// generating: the DSL decides, not the request's words)
+	if err := s.gatePaid(ctx, ar.raw, current, loc); err != nil {
+		return nil, err
+	}
+	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model, PromptVersion: PromptVersion()}
 	var saved *appconfigclient.Envelope
 	if len(ar.ops) > 0 && !ar.meta.AreaFallback && !ar.forceFull {
 		src.Mode = "patch"
@@ -361,25 +458,34 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		ar.meta = *meta
 	}
 	ar.meta.Model = s.Model
+	system, tail := s.onDemandPrompt(ctx, transcript, []byte(refDSL), &ar.meta)
 	var problems []string
 	var lastCandidate []byte
+	var lastNeed string
+	var lastNeedSeen bool
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
+	streamed := false         // a component event was sent: a regeneration sends restart (#636)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(WithOperation(ctx, OpGenerate), systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
-			appEventWatcher(sink, loc, ar.meta.Attempts+1))
+		if i > 0 {
+			restartEvent(sink, loc, ar.meta.Attempts+1, streamed)
+		}
+		resp, err := s.callBlocks(WithOperation(ctx, OpGenerate), system, "", tail, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
+			createEventWatcher(sink, loc, ar.meta.Attempts+1, &streamed))
 		if err != nil {
 			return nil, err
 		}
-		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
+		body, need, needSeen := takeServerNeed(extractJSON(resp.Text)) // never reaches the DSL
+		raw := dropFormPhotoPreviews(fillDefaults(body))
 		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
 		if perr == nil && linted == nil && i < s.maxRegen() {
 			// #245: a part this build cannot render is a validation problem;
 			// on the last attempt it is accepted and removed by applyRestriction.
 			if v := restrictionViolations(raw, nil, restrictionFrom(ctx)); len(v) > 0 {
-				lastCandidate = raw
+				lastCandidate, lastNeed, lastNeedSeen = raw, need, needSeen
 				problems = v
 				ar.meta.LastProblems = problems
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, RetryRestriction)
 				continue
 			}
 		}
@@ -428,6 +534,10 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
+			ar.serverNeed, ar.needSeen = need, needSeen
+			if linted != nil { // OR across the lint retry
+				ar.serverNeed, ar.needSeen = mergeServerNeed(linted.serverNeed, need), linted.needSeen || needSeen
+			}
 			// #257: parts of the request dropped without a word count as content problems too
 			om := omissions(transcript, app, app.App.Description, !uiOnly)
 			lintRetry := s.LintRetry && len(ar.meta.Lint)+len(om) > 0
@@ -441,6 +551,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 				kept := *ar
 				linted = &kept
 				problems = nil
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, contentRetryReasons(lintRetry, shareProblem != "")...)
 				if lintRetry {
 					ar.meta.LintRetried = true
 					problems = lintProblems(append(append([]string(nil), ar.meta.Lint...), omissionProblems(om)...))
@@ -457,15 +568,19 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			break // the lint retry broke the document: keep the earlier valid one
 		}
 		lastCandidate = raw
+		lastNeed, lastNeedSeen = need, needSeen
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+		ar.meta.noteRejected(perr, resp)
 	}
 	if linted != nil {
 		ar.raw, ar.summary, ar.meta.Lint = linted.raw, linted.summary, linted.meta.Lint
+		ar.serverNeed, ar.needSeen = linted.serverNeed, linted.needSeen
 		return ar, nil
 	}
 	if stripped, ok := stripAreas(lastCandidate); ok {
 		if app, perr := dsl.Parse(stripped); perr == nil {
+			ar.serverNeed, ar.needSeen = lastNeed, lastNeedSeen
 			ar.raw = stripped
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.AreaFallback = true
@@ -481,20 +596,25 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope, loc Locale, sink Sink) (*attemptResult, error) {
 	ar := &attemptResult{}
 	ar.meta.Model = s.Model
+	system, tail := s.onDemandPrompt(ctx, transcript, env.DSL, &ar.meta)
 	var problems []string
 	var lastOps []dsl.PatchOp
 	var lastSummary string
+	var lastNeed string
+	var lastNeedSeen bool
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(WithOperation(ctx, OpPatch), systemPrompt+"\n"+editRules,
+		resp, err := s.callBlocks(WithOperation(ctx, OpPatch), system, editSystemSuffix(), tail,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
 		var doc dsl.PatchDocument
-		uerr := json.Unmarshal(extractJSON(resp.Text), &doc)
+		out := extractJSON(resp.Text)
+		uerr := json.Unmarshal(out, &doc)
+		need, needSeen := editServerNeed(out) // beside the PatchDocument (server_need.go)
 		if uerr != nil && linted != nil {
 			break
 		}
@@ -504,6 +624,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 				problems = append(problems, "output was truncated (max_tokens); make the patch smaller")
 			}
 			ar.meta.LastProblems = problems
+			ar.meta.noteRejected(uerr, resp)
 			continue
 		}
 		doc.Patch = fillPatchDefaults(doc.Patch, env.DSL)
@@ -512,9 +633,10 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			// #245: the patch may not add parts this build cannot render
 			// (ones already in the app are removed by applyRestriction).
 			if v := restrictionViolations(next, env.DSL, restrictionFrom(ctx)); len(v) > 0 {
-				lastOps, lastSummary = doc.Patch, doc.Summary
+				lastOps, lastSummary, lastNeed, lastNeedSeen = doc.Patch, doc.Summary, need, needSeen
 				problems = v
 				ar.meta.LastProblems = problems
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, RetryRestriction)
 				continue
 			}
 		}
@@ -522,6 +644,10 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			ar.raw = next
 			ar.ops = doc.Patch
 			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
+			ar.serverNeed, ar.needSeen = need, needSeen
+			if linted != nil { // OR across the lint retry
+				ar.serverNeed, ar.needSeen = mergeServerNeed(linted.serverNeed, need), linted.needSeen || needSeen
+			}
 			ar.meta.Lint = newLint(baseLint, lintOf(next))
 			lintRetry := s.LintRetry && len(ar.meta.Lint) > 0
 			// #259: a share request answered with "できない" gets one retry even with LintRetry off
@@ -533,6 +659,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 				kept := *ar
 				linted = &kept
 				problems = nil
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, contentRetryReasons(lintRetry, shareProblem != "")...)
 				if lintRetry {
 					ar.meta.LintRetried = true
 					problems = lintProblems(ar.meta.Lint)
@@ -548,12 +675,14 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		if linted != nil {
 			break
 		}
-		lastOps, lastSummary = doc.Patch, doc.Summary
+		lastOps, lastSummary, lastNeed, lastNeedSeen = doc.Patch, doc.Summary, need, needSeen
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+		ar.meta.noteRejected(perr, resp)
 	}
 	if linted != nil {
 		ar.raw, ar.ops, ar.summary, ar.meta.Lint = linted.raw, linted.ops, linted.summary, linted.meta.Lint
+		ar.serverNeed, ar.needSeen = linted.serverNeed, linted.needSeen
 		return ar, nil
 	}
 	// Fallback 1: apply the last patch unchecked, drop areas, re-validate.
@@ -564,6 +693,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 					ar.raw = stripped
 					ar.ops = lastOps
 					ar.summary = strings.TrimSpace(lastSummary)
+					ar.serverNeed, ar.needSeen = lastNeed, lastNeedSeen
 					ar.meta.AreaFallback = true
 					return ar, nil
 				}
@@ -573,7 +703,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	// Fallback 2: one full rewrite with the current DSL as reference.
 	meta := ar.meta
 	meta.DowngradedToFull = true
-	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
+	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout, OnDemandRules: s.OnDemandRules, RecipeModel: s.RecipeModel, RecipeTimeout: s.RecipeTimeout}
 	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink, false)
 	if err != nil {
 		var ge *Error
@@ -612,15 +742,26 @@ func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale)
 // call performs one Claude request and folds usage/attempts/latency into ar.
 // onText (nil = non-streaming) receives the text deltas.
 func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
+	return s.callWith(ctx, system, "", user, schema, ar, onText)
+}
+
+// callWith is call with a second cached system block (Completion.SystemSuffix).
+func (s *Service) callWith(ctx context.Context, system, suffix, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
+	return s.callBlocks(ctx, system, suffix, nil, user, schema, ar, onText)
+}
+
+// callBlocks is callWith plus the uncached on-demand recipes (Completion.SystemTail).
+func (s *Service) callBlocks(ctx context.Context, system, suffix string, tail []string, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
 	}
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	schema = serverNeedSchema(ctx, schema) // restricted first, then + serverNeed (server_need.go)
 	t := time.Now()
-	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
-	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
+	resp, err := s.Claude.Complete(cctx, Completion{System: system, SystemSuffix: restrictPromptSuffix(ctx, suffix), SystemTail: restrictTail(ctx, tail), Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1
@@ -1034,7 +1175,7 @@ func mapStoreErr(err error) error {
 		if code == "" {
 			code = httpx.CodeAppconfigError
 		}
-		return &Error{Status: ae.Status, Code: code, Message: ae.Message}
+		return &Error{Status: ae.Status, Code: code, Message: ae.Message, Details: ae.Details}
 	}
 	return &Error{Status: http.StatusBadGateway, Code: httpx.CodeAppconfigError, Message: err.Error()}
 }

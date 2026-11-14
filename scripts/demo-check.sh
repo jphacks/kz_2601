@@ -7,13 +7,55 @@
 # 使い方:
 #   scripts/demo-check.sh stg
 #   scripts/demo-check.sh prod        # 審査の 30 分前に 1 回
+#   scripts/demo-check.sh stg --expect 89061ea   # 版を指定して照合(既定は stg=origin/develop・prod=origin/main の先頭 7 文字)
+#   scripts/demo-check.sh stg --expect skip      # 版を照合しない
+#   scripts/demo-check.sh prod --version-only    # /health の版と env だけ見る(キー不要・ユーザーを作らない)
+#   scripts/demo-check.sh --list                 # 確かめる項目の一覧(Markdown の表)を出すだけ(何も叩かない)
 #   (cd backend && make demo-check ENV=stg)
+# 版: appconfig・ai の GET /health の version(GIT_SHA 先頭 7 文字)と env を照合し、違えば NG。runner は非公開なので見ない。
 # Firebase Web API キーは $METAMON_SECRETS_DIR/GoogleService-Info.plist(既定 ~/Desktop/JPHACKS2026/secrets)の API_KEY、
 # または環境変数 FIREBASE_WEB_API_KEY。キーとトークンは画面・ログ・プロセス一覧に出さない。
 # URL は APPCONFIG_URL / AI_URL で上書きできる。DEMO_CHECK_NO_AI=1 で生成・対話・編集を飛ばす(Claude を呼ばない再ウォームアップ用)。終了コードは失敗が 1 つでもあれば 1。
 set -uo pipefail
 
-ENV_NAME="${1:-}"
+ENV_NAME="" EXPECT="" VERSION_ONLY=0
+usage() { echo "usage: $0 <stg|prod> [--expect <sha>|skip] [--version-only]   |   $0 --list" >&2; exit 2; }
+
+# 確かめる項目の一覧(--list)。名前は結果の表の「確認」と揃える。項目を足したらここにも足す
+list_checks() {
+  cat <<'EOF'
+| # | 確認 | 何を見るか | --version-only | DEMO_CHECK_NO_AI=1 |
+|---|---|---|---|---|
+| 1 | 匿名ユーザー作成(accounts:signUp) | Firebase の匿名ユーザーが作れ、ID トークンが取れる | 飛ばす | 見る |
+| 2 | appconfig / ai GET /health ×3 | 3 回とも 200(1 回目でコールドスタートを温める)。所要時間を 3 回分出す | 見る | 見る |
+| 3 | appconfig / ai env(/health) | /health の env が指定した stg / prod と同じ(URL の取り違え) | 見る | 見る |
+| 4 | appconfig / ai 版(/health version) | /health の version が期待する版(既定 stg=origin/develop・prod=origin/main)の先頭 7 文字と同じ。--expect skip で見ない | 見る | 見る |
+| 5 | appconfig GET /dsl(新規 seed) | 生成用のテストアプリの DSL が取れる | 飛ばす | 飛ばす |
+| 6 | 生成「家計簿アプリが欲しい」 | ai の生成が Claude で 200 を返す(Claude 1 回) | 飛ばす | 飛ばす |
+| 7 | 対話「日記」 | ai の対話が question / ready を返す(Claude 1 回) | 飛ばす | 飛ばす |
+| 8 | 対話の状態を消す(DELETE /v1/chat) | 対話の状態を消せる | 飛ばす | 飛ばす |
+| 9 | 編集「集計のタブを足して」 | ai の編集が Claude で版を進める(Claude 1 回) | 飛ばす | 飛ばす |
+| 10 | 探す GET /public-apps | 公開アプリの一覧が 1 件以上ある(読むだけ) | 飛ばす | 見る |
+| 11 | リアルタイム用アプリ作成(GET /dsl) | リアルタイム用のテストアプリの DSL が取れる(NG の時だけ表に出る) | 飛ばす | 見る |
+| 12 | リアルタイム用アプリ作成(PUT /dsl) | 家計簿の DSL を書き込める(NG の時だけ表に出る) | 飛ばす | 見る |
+| 13 | リアルタイム SSE 購読(hello) | SSE を購読して 10 秒以内に hello が来る(NG の時だけ表に出る) | 飛ばす | 見る |
+| 14 | リアルタイム 投稿 → SSE records | レコードの投稿が 10 秒以内に SSE の records で届く。投稿から通知までの ms | 飛ばす | 見る |
+| 15 | 後片付け: テスト用レコード削除 | 14 で投稿したレコードを消せる | 飛ばす | 見る |
+| 16 | 後片付け: アーカイブ <アプリ> | このスクリプトが作ったアプリをアーカイブできる(204 / 404) | 飛ばす | 見る |
+| 17 | 後片付け: 匿名ユーザー削除(accounts:delete) | 1 で作った匿名ユーザーを消せる | 飛ばす | 見る |
+EOF
+}
+
+if [ $# = 1 ] && [ "$1" = --list ]; then list_checks; exit 0; fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --expect) [ $# -ge 2 ] || usage; EXPECT="$2"; shift 2 ;;
+    --expect=*) EXPECT="${1#--expect=}"; shift ;;
+    --version-only) VERSION_ONLY=1; shift ;;
+    stg|prod) [ -z "$ENV_NAME" ] || usage; ENV_NAME="$1"; shift ;;
+    *) usage ;;
+  esac
+done
 case "$ENV_NAME" in
   stg)
     APPCONFIG="${APPCONFIG_URL:-https://appconfig-stg-378953239426.asia-northeast1.run.app}"
@@ -21,11 +63,25 @@ case "$ENV_NAME" in
   prod)
     APPCONFIG="${APPCONFIG_URL:-https://appconfig-prod-zgciuf3iha-an.a.run.app}"
     AI="${AI_URL:-https://ai-prod-zgciuf3iha-an.a.run.app}" ;;
-  *) echo "usage: $0 <stg|prod>" >&2; exit 2 ;;
+  *) usage ;;
 esac
 for c in curl jq python3; do command -v "$c" >/dev/null || { echo "$c が必要です" >&2; exit 2; }; done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# --- 期待する版(GIT_SHA 先頭 7 文字) ----------------------------------------------
+if [ -z "$EXPECT" ]; then
+  ref=origin/develop; [ "$ENV_NAME" = prod ] && ref=origin/main
+  EXPECT="$(git -C "$ROOT" rev-parse --verify -q "$ref^{commit}" 2>/dev/null)" \
+    || { echo "$ref が見つかりません。git fetch origin するか --expect <sha> / --expect skip を付けてください" >&2; exit 2; }
+  EXPECT_FROM="$ref"
+else
+  EXPECT_FROM="--expect"
+fi
+if [ "$EXPECT" != skip ]; then
+  [[ "$EXPECT" =~ ^[0-9a-fA-F]{7,40}$ ]] || { echo "--expect は 7 文字以上の commit sha か skip: $EXPECT" >&2; exit 2; }
+  EXPECT="$(printf '%s' "${EXPECT:0:7}" | tr 'A-F' 'a-f')"
+fi
 SECRETS="${METAMON_SECRETS_DIR:-$HOME/Desktop/JPHACKS2026/secrets}"
 TMP="$(umask 077; mktemp -d)"
 STAMP="$(date +%s)"
@@ -41,10 +97,12 @@ now_ms() { python3 -c 'import time;print(int(time.time()*1000))'; }
 
 # --- API キー(画面に出さない) ---------------------------------------------------
 KEY="${FIREBASE_WEB_API_KEY:-}"
-if [ -z "$KEY" ] && [ -f "$SECRETS/GoogleService-Info.plist" ]; then
-  KEY="$(/usr/libexec/PlistBuddy -c 'Print :API_KEY' "$SECRETS/GoogleService-Info.plist" 2>/dev/null || true)"
+if [ "$VERSION_ONLY" != 1 ]; then
+  if [ -z "$KEY" ] && [ -f "$SECRETS/GoogleService-Info.plist" ]; then
+    KEY="$(/usr/libexec/PlistBuddy -c 'Print :API_KEY' "$SECRETS/GoogleService-Info.plist" 2>/dev/null || true)"
+  fi
+  [ -n "$KEY" ] || { echo "Firebase Web API キーが見つかりません($SECRETS/GoogleService-Info.plist か FIREBASE_WEB_API_KEY)" >&2; exit 2; }
 fi
-[ -n "$KEY" ] || { echo "Firebase Web API キーが見つかりません($SECRETS/GoogleService-Info.plist か FIREBASE_WEB_API_KEY)" >&2; exit 2; }
 
 # req METHOD URL [BODY_FILE] [AUTH=1] → $CODE $MS、本文は $TMP/body。URL とヘッダーは curl -K 経由でプロセス一覧に出さない。
 req() {
@@ -67,18 +125,21 @@ reason() { jbody '.error.message // .message // .error // empty' | head -c 80; }
 echo "== demo-check $ENV_NAME =="
 echo "  appconfig: $APPCONFIG"
 echo "  ai:        $AI"
+echo "  expect:    $EXPECT ($EXPECT_FROM)"
 
 # --- 1. 匿名ユーザー -------------------------------------------------------------
 TOKEN=""
-printf '{"returnSecureToken":true}' >"$TMP/signup.json"
-req POST "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$KEY" "$TMP/signup.json" 0
-if [ "$CODE" = 200 ]; then
-  TOKEN="$(jbody .idToken)"; UID_="$(jbody .localId)"
-  row OK "匿名ユーザー作成(accounts:signUp)" "$CODE" "$MS" "uid ${UID_:0:6}…"
-else
-  row NG "匿名ユーザー作成(accounts:signUp)" "$CODE" "$MS" "$(jbody '.error.message // empty')"
+if [ "$VERSION_ONLY" != 1 ]; then
+  printf '{"returnSecureToken":true}' >"$TMP/signup.json"
+  req POST "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$KEY" "$TMP/signup.json" 0
+  if [ "$CODE" = 200 ]; then
+    TOKEN="$(jbody .idToken)"; UID_="$(jbody .localId)"
+    row OK "匿名ユーザー作成(accounts:signUp)" "$CODE" "$MS" "uid ${UID_:0:6}…"
+  else
+    row NG "匿名ユーザー作成(accounts:signUp)" "$CODE" "$MS" "$(jbody '.error.message // empty')"
+  fi
+  rm -f "$TMP/body"
 fi
-rm -f "$TMP/body"
 
 # --- 2. /health ×3(ウォームアップ) ------------------------------------------------
 for svc in appconfig ai; do
@@ -90,9 +151,22 @@ for svc in appconfig ai; do
   done
   [ "$ok" = 1 ] && r=OK || r=NG
   row "$r" "$svc GET /health ×3" "$codes" "${times[2]}" "1 回目 ${times[0]} / 2 回目 ${times[1]} / 3 回目 ${times[2]} ms"
+  # 3 回目の本文で env と版を照合する
+  got_ver="$(jbody '.version // empty')"; got_env="$(jbody '.env // empty')"; got_db="$(jbody '.firestoreDatabase // empty')"
+  [ "$got_env" = "$ENV_NAME" ] && r=OK || r=NG
+  row "$r" "$svc env(/health)" "$codes" "-" "env=${got_env:--} 期待=$ENV_NAME firestoreDatabase=${got_db:--}"
+  if [ "$EXPECT" = skip ]; then
+    echo "  -- $svc 版: --expect skip のため照合しない(version=${got_ver:--})"
+  else
+    [ -n "$got_ver" ] && [ "${got_ver:0:7}" = "$EXPECT" ] && r=OK || r=NG
+    row "$r" "$svc 版(/health version)" "$codes" "-" "version=${got_ver:--} 期待=$EXPECT"
+  fi
+  rm -f "$TMP/body"
 done
 
-if [ -z "$TOKEN" ]; then
+if [ "$VERSION_ONLY" = 1 ]; then
+  echo "  -- --version-only: /health の env と版だけ見ました"
+elif [ -z "$TOKEN" ]; then
   echo "トークンが無いので以降を省略します" >&2
 else
   # --- 3. 生成 -------------------------------------------------------------------

@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/debugoverride"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -33,6 +34,8 @@ type Source struct {
 	Summary      string `json:"summary,omitempty"`
 	Model        string `json:"model,omitempty"`
 	RestoredFrom int    `json:"restoredFrom,omitempty"`
+	// PromptVersion is ai.PromptVersion of the binary that generated it (#372).
+	PromptVersion string `json:"promptVersion,omitempty"`
 }
 
 // VersionSummary mirrors VersionSummary (GET /versions item, no DSL body).
@@ -59,6 +62,9 @@ type Error struct {
 	Code           string
 	Message        string
 	CurrentVersion int // set on 409
+	// Details is error.details when it has more than currentVersion
+	// (402 pro_required: features, #316).
+	Details map[string]any
 }
 
 func (e *Error) Error() string {
@@ -128,6 +134,10 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 	if token := appCheckFrom(ctx); token != "" {
 		req.Header.Set(AppCheckHeader, token)
 	}
+	if p := debugoverride.Requested(ctx); p != "" {
+		// stg test plan (#2085); appconfig applies it only under its own checks
+		req.Header.Set(debugoverride.Header, string(p))
+	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -152,6 +162,12 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 		}
 		if v, ok := e.Error.Details["currentVersion"].(float64); ok {
 			ae.CurrentVersion = int(v)
+		}
+		if f, ok := e.Error.Details["features"]; ok {
+			ae.Details = map[string]any{"features": f}
+		}
+		if ae.Code == httpx.CodeAppLimitReached { // #630: iOS offers to replace a held app from these
+			ae.Details = e.Error.Details
 		}
 		return ae
 	}

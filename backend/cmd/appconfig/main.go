@@ -10,14 +10,20 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // X-Time-Zone names resolve on a distroless image (#342)
 
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/appstore"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/calls"
+	"github.com/jphacks/kz_2601/backend/internal/coins/coinsapi"
+	"github.com/jphacks/kz_2601/backend/internal/debugoverride"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/moderation/textfilter"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -32,6 +38,7 @@ func main() {
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	target := fsenv.FromEnv(os.Getenv)
 	guardTarget(target, logger)
+	dbg := debugOverride(logger) // stg-only per-request Pro / free (#2085)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -40,13 +47,51 @@ func main() {
 	st, closeStore := newStore(ctx, target, logger)
 	defer closeStore()
 
-	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
-	api := appconfig.New(st)
+	appCheck, _, err := newAppCheck(os.Getenv, logger, func() (appcheck.Verifier, error) {
+		return appcheck.NewFirebaseVerifier(ctx, project)
+	})
+	if err != nil {
+		logger.Error("refusing to start", slog.Any("error", err))
+		os.Exit(1)
+	}
+	authed := newAuthed(appCheck, auth.Middleware(verifier, mode), st)
 	ents := newEntitlements(st, logger)
+	gp, err := googlePlayFromEnv(ctx, os.Getenv) // Android Pro purchases; nil = 503 not_configured
+	if err != nil {
+		logger.Error("google play: not configured", slog.Any("error", err))
+	}
+	ents.GooglePlay = gp
+	if gp != nil {
+		logger.Info("google play", slog.String("packageName", gp.Policy.PackageName), slog.Any("productIds", gp.Policy.ProductIDs))
+	}
+	// Pro features (#316): paid saves and shared writes need Pro; a purchase
+	// counts at once on this instance (Changed drops the cached "not Pro")
+	pro := entitlement.NewProChecker(ents.Store, ents.Verifier.Environments)
+	ents.Changed = pro.Forget
+	proMode, err := paid.ModeFromEnv(os.Getenv) // enforce (default) | log | off
+	if err != nil {
+		logger.Error("pro gate", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("pro gate", slog.String("mode", string(proMode)))
+	textMode, err := textfilter.ModeFromEnv(os.Getenv) // TEXT_FILTER: enforce (default) | log | off (#321)
+	if err != nil {
+		logger.Error("text filter", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("text filter", slog.String("mode", string(textMode)))
+	limits := planLimits(logger) // #317
+	cs := newCoins(st, ents, logger)
+	cl := newCalls(st, cs, logger) // calls (#447)
+	api := appconfig.New(st, appconfig.WithPro(debugoverride.Wrap(pro, dbg, logger)), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
+		appconfig.WithAppSlots(cs), // coin-bought app slots raise the held-app limit (#630)
+		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl),
+		appconfig.WithExt(newExt(ctx, logger))) // external APIs through the runner (#1493)
 	entitlement.Register(api, ents) // Pro (#314)
-	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
+	coinsapi.Register(api, cs)      // coins (#630)
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appconfig.MountAccountDeletePage, appStoreNotifications(ents, logger), playNotifications(ents, os.Getenv, logger), coinsapi.Public(cs.Config), calls.Public(cl))
 	server := &http.Server{
-		Handler:           handler,
+		Handler:           debugoverride.Middleware(dbg)(handler),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -109,32 +154,38 @@ func newVerifier(ctx context.Context, mode, project string, logger *slog.Logger)
 }
 
 // newAppCheck returns the App Check middleware (#318) for the authenticated
-// API only: /health, /s/{token} and /v1/client-config (needed to tell old
+// API only: /health, /s/{token}, /account/delete and /v1/client-config (needed to tell old
 // builds to update) stay open. APP_CHECK_MODE=off (default) | log | enforce,
 // APP_CHECK_APP_IDS optional. docs/infra/app-check.md
-func newAppCheck(ctx context.Context, project string, logger *slog.Logger) func(http.Handler) http.Handler {
-	mw, mode, err := appcheck.FromEnv(os.Getenv, logger, func() (appcheck.Verifier, error) {
-		return appcheck.NewFirebaseVerifier(ctx, project)
-	})
+func newAppCheck(getenv func(string) string, logger *slog.Logger, newVerifier func() (appcheck.Verifier, error)) (func(http.Handler) http.Handler, string, error) {
+	mw, mode, err := appcheck.FromEnv(getenv, logger, newVerifier)
 	if err != nil {
-		logger.Error("refusing to start", slog.Any("error", err))
-		os.Exit(1)
+		return nil, "", err
 	}
 	logger.Info("app check", slog.String("mode", mode))
-	return mw
+	return mw, mode, nil
 }
 
 // guardTarget exits when a stg process would use the production Firestore
 // without ALLOW_SHARED_PROD_DB=1 (fsenv.Check, #290).
 func guardTarget(t fsenv.Target, logger *slog.Logger) {
-	shared, err := fsenv.Check(t, os.Getenv)
-	if err != nil {
+	if err := checkTarget(t, os.Getenv, logger); err != nil {
 		logger.Error("refusing to start", slog.Any("error", err))
 		os.Exit(1)
+	}
+}
+
+// checkTarget is guardTarget without the exit: the error refuses the start,
+// and an accepted shared database is logged as a warning.
+func checkTarget(t fsenv.Target, getenv func(string) string, logger *slog.Logger) error {
+	shared, err := fsenv.Check(t, getenv)
+	if err != nil {
+		return err
 	}
 	if shared {
 		logger.Warn("stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)", slog.String("firestore", t.String()))
 	}
+	return nil
 }
 
 // newStore returns Firestore when GOOGLE_CLOUD_PROJECT is set (database from
@@ -182,10 +233,12 @@ func newEntitlements(st store.Store, logger *slog.Logger) *entitlement.Service {
 // API mux before auth so they stay 404/405 envelopes rather than 401.
 func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger, api *http.ServeMux, sharePage http.Handler, public ...func(*http.ServeMux)) http.Handler {
 	mux := http.NewServeMux()
+	health := httpx.Health(httpx.HealthInfoFromEnv(os.Getenv)) // env / database / version (#290)
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
 	if sharePage != nil {
 		mux.Handle("GET /s/{token}", sharePage) // read-only web view of a share link (#362, no records)
+		mux.Handle("GET /s/", sharePage)        // /s/, /s/a/b: the HTML invalid-link page, not a JSON 404
 	}
 	// minimum / latest iOS build (#302): public, read once from env
 	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
@@ -236,7 +289,16 @@ func rejectDeleted(accounts store.Accounts) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler { return appconfig.RejectDeleted(accounts, h) }
 }
 
-func health(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
+// debugOverride reads DEBUG_OVERRIDES / DEBUG_OVERRIDE_UIDS (#2085) and
+// refuses to start when the flag is set outside stg.
+func debugOverride(logger *slog.Logger) *debugoverride.Config {
+	c, err := debugoverride.FromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("debug override: refusing to start", slog.Any("error", err))
+		os.Exit(1)
+	}
+	if c != nil {
+		logger.Warn("debug override on", slog.String("header", debugoverride.Header), slog.Int("uids", c.Len()))
+	}
+	return c
 }

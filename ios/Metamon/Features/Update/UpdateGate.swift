@@ -65,6 +65,12 @@ final class UpdateGate {
         return false
     }
 
+    /// 「新しい版があります」のアラートを出すか。スプラッシュの上・起動時の同意 / チュートリアル / シェアリンクの順番待ちの間は出さない
+    /// (アラートが出ていると同意のシートが捨てられ、順番待ちが進まなくなる)。
+    var canShowNoticeAlert: Bool {
+        showsNotice && !isBlocking && !SplashPresence.shared.isShowing && !LaunchConsentHold.shared.isHolding
+    }
+
     func dismissNotice() {
         if case .recommended(let latest) = requirement { dismissedLatest = latest }
     }
@@ -160,7 +166,7 @@ struct UpdateGateModifier: ViewModifier {
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: gate.visibleNotice)
-            .alert("新しい版があります", isPresented: Binding(get: { gate.showsNotice && !gate.isBlocking }, set: { if !$0 { gate.dismissNotice() } })) {
+            .alert("新しい版があります", isPresented: Binding(get: { gate.canShowNoticeAlert }, set: { if !$0 { gate.dismissNotice() } })) {
                 Button("アップデート") {
                     gate.dismissNotice()
                     openURL(gate.storeURL)

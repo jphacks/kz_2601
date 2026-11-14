@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Form save bar feedback after tapping (#1374, iOS FormSaveBar). -->
+<resources>
+    <string name="renderer_save_bar_saved">Saved</string>
+    <string name="renderer_save_bar_queued_offline">We\'ll send it automatically when you\'re back online</string>
+</resources>

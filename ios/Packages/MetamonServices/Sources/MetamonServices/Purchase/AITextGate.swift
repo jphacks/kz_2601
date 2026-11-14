@@ -12,9 +12,11 @@ public enum AITextGate {
     }
 
     /// - enforced: 課金の制限が有効か(Debug の既定は無効 = `ProGate.isEnforced`)
-    public static func decide(consentGranted: Bool, isPro: Bool, enforced: Bool) -> Decision {
+    /// - sharedApp: 共有の記録を持つアプリの中から。参加者なら作成者の Pro で通るので、Pro でなくてもサーバーに判定させる
+    ///   (作成者が Pro でなければ 402 `creator_needs_pro`、参加者でなければ 402 → 課金画面)
+    public static func decide(consentGranted: Bool, isPro: Bool, enforced: Bool, sharedApp: Bool = false) -> Decision {
         guard consentGranted else { return .needsConsent }
-        guard isPro || !enforced else { return .needsPro }
+        guard isPro || !enforced || sharedApp else { return .needsPro }
         return .send
     }
 }

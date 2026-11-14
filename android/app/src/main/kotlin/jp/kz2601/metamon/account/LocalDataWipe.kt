@@ -1,0 +1,91 @@
+package jp.kz2601.metamon.account
+
+import jp.kz2601.metamon.services.feeds.FeedCache
+import jp.kz2601.metamon.services.local.AppListCache
+import jp.kz2601.metamon.services.local.DocumentCache
+import jp.kz2601.metamon.services.local.RecordSyncEngine
+import jp.kz2601.metamon.services.social.AuthorProfile
+import jp.kz2601.metamon.switcher.AppThumbnailStore
+import jp.kz2601.metamon.voice.ChatHistoryStore
+
+/**
+ * この端末に残る前の人のデータを全部消す(#841・iOS の `AppRuntime.wipeLocalData`)。サーバーには何も送らない。
+ * 表示の言語(端末の設定)は残す(iOS の `LocalWipe.preservedKeys` と同じ)。
+ *
+ * 消すもの(iOS との対応):
+ * - 記録のローカル DB・送信待ち・取り消し待ちの削除([RecordSyncEngine.wipe] = iOS `recordSync.wipe()`)
+ * - 保存した DSL([DocumentCache.removeAll] = iOS `DocumentCache.shared.removeAll()`)
+ * - アプリの一覧([AppListCache.clear] = iOS `DocumentCache` の一覧・`apps = []`)
+ * - 権限の記録(聞いた結果。[forgetDeviceState] = iOS `LocalWipe.clearDefaults`)
+ * - 音声の画面の読み上げの ON / OFF・起動回数・マイク FAB の位置・聞き返しの設定(#892・[forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
+ * - 会話の履歴(#893・[ChatHistoryStore.removeAll] = iOS `ChatHistoryStore.removeAll()`)
+ * - 投稿に表示する名前(#875・[AuthorProfile.clear])
+ * - feed の覚えた行(#876・[FeedCache.removeAll] = iOS `FeedCache.removeAll()`)
+ * - 端末内の動画(#863)・録音(#1084)・ドラレコ(#872)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
+ * - AI への同意・同意の前に止めた 1 件・aiButton の貯めた数・18 歳以上の確認(#877)([forgetConsent] = iOS `LocalWipe.clearDefaults` + `aiConsent.reload()`)
+ * - チュートリアルと「こう話すと直せます」を見た印・操作のヒントの吹き出しを閉じた印(#900・[forgetTutorial] = iOS `LocalWipe.clearDefaults` + `tutorial.reload()` / `coachMarks.reload()`)
+ * - 他の人の行動で届く通知の同意の控え・登録の控え(installationId は残す)・閉じたお知らせ([forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
+ * - 生成アプリの通知の予約・出ている通知([forgetDeviceState] の中 = iOS `notifications.removeAll()`)
+ * - タイマーの走行状態と終了通知の予約・正確なアラームの案内を出した印(#1128・#1123・[forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
+ * - 進行中の表示の通知(#1030・[forgetDeviceState] の中 = iOS `LiveActivities.endAll`)
+ * - https の画像のキャッシュ(メモリ・ディスク。[clearImageCache] = iOS は URLCache)
+ * - 切り替え一覧のサムネ(#1199・[AppThumbnailStore.removeAll] = iOS `AppThumbnailStore.shared.removeAll()`)
+ * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
+ * - ブロック中の人・仲間探しの一覧(#877・[resetRuntime] の中の `SocialRuntime.forget`。iOS は次の人の uid で読み直すまで残るが、
+ *   Android は前の人のブロックで次の人の投稿を隠さないよう先に捨てる)
+ * - 位置の記録(#869・[stopLocationTracking])
+ * - ホーム画面のウィジェットの中身(#912・[clearWidget] = iOS `WidgetSnapshot.clear()`)
+ * - 端末に置いたフォームの書きかけ(#1185・[forgetFormDrafts]。iOS は置かない)
+ * - 開いているフィードバックの画面(前の人の画面のスクショ・書きかけ・#1315。[closeFeedback]。消す途中で失敗しても閉じる)
+ * - 音声の画面の状態は [AccountGuard.generation] で作り直し、前の ViewModel は [PerAccountViewModels] で捨てる(#1167・iOS `chatHistory = []`)
+ */
+class LocalDataWipe(
+    private val recordSync: RecordSyncEngine,
+    private val documentCache: DocumentCache,
+    private val appList: AppListCache,
+    private val resetRuntime: () -> Unit,
+    private val forgetDeviceState: () -> Unit,
+    private val chatHistory: ChatHistoryStore? = null,
+    private val authorProfile: AuthorProfile? = null,
+    private val removeLocalMedia: () -> Unit = {},
+    private val clearImageCache: () -> Unit = {},
+    private val feedCache: FeedCache? = null,
+    private val thumbnails: AppThumbnailStore? = null,
+    private val forgetConsent: () -> Unit = {},
+    private val forgetTutorial: () -> Unit = {},
+    private val closeFeedback: () -> Unit = {},
+    /** 位置の記録(#869)を止め、保存の途中の 1 点が書き終わるまで待つ(前の人の記録を続けない・消した後に点を残さない) */
+    private val stopLocationTracking: suspend () -> Unit = {},
+    /** ホーム画面のウィジェットの中身(#912・iOS の `WidgetSnapshot.clear`) */
+    private val clearWidget: () -> Unit = {},
+    /** プロセスが落とされた後に戻すフォームの書きかけ(#1185) */
+    private val forgetFormDrafts: () -> Unit = {},
+) {
+    suspend operator fun invoke() {
+        closeFeedback()
+        try {
+            wipeAll()
+        } finally {
+            closeFeedback() // 消している間に開かれた分(前の人の画面を撮ったもの)も閉じる
+        }
+    }
+
+    private suspend fun wipeAll() {
+        stopLocationTracking() // 消す前に止め、書きかけの点を待つ(消した後に点を足さない)
+        recordSync.wipe() // 最初に止める(前の人の送信待ちを次の人に送らない)
+        documentCache.removeAll()
+        appList.clear()
+        forgetDeviceState()
+        forgetConsent()
+        forgetTutorial()
+        authorProfile?.clear()
+        chatHistory?.removeAll()
+        removeLocalMedia()
+        clearImageCache()
+        feedCache?.removeAll()
+        thumbnails?.removeAll()
+        forgetFormDrafts()
+        resetRuntime() // 一覧・DSL を消した後に新しい appId へ
+        clearWidget() // 前の人の集計・記録をホーム画面に残さない(ランタイムを戻した後に消す)
+    }
+}

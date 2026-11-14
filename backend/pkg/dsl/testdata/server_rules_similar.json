@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "趣味の近い人", "voiceEntry": "none"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "profiles", "name": "プロフィール", "scope": "shared", "titleField": "name", "fields": [
+      {"id": "name", "name": "名前", "type": "string", "required": true},
+      {"id": "hobbies", "name": "趣味", "type": "string"},
+      {"id": "level", "name": "レベル", "type": "enum", "options": ["beginner", "middle", "expert"]},
+      {"id": "best_match", "name": "おすすめの人", "type": "ref", "refEntity": "profiles"},
+      {"id": "best_name", "name": "おすすめの人の名前", "type": "string"},
+      {"id": "match_score", "name": "共通点", "type": "integer"}
+    ]},
+    {"id": "circles", "name": "サークル", "scope": "shared", "titleField": "name", "fields": [
+      {"id": "name", "name": "名前", "type": "string", "required": true},
+      {"id": "hobbies", "name": "活動", "type": "text"}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "プロフィール", "components": [
+      {"type": "list", "entity": "profiles", "item": {"title": "name", "subtitle": "best_name"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "recommend", "on": {"record": "updated", "entity": "profiles", "fields": ["hobbies", "level"]},
+     "similar": {"entity": "profiles", "fields": ["hobbies", "level"], "min": 2},
+     "do": [{"updateRecord": {"values": {"best_match": {"ref": "$similar"}, "best_name": {"ref": "$similar.name"}, "match_score": {"ref": "$similarScore"}}}},
+       {"notify": {"to": {"kind": "authorOf", "field": "$similar"}, "title": "趣味の近い人", "body": "共通点が {$similarScore} 個ある人が来ました"}}]},
+    {"id": "daily_match", "on": {"every": "daily", "time": "08:00", "each": "profiles"},
+     "similar": {"entity": "profiles", "fields": ["hobbies"]},
+     "do": [{"updateRecord": {"values": {"best_match": {"ref": "$similar"}, "best_name": {"ref": "$similar.name"}}}}]},
+    {"id": "scout", "on": {"record": "created", "entity": "circles"},
+     "similar": {"entity": "profiles", "fields": ["hobbies"]},
+     "do": [{"notify": {"to": {"kind": "authorOf", "field": "$similar"}, "title": "サークルのお誘い", "body": "{name} があなたの趣味と {$similarScore} 個合います"}}]}
+  ]
+}

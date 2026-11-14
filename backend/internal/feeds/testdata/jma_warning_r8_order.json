@@ -1,0 +1,12 @@
+[
+  {"reportDatetime":"2026-11-05T16:00:00+09:00","warning":{"class10Items":[
+    {"areaCode":"016010","kinds":[{"code":"03","status":"解除"},{"code":"10","status":"発表"}]},
+    {"areaCode":"016020","kinds":[{"code":"03","status":"解除"}]}]}},
+  {"reportDatetime":"2026-11-05T10:00:00+09:00","warning":{"class10Items":[
+    {"areaCode":"016010","kinds":[{"code":"03","status":"発表"},{"code":"14","status":"発表"}]},
+    {"areaCode":"016020","kinds":[{"code":"03","status":"発表"}]},
+    {"areaCode":"016030","kinds":[{"code":"03","status":"発表"}]}]}},
+  {"reportDatetime":"2026-11-05T13:00:00+09:00","warning":{"class10Items":[
+    {"areaCode":"016010","kinds":[{"code":"14","status":"解除"}]},
+    {"areaCode":"016030","kinds":[{"code":"03","status":"継続"}]}]}}
+]

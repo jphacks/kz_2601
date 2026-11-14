@@ -2,6 +2,7 @@
 
 > 正典は `docs/00_decisions.md`。本書は iOS 側の実装設計。DSL スキーマは統一版 v1 `docs/dsl/README.md`(旧 iOS 案: `docs/ios/dsl-proposal.md`)。**注**: 本書 §2〜§5 の `{{式}}`/`state`/`Interpolator` の記述は v1 で廃止され、`screen.entity` のドラフト + `field` 束縛(`FormDraft`)・`initialScreen` + push/sheet/fullScreen・`app.tabs[]`(TabView)に置き換わった。画面内配置は `area`(6 列 × 可視高さ÷12 行のグリッド)で `GridScreenLayout` が絶対配置する。
 > 実装: `ios/Metamon/`(アプリ本体)+ `ios/Packages/{MetamonDSL,MetamonRenderer,MetamonServices}`(ローカル Swift Package)。§1 参照。
+> Mac 版(`ios/MetamonMac/`)の作り(共有の形・置き換え層・`MacAppRuntime` との対応)は [`../mac/architecture.md`](../mac/architecture.md)。
 
 ## 0. 追加決定の反映(2026-10-24 昼)
 | 項目 | 決定 | iOS 側の帰結 |
@@ -11,7 +12,7 @@
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
 | デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
-| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`)/ シミュレータ `MockTranscriber`(§6) |
+| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`。準備中は `AppleOnDeviceTranscriber` で仮に聞き取る `FallbackTranscriber`・U5)/ シミュレータ `MockTranscriber`(§6) |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
 
 ## 1. 全体構成(マルチモジュール)
@@ -164,9 +165,11 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | URL 起動 | P0 | `openURL` / `native: openURL` | `UIApplication.open`(実装済み) | 不要 |
 | 位置 | P1 | `native: location.current → into` / `map` コンポーネント | `CLLocationManager` 1回取得(stub) / MapKit(実装済み) | `NSLocationWhenInUseUsageDescription` |
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
+| カレンダーへの追加 | P1 | action `addToCalendar{entity, calendarEvent}` | `EKEventEditViewController`(実装済み・§12.2) | 不要(別プロセスの OS の画面) |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 | 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
+| 文字起こし・読み上げ | P3 | `transcribeField { field, label?, placeholder? }` / `speakButton { text / field / value, label? }` | **実装済み**(`TranscribeFieldLeaf` + `Host/Capabilities/DictationHost.swift` → 本体 `Features/Voice/AppRuntime+Dictation.swift`(音声入力と同じ `services.transcriber`)、`SpeakButtonLeaf` + `Support/LeafSpeech.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用・文字起こしを追記)。読み上げは不要 |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -178,10 +181,21 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 権限 | `AVCaptureDevice.authorizationStatus(.video)`。未決定なら要求、拒否/制限なら alert「カメラを使えません」→「設定を開く」(`UIApplication.openSettingsURLString`)/「写真から選ぶ」 |
 | エンコード | `PhotoCodec.dataURL(from: UIImage)`:**ピクセル基準で長辺 ≤800px**・renderer scale=1 固定(既定の画面倍率だと 800pt=2400px になる)・JPEG q0.5 → `data:image/jpeg;base64,...` を `FormDraft.values[field]` へ(保存経路は他の入力と同じ `entity.create/update`) |
 | 表示 | 値があれば `PhotoView` サムネイル(160pt)+「撮り直す」「削除」、無ければ `label` のボタン 1 つ |
-| 読み取り(`analyze`・#418) | 撮った・選んだ直後に `PhotoReader`(`Support/PhotoVision.swift`)が Vision で必要な分だけ実行: 文字 `VNRecognizeTextRequest`(ja-JP / en-US・同じ高さの断片を 1 行にまとめる `OCRPiece.lines`)、分類ラベル `VNClassifyImageRequest`、骨格 `VNDetectHumanBodyPoseRequest`。金額・日付・関節の角度・分類のフォールバックは MetamonDSL の純関数(`ReceiptParser` / `PoseAngle` / `PhotoClassifier`)。classify / describe は Apple Intelligence が使える端末なら `OnDeviceAI`(Foundation Models)にラベル + 文字を渡す。読めた項目だけ `FormDraft.values[into]` に入れ、写真の下に「もう一度読み取る」と結果(読めなかった項目名)を出す。jointAngle があればプレビューを `PosePhotoView`(縦横比を保って収め、関節の点と線を Canvas で重ねる)に替え、編集で開いた既存の写真にも骨格だけ重ねる。外部ライブラリ・ネットワークは使わない |
+| 読み取り(`analyze`・#418) | 撮った・選んだ直後に `PhotoReader`(`Support/PhotoVision.swift`)が Vision で必要な分だけ実行: 文字 `VNRecognizeTextRequest`(ja-JP / en-US・同じ高さの断片を 1 行にまとめる `OCRPiece.lines`)、分類ラベル `VNClassifyImageRequest`、骨格 `VNDetectHumanBodyPoseRequest`、バーコード `VNDetectBarcodesRequest`、人数 `VNDetectFaceRectanglesRequest` + `VNDetectHumanRectanglesRequest`、主な色は中央を 32×32 に縮めた画素(結果は `PhotoClues` にまとめ、テストで差し替える)。金額・日付・関節の角度・分類のフォールバック・ラベルの名前・色の名前は MetamonDSL の純関数(`ReceiptParser` / `PoseAngle` / `PhotoClassifier` / `PhotoColor`)。classify / describe は Apple Intelligence が使える端末なら `OnDeviceAI`(Foundation Models)にラベル + 文字を渡す。読めた項目だけ `FormDraft.values[into]` に入れ、写真の下に「もう一度読み取る」と結果(読めなかった項目名)を出す。jointAngle があればプレビューを `PosePhotoView`(縦横比を保って収め、関節の点と線を Canvas で重ねる)に替え、編集で開いた既存の写真にも骨格だけ重ねる。外部ライブラリ・ネットワークは使わない |
 
 画像は **base64 JPEG 文字列として photo フィールドに置き、entity.create の data に含めて送る**(縮小後 ≈ 数十〜100KB で Firestore ドキュメント 1MB 制限内)。Cloud Storage 経由(URL 化)は P1 以降。
 全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
+
+### transcribeField / speakButton(文字起こし・読み上げ)の実装要点
+
+| 項目 | 内容 |
+|---|---|
+| 文字起こし | `TranscribeFieldLeaf` → `DictationHost`(Renderer は Services を知らないので能力の protocol 越し)→ 本体の `AppRuntime+Dictation` が `services.transcriber`(WhisperKit・端末内)の `startRecording` / `stopAndTranscribe` を呼ぶ。結果は `DictationText.appending` で field の後ろに足す。声はサーバーに送らず、録音も残さない |
+| 音声モデル | 音声入力と同じモデル。無ければ部品のボタンが「音声モデルを用意する」になり、起動時と同じ確認(#246 `prepareTranscriberIfAllowed`)を出す |
+| マイクの取り合い | 音声入力と同じ `transcriber` を使うので同時には録れない。マイク FAB の音声入力のシート(`showVoiceSheet`)が出たら部品は録音を捨てる。画面を離れた時も捨てる |
+| 読み上げ | `LeafSpeech.shared`(アプリ全体で 1 本)。`usesApplicationAudioSession = false` で共有セッションに触らない(#43 の `SpeechReader` と同じ)。声は UI の言語(`LanguagePreference`: ja-JP / en-US)。設定の「挨拶と質問を読み上げる」(#43)とは別で、ユーザーが押した時だけ喋る |
+| 録音中は喋らない | `SpeechReader.stopForRecording()` / `recordingFinished()` が `LeafSpeech` も止める・抑止を解く。音声入力と `transcribeField` の録音の両方がこれを通る |
+| 審査用ビルド | 両方残す(端末の中だけ・マイクは音声入力と同じ説明文に文字起こしを追記) |
 
 ### audioRecorder(録音・#420)の実装要点
 
@@ -200,6 +214,22 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 3. 録音中にマイク(FAB)を押す → 音声入力が動く。録音は続く・止まるどちらでも、その後の音声入力が普通に使える。
 4. AirPods を付けてフォームを開き、本体で一度録音・停止 → AirPods を 1 回押すと録音が始まり、もう 1 回で止まる。フォームを閉じた後は AirPods のボタンが録音を始めない。
 5. 上限(maxDuration を 10 秒にした DSL)で自動で止まり、録れた分が残る。録音中に電話が来ても録れた分が残る。
+
+### 5.1 プッシュ通知(#269)
+
+他の人の行動で届く通知の iOS 側。配信は runner(`docs/backend/features/notifications.md`)。審査用の版からは外す(`docs/ios/review-build.md`)。
+
+| 項目 | 決め方 |
+|---|---|
+| 登録 | `Features/Push/PushHost` がサインイン(uid の変化)と前面復帰で通知の許可を見て、許可済みの時だけ `registerForRemoteNotifications` する。許可の確認はここでは出さない(今までの通知の許可の流れで許可された時も、前面に戻るのでここを通る) |
+| 送る | `PushDeviceRegistrar` が `PUT /v1/me/devices/{installationId}`。uid・トークン・環境・版・OS のハッシュを覚えて、変わった時だけ送る。失敗は次の前面復帰でやり直す |
+| installationId | UUID を UserDefaults に保存。ログアウトでも変えない(`LocalWipe.preservedKeys`)。入れ直すと変わる |
+| environment | `embedded.mobileprovision` の `aps-environment` が development なら sandbox、シミュレータも sandbox、他は production |
+| 消す | サインアウトは `wipeLocal` の先頭、退会は `DELETE /v1/me` の前に `DELETE /v1/me/devices/{installationId}`。最大 3 秒で先へ進み、失敗で止めない。通知の許可を切った時も消す |
+| 同意 | 設定の「他の人の行動で届く通知」(共有・公開の記録があるアプリで、作成者以外)が `PUT /v1/me/notify-consent/{appId}`。参加の画面で「参加する」を押すと有効。読む API が無いので値は端末の控え(`NotifyConsentStore`)で、ログアウトや入れ直しの後はオフに見える |
+| タップ | 本文の `appId` を `IntentHost` に渡して開く(bootstrap の前なら待つ)。ローカル通知に `appId` は無い |
+| entitlement | `Metamon.entitlements` の `aps-environment` = `$(METAMON_APS_ENV)`(`project.yml`。Debug / Staging は development、Release は production・#683)。審査用の `Metamon-Review.entitlements` には入れない。App ID の Push Notifications は自動署名が付ける(手動署名なら人が App ID で有効にして profile を作り直す)。登録に失敗しても利用者には何も出さない |
+| Mac(#982) | 同じ `PushDeviceRegistrar` を使い、OS とのやり取りだけ `MetamonMac/App/Push/MacPushHost.swift`。サーバーに platform は送らず(= ios・APNs)、`os` で Mac と分かる。タップは起動直後なら一覧が載るまで最大 30 秒待つ。詳細は [Mac の OS との連携](../mac/system-integration.md#プッシュ通知) |
 
 ## 6. 音声入力画面とホットリロード
 
@@ -220,10 +250,25 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | モデル | `BuildConfig.whisperModel`(環境変数 `METAMON_WHISPER_MODEL` / Info.plist `MetamonWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
 | 配置 | `Application Support/WhisperKit/models/argmaxinc/whisperkit-coreml/openai_whisper-small/`(約 500MB)。`MelSpectrogram/AudioEncoder/TextDecoder.mlmodelc` + `config.json` が揃っていればオフラインでも Hub に問い合わせずロード |
 | DL と状態 | `prepare()` を `AppRuntime.bootstrap()` が起動直後に呼ぶ。`status`: `notDownloaded → downloading(downloadProgress 0〜1) → loading(CoreML ロード + ANE 特化 prewarm) → ready → recognizing`。失敗は `.failed(message)` で UI に「再試行」ボタン |
-| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。`NSSpeechRecognitionUsageDescription` は Apple Speech フォールバック用に残置(WhisperKit 自体は不要) |
+| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。WhisperKit 自体は音声認識の許可が不要。`NSSpeechRecognitionUsageDescription` は下の仮の聞き取り(U5)用 |
 | 録音 | 録音前に **自前で** `AVAudioSession(.playAndRecord, .default, [.defaultToSpeaker, .allowBluetooth])` + `setActive(true)`(WhisperKit 側は `try?` で失敗を握りつぶすため。カメラ/AVCaptureSession の後でも record 系に戻す)→ `startRecordingLive(callback: nil)` → 停止で `audioSamples` を取り出し `purgeAudioSamples`。`precheck`: 0 サンプル=`noAudioCaptured`・0.5 秒未満=`tooShort`・ピーク < 0.001(-60dBFS)=`silent` を **理由付き `TranscriberFailure`** として throw(toast にそのまま日本語で出る) |
 | 診断 | `lastDiagnostics: TranscriberDiagnostics`(録音秒数・サンプル数・ピーク/RMS・セッション category/mode・入力ルート・権限・モデル状態・失敗理由)。`[Voice]` プレフィックスで stdout と os_log(subsystem `jp.kz2601.metamon` category `voice`)に `recording started` / `stopped samples=N duration=S peak=…` / `transcribe result text="…"` を出す。実機ログ: `xcrun devicectl device process launch --console --device <id> jp.kz2601.metamon` |
 | 制約 | シミュレータでは `#if targetEnvironment(simulator)` で `MockTranscriber` + 文字入力のみ(マイク非表示)。ストリーミング(途中結果)は未対応=停止後に一括。`small` のメモリは推論時 ~1GB 弱、初回 prewarm は 30〜90 秒 |
+
+### 準備中の仮の聞き取り(U5・2026-11-06)
+
+WhisperKit の DL・読み込み(初回は数分)の間もマイクで話せるように、Apple の端末内の音声認識で仮に聞き取る(UX 点検 H2)。
+
+| 項目 | 内容 |
+|---|---|
+| 組み立て | 実機の `BuildConfig.makeTranscriber()` が `FallbackTranscriber(primary: WhisperKitRecognizer, provisional: AppleOnDeviceTranscriber)` を返す。シミュレータは従来どおり `MockTranscriber` |
+| 切り替え | 録音を**始める時**に選ぶ。WhisperKit が ready なら WhisperKit、そうでなく仮が使えるなら仮。録音中に WhisperKit の準備が終わっても、その録音は始めた方で止める(切り替えは録音の合間) |
+| 見せる状態 | `status`・`downloadProgress`・`needsDownload`・`prepare()` は WhisperKit のまま(設定・DL の確認・進捗の表示は変わらない)。`isReady` は「WhisperKit が ready か仮が使える」。`isProvisional` が true の間、音声画面に「準備中のため簡易の聞き取りです」 |
+| 端末内だけ | `SFSpeechAudioBufferRecognitionRequest.requiresOnDeviceRecognition = true`。`supportsOnDeviceRecognition == false` の端末・言語では使わない(サーバーへ送る Apple の認識には落とさない)→ 今まで通りマイクは灰色で文字の入力を先に出す |
+| 許可 | 最初の仮の録音で `SFSpeechRecognizer.requestAuthorization`(`NSSpeechRecognitionUsageDescription`。審査用の版は `strip-review-plist.sh` が同じ趣旨の文に差し替える)。拒否・制限なら `TranscriberFailure.speechRecognitionDenied` を出し、以後は仮を使わない(マイクは灰色・文字を先に) |
+| 言語 | `LanguagePreference` の `ja` → `ja-JP`、`en` → `en-US` |
+| プライバシー | 声は端末の外に送らず、録音も残さない。プライバシーの申告(音声データは集めない)は変わらない(`docs/store/privacy-label.md`) |
+| テスト | `MetamonServicesTests/FallbackTranscriberTests`(偽の実装で: 準備中は仮・準備後は WhisperKit・録音の合間だけ切り替え・端末内が使えない時は使わない・許可が無い時) |
 
 ### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
@@ -235,7 +280,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 VoiceInputView.phase                         AppRuntime.morphJob               RootView
  idle ──tap──▶ listening ──tap──▶ transcribing ──text──▶ (送信) ─▶ create / edit ──apply──▶ nil
    │ 例文チップ / 文字入力 ─────────────────────────────▶ (送信) ─┘                      │
-   └ 準備中(モデル DL/ロード)はマイク灰色・タップ不可                               summaryBanner 3〜5s
+   └ 準備中(モデル DL/ロード)は仮の聞き取り(U5)。端末内の認識が使えない時はマイク灰色・タップ不可                               summaryBanner 3〜5s
 ```
 
 | 画面状態 | 判定 | UI |
@@ -244,9 +289,12 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | idle(準備中) | `status` が notDownloaded/downloading/loading | マイク灰色・無効、下に DL 進捗 / 読み込み中 |
 | listening | 録音中 | 赤〜珊瑚のマイク + 外へ広がる波紋 ×3(擬似音量で振幅が揺れる ※ `SpeechTranscriber` に音量 API が無いため実音量連動は未対応)、"聞いています…" |
 | transcribing | `stopAndTranscribe` 待ち | 波形バー、"文字起こし中…"。結果はカードに 1 文字ずつ(`TypewriterText`)表示してから送信 |
-| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、6×12 スケルトングリッド(セルが斜めに光り、3s ごとにレイアウト案が入れ替わる)、段階文言、経過秒 |
-| 生成中 edit | `morphJob.kind == .edit` | シートを閉じ、現在画面を 45% + blur 1.5 で薄くし、上部に `EditingIndicator` カプセル(「変更を反映しています…」+ 発話) |
+| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、組み立て台 `BuildStageView`(#626: パーツ箱から部品のシルエットを選んで空の画面に置く → 入れ替える → 並べ直す。依頼文の語「グラフ」「記録」「チェック」等から出そうな部品を先に出す・`BuildChoreography.WaitingScript`)、段階文言、経過秒。#636: create は `POST /v1/generate?stream=1`(SSE)で読み、`app` でアプリ名(見出しの上)とタブの帯、`component` で本物の部品を届いた順に下書きと置き換えて**仮置き**(同じ index は 1 回・`LiveDraft`)、`restart` で仮置きを捨てて当て推量に戻る。SSE が使えない(401 / 429・接続断・`result` の前に終わった)時は仮置きを捨てて stream なしの呼び方に戻る(`event: error` はそのまま失敗として出す)。edit は stream しない |
+| 生成中 edit | `morphJob.kind == .edit` | シートを閉じ、現在画面を 45% + blur 1.5 で薄くし、上部に `EditingIndicator` カプセル(小さな部品の並べ直し + 「変更を反映しています…」+ 発話) |
 | 変身 | `apply(doc)` | **同じ `withAnimation(.spring 0.65)` の中で** `document` 差し替えと `morphJob = nil` → 生成中オーバーレイ fade out と新ツリー scale(0.96→1)+fade in がクロスフェード |
+| 組み上げ(create の結果・#626) | `apply(doc, reveal:)` で `buildReveal` が立つ | 結果は適用済みのまま、RootView は `.id` を待っていた時の値(`rootViewID`)に留めて `GeneratingView` を続け、本物の結果の部品(初期タブの直下・上から行 → 列)を 1 つずつ置く(`AssemblyPlan`。仮置きと id・種類・場所が同じ部品は最初から置いたまま、違う部品は結果で置き直す・#636・全体 1.5 秒以内・タップで飛ばせる)。終わると `buildReveal = nil` で本物の画面へクロスフェード。別の apply が来たら捨てる |
+| 変身(edit の結果・#626) | `apply(doc, highlight:)` | 変わった部品(中身の印で比較・`editHighlight`)だけを Renderer の出現で置き直して光らせ、変わっていない部品は待たせず出す。新しい画面・7 割超が変わった画面はいつもの出現 |
+| Reduce Motion | — | 待っている間は 2.4 秒ごとにフェードだけで切り替え、組み上げは全部を一度にフェード(0.45 秒)、編集は光の淡いフェードだけ |
 | 要約 | `summaryBanner` | 画面上部のカード(sparkles + summary)を 3〜5 秒(文字数÷12 でクランプ)表示して自動で消える。タップで即閉じ |
 | 位置ハイライト | `PositionHint.anchor(in: summary)` | summary に「右下/左上/上部/一番下/中央/右/左…」が含まれれば、その領域を淡い円で 2 回ほど脈打たせる(部品単位ではなく領域。DSL と summary に対応が無いため) |
 
@@ -254,13 +302,13 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 
 | 経過 | stage | create の文言 | edit の文言 | 備考 |
 |---|---|---|---|---|
-| 0〜3s | normal | どんなアプリにするか考えています… | 変更を反映しています… | |
+| 0〜3s | normal | どんなアプリにするか考えています… + 経過秒の横に目安「ふつう 10 秒ほど」(0〜10s だけ)+ 小さい **キャンセル** | 変更を反映しています… + **中止** | キャンセル / 中止は最初から出す(言い間違いに気づいたらすぐ止める・UX 点検 M6) |
 | 3〜6s | normal | 必要な画面とデータを決めています… | 〃 | |
 | 6〜9s | normal | 画面を組み立てています… | 〃 | create p50 はここで完了 |
 | 9〜10s | normal | 細部を整えています… | 〃 | (以後 3s 周期で巡回) |
 | 10〜20s | slow | もう少しかかっています… | 〃 | `area` 再生成 1 回 ≒ +7s |
 | 20〜30s | warning | 時間がかかっています。もう少しだけお待ちください(橙) | 〃(橙) | backend 警告ライン |
-| 30s〜 | fallback | 混み合っています。安全なテンプレートに切り替えています… + **キャンセル** | 〃 + **中止** | backend はテンプレ DSL へフォールバック。キャンセルは `AppRuntime.cancelMorph()`(Task cancel → URLSession 中断)。HTTP timeout 45s |
+| 30s〜 | fallback | 混み合っています。安全なテンプレートに切り替えています… + **キャンセル**(枠付きで目立たせる) | 〃 + **中止** | backend はテンプレ DSL へフォールバック。キャンセルは `AppRuntime.cancelMorph()`(Task cancel → URLSession 中断)。HTTP timeout 45s |
 | 失敗 | — | **状態カード**(下表・#60)。トーストは使わない | 〃(画面上部にコンパクト版) | 画面は元のまま。主ボタン「もう一度」は同じ発話で再送 |
 | キャンセル | — | 下部トースト「生成をキャンセルしました」(軽微) | 〃 | 画面は元のまま |
 
@@ -317,6 +365,8 @@ stateDiagram-v2
 カードは初期画面 / 音声シートでは `VoiceInputView` の中(マイクの下)、生成後(edit)の失敗は音声シートが閉じているので `RootView` が画面上部にコンパクト版を出す。
 文言は `Features/Voice/ErrorCopy.swift` に集約(Greeting と同じ方針)。失敗の分類は Services の `FailureKind.classify(error)` が 1 箇所で行い、UI は分類だけを見る。
 トーストに残すのは軽微なもの(保存失敗・キャンセル・「これ以上前の状態はありません」等)だけ。
+**文言に内部の値を出さない**(UX 点検 H9): OS の `localizedDescription`・サーバーの message・秒数 / dB / サンプル数などの診断は画面に出さず、`ErrorLog.record`(stdout の `[Metamon] <context> failed:` と os_log subsystem `jp.kz2601.metamon` category `error`)にだけ残す。画面は `ErrorCopy.failure("〇〇できませんでした", error, context:)` で「何が起きたか。次の一手」(圏外なら接続の確認・それ以外は少し待って再試行)。生成以外の消えない知らせ(録音の失敗・起動時に届かない)は `ErrorPresentation.notice`(主ボタンなし・「閉じる」だけ)。
+**VoiceOver**(H8): `toast` / `summaryBanner` / `errorCard` の didSet と、AI の返事(`chatRound`)・要約の無い完成で `VoiceOverAnnouncer.announce` を出す。VoiceOver が有効な時は要約バナーとトーストが自動で消えるまでを長くする(`VoiceOverAnnouncer.holdSeconds`・3 倍・最低 15 秒)。確認アラートの主ボタンはアクションに合わせる(削除 =「削除」・取り消せない操作は destructive・L1)。
 
 | 状況 | 判定(`FailureKind`) | 表示(カード) | 主ボタン | 副ボタン | 自動復帰 |
 |---|---|---|---|---|---|
@@ -328,9 +378,11 @@ stateDiagram-v2
 | 401(Firebase ID トークン失効) | HTTP 層: `idToken(forceRefresh: true)` → 値が変われば同じリクエストを 1 回再送(ai / appconfig 共通) | 成功すれば何も出ない | — | — | **自動(1 回)** |
 | 401 が再取得後も続く | `.sessionExpired` | 「サインインの有効期限が切れました」「もう一度サインインしてください」 | サインイン | 閉じる | `AuthSession.expire()` → サインアウト → `SignInView` に同じ 1 文を表示 |
 | appconfig 409(version 競合) | `.conflict`(ai 側の baseVersion 無しリトライでも解けなかった時) | バナー「別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください」 | — | — | **`GET /dsl` で最新を取り直して `apply()`** |
-| 4xx(入力不備など)/ 分類不能 | `.rejected(message)` / `.other` | 「生成に失敗しました」+ サーバーの message | もう一度 | 閉じる | なし |
-| ユーザーのキャンセル | `.cancelled` | トースト「生成をキャンセルしました」 | — | — | — |
-| 起動時にサーバー到達不能 | `restoreFromServer` 失敗 | トースト「オフライン: 最後に取得したアプリ(vN)を表示しています」(キャッシュ無しなら「サーバーに接続できません」) | — | — | 到達性 online 復帰で `GET /dsl` を取り直す |
+| 4xx(入力不備など) | `.rejected(message)` | 「うまく伝わりませんでした」「言い方を変えて、もう一度お話しください」(サーバーの message はログだけ) | — | 閉じる | なし |
+| 分類不能 | `.other` | 「うまく作れませんでした」「少し待ってから、もう一度お試しください」 | もう一度 | 閉じる | なし |
+| ユーザーのキャンセル | `.cancelled` | トースト「作るのをやめました」 | — | — | — |
+| 起動時にサーバー到達不能 | `restoreFromServer` 失敗 | トースト「オフラインです。最後に保存したアプリを表示しています」(キャッシュ無しなら状態カード「サーバーに接続できません」「接続を確認してください。つながると自動で読み込み直します」) | — | 閉じる | 到達性 online 復帰で `GET /dsl` を取り直す |
+| 録音・文字起こしの失敗 | `TranscriberFailure` / 空の書き起こし | 音声画面の状態カード(例「うまく聞き取れませんでした」「マイクに近づいて、もう一度話してください」)。秒数・dB は `[Voice]` のログ | — | 閉じる | 次に録音を始めると消える |
 | レコード取得失敗(#85) | `refresh()` 失敗 & ローカルにも無い → `AppRuntime.failed` に entity | list / table / timeline / chart: 「読み込めませんでした」+ **再試行**、stat: `—`、calendar: 文言 + 再試行(空状態「まだありません」「¥0」と区別) | 再試行(`load(force:)`) | — | 到達性 online 復帰で `failed` の entity を読み直す |
 
 自動再送の方針: **POST を二重実行し得る失敗(5xx / タイムアウト / 接続断)は自動再送しない**(ai の生成はべき等でない)。自動で再送するのは 401(トークン差し替え)と 429(サーバーが待てと言った)だけ、それぞれ 1 回。
@@ -353,10 +405,25 @@ FAB 本体は `ios/Metamon/App/VoiceFab.swift`。判定ロジックは純粋関�
 | 部品回避 | 吸着した側の最下段 2 列(左 A〜B / 右 E〜F)に部品があれば、その上端まで上げる(#83)。Renderer が `GridBottomObstructionKey`(左)/ `GridBottomTrailingObstructionKey`(右)で上端 y を上げる。ユーザーが下げても退避位置より下には置かない(`FabDock.displayedBottom`) |
 | 背の高い部品 | 最下段に寄せた操作部品ではない背の高い list / table / section 等(背景扱い)は FAB が上に浮く。代わりに `VoiceFab` が止まっている矩形(global)を `VoiceFabFrameKey` で上げ、`RootView` が環境値 `fabFrame` で Renderer に渡す。`GridCell` のセル内スクロール(と area 無しで積んだ画面スクロール)は、FAB と重なる分だけ末尾に `contentMargins` を足し、最後の行を FAB の上までスクロールで出せる(#157・`FabClearance.contentMargin`)。隠れている / 非表示 / 横に重ならない時は 0 |
 | 保存 | `@AppStorage`: `fab.side`(leading/trailing)・`fab.bottom`(下端からの距離。-1 = 自動)・`fab.hidden`。アプリごとではなく Tailor It 共通 |
-| 維持 | フォーム表示中は出さない(#83)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
+| 維持 | フォーム表示中は出さない(#83)・キーボード表示中は隠す(#143)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
 | VoiceOver | 本体: 「話しかけて変える」+ アクション「変身一覧」「反対側へ移動」「端に隠す」。取っ手: 「話しかけて変える。ダブルタップで表示」+「変身一覧」 |
 
 ジェスチャ競合: `Button` は残し(VoiceOver・押下ハイライト)、長押しとドラッグを `simultaneousGesture` で重ねる。FAB が指に付いて動くので離した瞬間に Button のタップも発火する → ドラッグ認識時に `suppressTap`、長押し発火時に `longPressFired` を立ててタップを捨てる(次に指が触れた瞬間 = `LongPressGesture.onChanged` でリセット、ドラッグ後は 0.3s 後にも解除)。長押しの許容移動は 10pt でドラッグしきい値と揃える(先に 10pt 動けば長押し失敗 = ドラッグ、0.45s 静止で変身一覧)。長押し発火後のドラッグは無視。
+
+#### どの画面・シートでも出す(#629)
+
+SwiftUI のシートは別の階層に出て根の FAB が隠れるので、層ごとに同じ入口を置き、いちばん上の層だけが出す(`ios/Metamon/App/AIButton.swift`・判定は `AIButtonPlacement`・`AIButtonPlacementTests`)。
+
+| 層 | 入口 | 音声シートの表示元 |
+|---|---|---|
+| 根(タブ・メインのスタック・push 先) | 左下の FAB(`RootView`) | `HostSheets(onModal: false)` |
+| DSL のシート / 全画面(中の push を含む) | 同じ FAB(`ModalVoiceFabLayer`・タブ無し扱いの位置) | `HostSheets(onModal: true)` |
+| 部品から開くシート(場所を選ぶ・曲を探す・QR・ドラレコの映像) | ナビバー右上の小さなマイク(`ComponentAIButtonLayer`)。下側に全幅のボタン・検索欄があるので FAB にしない。長押しの変身一覧は付けない | そのシート(`AIButtonLayers` の一番上) |
+| フォーム画面(どの層でも) | ナビバー右上の小さなマイク(#83) | その層 |
+
+Renderer は部品のシートの中身に `.aiButtonTarget(c)` と `.aiButtonLayer()` を付けるだけで、ホストが環境値 `aiButtonLayer` で包む。システムのアラート・確認の選択肢(`confirmationDialog`)・カメラは UIKit が一番上に出すので、その上には出さない。
+
+押すと今見えている画面(全画面 > シート > メインのスタック)と、部品のシートなら部品を、画面マップと同じ `ScreenMapUI.context` に入れて音声シートを開く。API は変えず、transcript の先頭に「画面「B」(id: b)の部品「場所」(id: where)で: 」を付ける。タブの無いアプリの最初の画面(根)だけは付けない(アプリ全体への指示を 1 画面に縛らない)。
 
 DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例 `right-hidden:360`)/ `auto`(初期状態に戻す)。simctl でドラッグを再現しにくいので保存値を直接書く。
 
@@ -421,6 +488,10 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 | **長押し**(0.45s・`Theme.Layout.fabLongPressSeconds`) | メタ操作 = **変身一覧シート** | `.simultaneousGesture(LongPressGesture)` → `AppRuntime.openSwitcher()`。触覚 `.sensoryFeedback(.impact)`。VoiceOver は accessibilityAction「変身一覧」 |
 | 音声「○○に切り替えて / ○○を開いて / ○○に変身して」 | 名前で切替 | `VoiceIntent.switchApp(name)` → `switchApp(named:)`: `GET /apps` の name と照合(完全一致→前方一致→部分一致・`AppNameMatch`)。1 件なら切替、曖昧/無ければ toast + 一覧を開く |
 | 音声「アプリ一覧 / 変身一覧 / 別のアプリに切り替えて(名前なし)」 | 一覧を開く | `VoiceIntent.listApps` → `openSwitcher()` |
+| 音声シート・初期画面の上部の一覧ボタン(H10) | 一覧を開く | `voice.appList` → `openSwitcher()`。まだ何も作っていない初回の初期画面には出さない(`VoiceTopBar.showsAppList`) |
+| 変身一覧の上部の歯車(H10) | 設定を開く | `switcher.settings` → `SettingsSheet`(音声シートの歯車と同じ) |
+
+常設の UI はマイクだけのまま。一覧・設定の入口は、マイクから開くシート(音声シート・変身一覧)の上部に置く(UX 点検 H10・2026-11-06 オーナーの決定 U1)。
 
 ```
 変身一覧シート(Features/Switcher/AppSwitcherSheet.swift)
@@ -434,6 +505,17 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 サムネ: AppThumbnailStore(Application Support/metamon-thumbs/<appId>.jpg・1/3 スケール JPEG)。撮るのは「切替・一覧を開く直前」と「apply の 1.2 秒後(RootView.onChange(version))」
         取得はキーウィンドウの drawHierarchy(ImageRenderer は NavigationStack/TabView を描けないため)
 ```
+
+**カードのひと目の数字(`AppGlance.swift`・#1943)** — カードの 2 行目に stat を 1 つ出す(例「未購入 4件」)。数え方はウィジェットと同じ `WidgetSnapshotWriter` なので、アプリの中の stat とそろう。使用中のアプリは画面に読み込んだ記録、ほかは端末の中の DSL(`DocumentCache`)とローカル DB の記録だけで数え、記録の API は呼ばない(ローカル DB から数える時、暗号化した項目の stat は「🔒」)。
+
+| 項目 | 決まり |
+|---|---|
+| main actor の外 | DSL の読み出し・暗号の復号・集計は detached task(`AppGlance.offMain`)で走らせる。main actor では入力の写し(DSL・記録・件数の単位)と結果の反映だけ。使用中のアプリの `AppGlanceStore.update` も集計は main actor の外(async) |
+| 言語 | 「件」と復号できない時の文言は main actor で引いて文字列で渡す(main actor の外で言語の設定を読まない) |
+| 外でも呼べる版 | `WidgetSnapshotWriter` の `statText`・`formatted`・`formattedValue`・`statComponents` に `countUnit` を受け取る版、`RecordSyncEngine` に復号前の記録を返す `cachedSealed` と外で復号する `opened(_:cipher:lockedText:)`。今までの呼び方もそのまま使える |
+| サインアウト | `clear()` で `generation` を進め、数えている間にサインアウトした時は前の人の数字を書き戻さない |
+| 変わらないもの | 同じアプリは 60 秒読み直さない(`recheckAfter`)・古い値は薄く出す・VoiceOver の読み上げ・端末に DSL の無いアプリは前の値のまま(読み込みの重複は `inFlight` で防ぐ) |
+| テスト | `MetamonTests/AppGlanceTests` |
 
 **起動時の挨拶(#42)** — 文言は `Features/Voice/Greeting.swift` の 1 箇所(多言語化 #44 ではこのファイルを差し替える)。時間帯(5〜10 時おはよう / 11〜17 時こんにちは / 他こんばんは)を前置き。
 
@@ -454,11 +536,12 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 | 入口 | 動き | 実装 |
 |---|---|---|
 | 変身一覧の各カード右上の共有ボタン | `ShareAppSheet`: `POST /apps/{id}/share` → QR(`tailorit://import/<token>`)・`ShareLink`(Web フォールバック URL + アプリ URL)・コピー・取り消し。下段で「探す」へ公開/非公開(説明・タグ) | `Features/Share/ShareAppSheet.swift`。発行済みトークンは `SharingUI.issued` に保持(開くたびに増やさない) |
-| `tailorit://import/<token>`(QR / リンク) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、`SharingHooks`(RootView に 1 行)の `onOpenURL` → `AppRuntime.openShareURL` |
+| `tailorit://import/<token>`(QR / リンク)・`https://tailor-it.app/s/<token>`(Universal Links・#331) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、entitlement `applinks:tailor-it.app`(通常の版だけ)。`ShareLinkReceiver` の `onOpenURL` / `onContinueUserActivity` → `SharingHooks` → `AppRuntime.openShareURL`。サイト側の準備は `docs/infra/universal-links/README.md` |
 | 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
 
 - サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
 - 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する([backend features/sharing.md](../backend/features/sharing.md))。要約カードに「みんなの投稿も見られます」を添える。
+- Handoff(#1851): 生成アプリを開いている間、`RootView` の `HandoffAdvertiser` が `jp.kz2601.metamon.view`(`appId`・`screenId`・`recordId` だけ・`ios/Shared/Runtime/HandoffActivity.swift`)を出し、Mac と引き継ぐ。受けるのは `ShareLinkReceiver` と同じ所で、`IntentHost` に保留してサインインと bootstrap の後に開く(60 秒で捨てる)。審査用の版では出さず受けない。詳細は [Mac の OS との連携](../mac/system-integration.md#handoff)。
 - DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
 - 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
@@ -500,8 +583,8 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 | Mock | `Mock/MockAuthService.swift`: 固定 uid `mock00-fixed-uid`。`AppEnvironment.mock` と Preview/テスト用。トークンは nil(ヘッダ無し) |
 | Bearer | `Live/AuthTokenProvider.swift` が `AuthService.idToken(forceRefresh:false)` を `TokenProvider` として供給。`HTTP.send` が毎リクエスト付与(更新は Firebase SDK 任せ) |
 | 画面 | `Metamon/Features/Auth/SignInView.swift`(`SignInWithAppleButton` + 匿名ボタン)。`AuthSession`(@Observable)の `user == nil` の間だけ `MetamonApp` が表示。nonce は `AppleNonce.random()`(生値→Firebase)/`sha256`(→Apple) |
-| ログアウト | `VoiceInputView` 最下部の `uid 先頭6桁` ラベル(Menu)→ ログアウト。デバッグ用に目立たせない |
-| アカウント削除(#119) | 設定シートの「アカウントを削除」(赤)→ 確認「アカウントとすべてのアプリが使えなくなります。元に戻せません」→ `AuthSession.deleteAccount`(`Features/Auth/AccountDeletion.swift`): ⓪ Apple ユーザーのみ Apple 再認証(nonce 付き)→ Firebase を再認証(requiresRecentLogin の回避)→ `authorizationCode` で `revokeAppleToken`(Firebase `revokeToken`。どちらも失敗しても続行・再認証キャンセルなら中止)。以降は `AccountDeletionFlow`(Services・順番をユニットテスト済み): ① `DELETE /v1/me`(サーバーは論理削除・以後 410。失敗ならここで止めて何も消さない) ② `AuthService.deleteCurrentUser()` = Firebase `User.delete()`(同じ Apple ID で次にサインインすると新しい uid = 新規ユーザー)。`requiresRecentLogin` なら Apple 再認証→もう一度。それでも失敗ならログを残して続行 ③ `AppRuntime.wipeLocalData()`: `RecordSyncEngine.wipe()`(オフライン DB と未送信キュー)・`DocumentCache.removeAll()`(DSL とアプリ一覧)・サムネ・App Group(ウィジェット)・`UserDefaults`・ローカル通知を消し、`resetToInitial()` で新しい appId の初期状態に ④ サインアウト → `SignInView`。匿名ユーザーも同じ(⓪を飛ばす)。WhisperKit のモデル(端末内・個人データではない)は再ダウンロードを避けるため残す。E2E: `METAMON_AUTO_SETTINGS=1 METAMON_E2E_DELETE_ACCOUNT=<秒>` |
+| ログアウト | 設定シートの「ログアウト」→ 確認(匿名は「この端末のデータが消え、匿名のアカウントには戻れません」)→ `AuthSession.signOutAndWipe`(`Features/Auth/SignOutWipe.swift`)= `SignOutFlow`(Services・ユニットテスト済み): 未送信があれば確認で「送ってからログアウト」(オンライン時の既定・`RecordSyncEngine.flush` で送り切れなければ何も消さずに止めて再確認)/「送らずにログアウト」→ アカウント削除と同じ `AppRuntime.wipeLocalData()` → サインアウト。`LocalWipe.preservedKeys`(表示の言語・送信のオプトアウト 2 つ・タイマーのキーの移行の印)は残す |
+| アカウント削除(#119) | 生成中(`AppRuntime.canDelete == false`)はアプリの削除・アカウントの削除のボタンを押せない(理由を添える・呼ばれても何もしない)。設定シートの「アカウントを削除」(赤)→ 確認「アカウントとすべてのアプリが使えなくなります。元に戻せません」→ `AuthSession.deleteAccount`(`Features/Auth/AccountDeletion.swift`): ⓪ Apple ユーザーのみ Apple 再認証(nonce 付き)→ Firebase を再認証(requiresRecentLogin の回避)→ `authorizationCode` で `revokeAppleToken`(Firebase `revokeToken`。どちらも失敗しても続行・再認証キャンセルなら中止)。以降は `AccountDeletionFlow`(Services・順番をユニットテスト済み): ① `DELETE /v1/me`(サーバーは論理削除・以後 410。失敗ならここで止めて何も消さない) ② `AuthService.deleteCurrentUser()` = Firebase `User.delete()`(同じ Apple ID で次にサインインすると新しい uid = 新規ユーザー)。`requiresRecentLogin` なら Apple 再認証→もう一度。それでも失敗ならログを残して続行 ③ `AppRuntime.wipeLocalData()`: `RecordSyncEngine.wipe()`(オフライン DB と未送信キュー)・`DocumentCache.removeAll()`(DSL とアプリ一覧)・サムネ・App Group(ウィジェット)・`UserDefaults`・ローカル通知を消し、`resetToInitial()` で新しい appId の初期状態に ④ サインアウト → `SignInView`。匿名ユーザーも同じ(⓪を飛ばす)。WhisperKit のモデル(端末内・個人データではない)は再ダウンロードを避けるため残す。E2E: `METAMON_AUTO_SETTINGS=1 METAMON_E2E_DELETE_ACCOUNT=<秒>` |
 | entitlements | `project.yml` → `Metamon/Metamon.entitlements` に `com.apple.developer.applesignin: [Default]`。自動署名(`-allowProvisioningUpdates`)が App ID に capability を付ける |
 | 初期化順 | `MetamonApp.init`: `FirebaseBootstrap.configureIfAvailable()` → `BuildConfig.make()` → `AuthSession(service: services.auth)` |
 | Go 側 | `firebase.google.com/go/v4/auth` の `VerifyIDToken`。`uid` を entity レコードの owner に使う(ai は受け取った Bearer を appconfig へ転送するだけ) |
@@ -579,7 +662,9 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 |---|---|
 | DB | `MetamonServices/Local/RecordStore.swift`(actor)。**FileManager + JSON**: `Application Support/metamon-records/<appId>/<entity>.json` に `LocalRecord{appId, entity, recordId, data, createdAt, updatedAt, pendingOp, clientId}` の配列。SwiftData/SQLite にしなかった理由: 1 entity ≤ 1000 件・読みは entity 単位全件なのでファイル=索引(appId, entity)で足りる / `DocumentCache` と同じ流儀でスキーマ移行・ModelContainer を抱えない / macOS `swift test` でそのまま動く。万単位になったら同 I/F で SQLite 化 |
 | 差分取得 | appconfig の `GET /records` は `filterField` に entity の Field しか受けない(`buildFilter`)ため `updatedAfter` 相当が無い → **全件取得で置換**(`store.replace`)。未送信行(`pendingOp != none`)だけ残す。`lastUpdatedAt` は将来の差分 API 用に用意済み |
+| 並び(#2009) | `RecordStore.rows` は createdAt の降順(サーバーの既定と同じ)。文字列ではなく時刻(秒 + ナノ秒のキー)で比べるので、小数秒の桁が違うもの(`.123Z` と `.123456Z`)や `+09:00` などのオフセット付きも正しく並ぶ。小数秒は `Date` を通さず桁のまま持つ(`ISO8601DateFormatter` はミリ秒より細かい桁を落とすため)。同じ時刻の行は表に後から入った行を先に出す。表は古い順に持ち、`replace` はサーバーの一覧(新しい順・同時刻は id 降順)を逆にして入れるので、同時刻の並びがサーバーとそろう(デスクトップ・Android と同じやり方)。createdAt が無い・空・読めない(小数秒が 10 桁以上・オフセットが無い)行は末尾。テストは `MetamonServicesTests/RecordOrderTests` |
 | 書き込み | `RecordSyncEngine.save/delete`(`Local/RecordSyncEngine.swift`・`@MainActor @Observable`)。create は仮 id `local-<clientId>`、update はキー単位マージ(PATCH と同義・DSL から消えた項目もローカルで保持)、delete は行を `pendingOp=delete` にして一覧から隠す |
+| 削除の取り消し(M11) | `deleteRecord`(一覧の長押し・VoiceOver の操作「削除」・フォームの削除ボタン)は `RecordSyncEngine.deleteUndoably`(`Local/RecordSyncEngine+Undo.swift`)。5 秒(VoiceOver では 10 秒)はメモリ上で一覧から隠すだけで、ローカル DB にも送信の列にも触れない。下部の「削除しました・元に戻す」(`RecordUndoToast`)で戻せばサーバーには何も送らない(記録の id・作成日時・作者が変わらない)。時間が過ぎる・背面に回る・サインアウトの送り切りで `delete` と同じく列に積む。待ちの間にアプリが落ちたら記録は残る(消えすぎない側) |
 | キュー | `Local/SyncQueue.swift`(actor)。積む時に畳む: create+update → create に併合 / create+delete → 両方消す(サーバーに行かない)/ update+update → 1 つ。送信後は仮 id → サーバー id の別名表を持ち、後続の update/delete を引き直す。`BackoffPolicy(base 0.5s, ×2, maxAttempts 5)`。`sleep` を差し替えられるのでテストは待たない |
 | 冪等 | `AppConfigClient.create(appId:entity:data:clientId:)` を追加(既定実装は clientId 無視)。`HTTPAppConfigClient` は `{data, clientId}` を送り、再送でも同じ clientId |
 | 到達性 | `Local/Connectivity.swift`: `NetworkPathConnectivity`(`NWPathMonitor`)/ `ManualConnectivity`(テスト・E2E)。オンライン復帰で `queue.resume()` |
@@ -587,6 +672,21 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 | 設定シート | 「データ」節: `同期: 最新 / 未送信 N 件 / 送信中 / オフライン(・未送信 N 件)` + 「今すぐ同期」(`RecordSyncEngine.status/pendingCount/isOnline`) |
 | E2E | DEBUG `METAMON_E2E_OFFLINE_SECONDS=<n>`(`Metamon/App/RecordSyncFactory.swift`): n 秒間レコード API を `URLError(.notConnectedToInternet)` にし到達性も offline → n 秒後に online。`METAMON_AUTO_RECORD` と併用して「圏外保存 → 即表示 → 復帰で送信」を通す |
 | テスト | `MetamonServicesTests/RecordSyncTests.swift`: Store CRUD/永続化/置換、キューの順序・畳み込み・同一 clientId 再送・バックオフ・5 回で停止→再開・競合、エンジンのオフライン→オンライン送信 |
+
+### 記録のコピー・貼り付け(#1871・#1939)
+
+フォームのナビバーの「記録のコピーと貼り付け」メニュー(`RecordClipboardMenu`)と一覧の行の長押しメニュー(`ListLeaf`)から、記録を項目つきでコピーし、別の生成アプリのフォームに貼れます。中身の作り方と合わせ方は純粋ロジックの `MetamonDSL/Records/RecordClipboard.swift`、クリップボードの読み書きは `MetamonRenderer/Support/RecordPasteboard.swift` です。
+
+| 項目 | 決まり |
+|---|---|
+| 載せるもの | 保存フィールドのうち、hidden・暗号化・端末のファイル(photo / video / audio)・アプリが違うと意味の無い参照(ref / refs / member / members)以外。独自の型 `app.tailorit.record` と、メモなどに貼るための「名前: 値」の文字の 2 つを 1 項目に載せる |
+| 置き方 | 10 分で消え(`RecordClipboard.expiry`)、この端末の中だけに置く(`.localOnly`。Mac 側の貼り付けができるまで) |
+| 合わせ方 | 同じアプリ(appId)の同じ entity の時だけ field の id で合わせ、それ以外は名前(前後の空白・大文字小文字を無視)で合わせる。貼る先の 1 つの field には 1 回だけ入れる。合わないものは捨て、「合わなかった項目」に名前を出す |
+| 管理者だけの項目 | 管理者でなければ `editableBy: admins` の項目には入れない。管理者か分からない時は管理者でない扱い |
+| 値の確かめ方 | サーバー・CSV の読み込み(`RecordImport`)と同じ規則。integer は小数を断り、currency は四捨五入。どちらも絶対値が `Int64.max / 2` まで。文字は `RecordImport.characterLimit` まで(string 4000・text 20000)。日付・日時は `FieldCoding.date(from:)` で読んで書き直す(2/30 などは入れない・小数秒つきの日時も読める)。位置は緯度 90・経度 180 まで |
+| 貼った後 | フォームに値を入れるだけで保存はしない。「N 項目を入れました: …」と合わなかった項目を一言で出す |
+| 読めない時 | 記録が載っているのに読めない(貼り付けを許可されなかった等)時は「貼り付けが許可されませんでした」、載っていなければ「貼り付けられる記録がありません」 |
+| テスト | `MetamonTests/RecordClipboardTests` |
 
 ## 8. DSL スキーマ
 → 統一版 v1: `docs/dsl/README.md`(決定表)+ `docs/dsl/dsl.schema.json`。旧 iOS 案は `docs/ios/dsl-proposal.md`。
@@ -653,6 +753,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
 | シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |
 | ロック画面(#423) | 同じウィジェット(`MetamonStatWidget`)の `supportedFamilies` に accessory 3 種を足しただけ。データ・更新経路はホーム画面と共通。ロック画面は単色(vibrant)で描かれるので色に頼らず太さで区別(`MetamonWidget/AccessoryViews.swift`)。配置はロック画面長押し → カスタマイズ → ロック画面 → ウィジェット |
+| Mac(#984) | 拡張 `MetamonMacWidget`(小・中・大)。見た目・`WidgetSnapshot`・`WidgetSnapshotWriter`・文言・App Group は共有し、スナップショットに `appId`(省略可)を足した。押すと `tailorit://widget?app=<appId>`。メニューバーの stat も同じ集計を使う。詳細は [Mac の OS との連携](../mac/system-integration.md#ウィジェット) |
 
 ### 12.1 ライブアクティビティ(ActivityKit・Issue #423)
 ロック画面のバナーと Dynamic Island(compact / expanded / minimal)に「タイマー」「いま◯◯中」を出す。**更新は端末内だけ(push しない)**。時間は日付で渡し OS が描くので、アプリが止まっていても数字は進む。
@@ -676,6 +777,18 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 - **実機**(iPhone 14 Pro 以降で Dynamic Island。13 はロック画面のバナーのみ): `METAMON_INITIAL_EXAMPLE=ramen_timer` で起動 → タイマー開始 → ロックして残り時間が進む・0 で 00:00 → アプリに戻ると「終わりました」→ 15 分で消える。「行列に並ぶ」→ ロック画面に「行列に並び中」と今月の杯数 → 記録を足すと数字が変わる → 「席に着いた」で消える。
 - シミュレータでもロック画面(⌘L)と Dynamic Island(iPhone 17)の表示は確認できる。
 
+### 12.2 端末のカレンダーへの追加(EventKitUI・`addToCalendar`)
+生成アプリのレコードを iPhone のカレンダーに予定として入れる。**`addToCalendar` は端末の予定を読まない・書き込みもしない**(予定とリマインダーを読む口 `DeviceCalendarSource`・#1987 は別にあり、使う部品はまだ無い。[OS との連携](system-integration.md#カレンダーの予定とリマインダーを読むdevicecalendarsource)): OS の「新規イベント」画面(`EKEventEditViewController`)を中身を埋めて開き、ユーザーが「追加」を押した時だけ OS が入れる。
+
+| 項目 | 内容 |
+|---|---|
+| DSL | action `addToCalendar{entity, calendarEvent:{startField, endField?, durationMinutes?, titleField?, locationField?, notesField?, alertMinutes?}}`(`docs/dsl/README.md` §3.2) |
+| 権限 | 不要。iOS 17 以降 `EKEventEditViewController` は別プロセスで描かれ、`requestAccess` も `NSCalendars*UsageDescription` も entitlement も要らない(Info.plist のフルアクセスの説明文は `DeviceCalendarSource` 用)(最低 iOS は 17.0)。`EKEventStore()` は event を作るためだけに使う |
+| 値 | フォーム画面なら `FormDraft.payload`(未保存でも今の値)、`list.onItemTap` なら `records` のその行。組み立ては純関数 `CalendarEventPlan.build`(MetamonDSL・`CalendarEventPlanTests`) |
+| 構成 | `Metamon/App/AppRuntime+Calendar.swift`(`addToCalendar` と `CalendarEventEditor`)・`AppRuntime.calendarDraft` が立つと `RootView` の `HostSheets` がシートで出す。「追加」で toast「カレンダーに追加しました」 |
+| 審査用の版 | 残す(権限ダイアログが無い・ユーザーの操作でだけ入る) |
+| 確認 | シミュレータでも OS の画面は開く。保存先はシミュレータのカレンダー |
+
 ## 13. アクセシビリティ最低限(Renderer・Issue #68)
 生成アプリ側(Renderer の全部品)で Dynamic Type・VoiceOver・コントラスト・Reduce Motion の最低線を守る。本体(`ios/Metamon/`)は対象外。
 
@@ -684,6 +797,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | Dynamic Type | セル高は `area` 固定なので「文字を切る」のではなく**セル内スクロール(`FadingScrollView`)に逃がす**。アクセシビリティサイズ(`dynamicTypeSize.isAccessibilitySize`)では image/map/chart/gauge など面を自前で埋める型以外は全部内側スクロール。stat は数値 `minimumScaleFactor(0.6)`・ラベル縮小 1 行・カード余白を sm に詰めて 1 行高のセルでも数値が見える、button の高さ 48 は `@ScaledMetric` で追従し 2 行まで折り返し、list の行は trailing を下段に落とす(`AnyLayout`) | `Screen/GridScreenLayout.swift` `GridCell.scrollsInside` / `StatLeaf` / `ButtonLeaf.RenderButtonStyle` / `Support/ListRow.swift` / `BadgeLeaf` / `CalendarLeaf.dayCell` |
 | VoiceOver | 部品 1 つ = 1 要素で意味を読む。stat=「ラベル, 値」(`accessibilityLabel/Value`)、list 行=「title, subtitle, trailing」+ `isButton` と `accessibilityAction`(onTapGesture は VoiceOver から呼べないため)、photoField=「レシートを撮る, ボタン, カメラを開きます」、calendar の日=「10月24日 金曜日, 記録2件」+ `isSelected`、gauge/progressBar=ラベル+値。装飾(icon 部品・list のアイコン/chevron・timeline のレール・EmptyPlaceholder のアイコン・曜日行)は `accessibilityHidden(true)`。toggle/picker/slider/stepper/datePicker は SwiftUI 標準に任せる | 各 Leaf / `ListRow` / `PhotoView` |
 | コントラスト | schema の `SemanticColor` red/green/orange/blue はシステム色だとライトで 2.2〜4.0:1 しか無い。`SemanticPalette`(ライト/ダーク別の固定トーン)に置き換え、面(白 / #1C1C1E)と badge のピル(同色 15%)の両方で **4.5:1 以上**を `SemanticColorContrastTests` が検算する(表は下)。`RGB.readableForeground` は背景輝度で黒/白を返すヘルパー | `Support/SemanticColor.swift` / `Tests/MetamonRendererTests/SemanticColorContrastTests.swift` |
+| Mac(#937 / #940) | iOS と同じ部品の名前・値をそのまま使い、Mac だけの差を `#if os(macOS)` で足す。section / card の見出しは `macAccessibilityHeading()`(`.isHeader`)。carousel は左右のボタン「前へ / 次へ」+ ページの点(Tab で止まり、←→ キーと VoiceOver の増減で送る・値「2 / 5」)。disclosure は行全体を 1 つのボタンにし(Space / Return)、値「開いています / 閉じています」。送り・開閉・一言の出入りは「視差効果を減らす」で止める。一言と「削除しました」は `MacVoiceOver.announce` で読み、VoiceOver の時は長く出す(iOS の H8 と同じ 3 倍・最低 15 秒)。シートは Esc で閉じる | `CarouselContainer` / `DisclosureContainer`(`MacDisclosureStyle`)/ `CarouselPaging` / `MetamonMac/App/Shell/AppCanvas.swift`・`MacVoiceOver.swift` |
 | Reduce Motion | `StaggeredAppear`(変身の受け側)はスキップ済み。加えて `FadingScrollView` のフェード切替・button の押下スケール・calendar の月送り・progressBar の値変化を `accessibilityReduceMotion` で無効化(即時反映) | `GridScreenLayout` / `ButtonLeaf` / `CalendarLeaf` / `ProgressBarLeaf` |
 
 `SemanticPalette` のコントラスト比(WCAG 相対輝度、面 = secondarySystemGroupedBackground):
@@ -746,7 +860,9 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
 | 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
 | E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
+| Mac(#1034) | Intent の型・Query・フレーズ(`TailorItIntents` / `IntentEntities` / `IntentE2E` / `AppShortcuts.xcstrings`)は同じファイルを Mac のターゲットにも入れる。本体との橋渡し `IntentHost` だけ Mac 用(`MetamonMac/App/Intents/MacIntentHost.swift`): 一覧は `MacAppLibrary` + 同梱の例、開く / 話しかけるは `MacRootView` が受けて一覧の選択・⇧⌘M の会話へ、記録の追加は端末に残る作ったアプリだけを `MacRecordEngines` のエンジンに書く。`MetamonMacApp.init` で `register` |
 | HealthKit | 実装済み(#167・下記 §15.1) |
+| 集中モード・Spotlight | `TailorAppEntity` を集中モードのフィルタ(#1991)と Spotlight(#1996・iOS 18 は `IndexedEntity`)でも使う。詳細は [iOS の OS との連携](system-integration.md) |
 
 ### 15.1 ヘルスデータ(`healthStat` / `Field.health`・Issue #167)
 
@@ -781,8 +897,10 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 ### 17.1 タイマー(`timerDisplay`)
 - 状態は `TimerRun { base(一時停止までの累計秒), startedAt(走行中の開始時刻) }` だけ持ち、表示秒は毎回 `now` から計算(`MetamonRenderer/Support/TimerClock.swift`)。
-- `TimerRunStore`(UserDefaults・キー `metamon.timer.<アプリ名>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。
-- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown が走行中で scenePhase が active 以外になった時だけ** 終了時刻に予約(識別子 `timer.<キー>`)、active に戻ったら取り消し。inactive(コントロールセンター・許可ダイアログ・App スイッチャー)でも予約するのは、スイッチャーからの強制終了でも通知を残すため(active で取り消すので重複しない)。
+- `TimerRunStore`(UserDefaults・キー `metamon.timer.<appId>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。キーは appId で始めるので、同じ名前のアプリが 2 つあっても混ざらない(ライブアクティビティのキー・通知の識別子も同じキーから作る)。
+- 以前のキー(`<アプリ名>/...`)は起動時に 1 回だけ `TimerKeyMigration` で移す(印 `metamon.timerKeys.migratedToAppId`)。持ち主はアプリ一覧のキャッシュと開いているアプリから決め、同じ名前のアプリが複数ある時は開いているアプリがその名前ならそちらへ、それ以外は決められないので捨てる。予約済みの終了通知も新しい識別子で取り直し、古いキーのライブアクティビティは消す(部品を開くと出し直す)。
+- アプリの削除では `TimerCleanup.removeApp(appId:)` でそのアプリの走行状態と終了通知を消す。
+- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown を開始した時点で** 終了時刻に予約(識別子 `timer.<キー>`)し、一時停止・リセット・終了で取り消す。部品の表示や scenePhase には頼らない(生成アプリを切り替えて部品が画面から消えても予約が残る)。予約・取り消しは 1 本の列で順番に流す。前面でその部品が見えている間は通知の delegate がバナーを出さない(`TimerVisibility`)。
 - 通知許可は countdown を初めて開始した時に求める。拒否されていても画面上のタイマーは正しく動く。
 - 見た目(`TimerDisplayLeaf` の body)は変更していない。
 
@@ -824,7 +942,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | 裏の同期 | ときどき(OS 任せ・最短 15 分) | `BGAppRefreshTask`(§17.2) |
 | カメラ・録画(`photoField` / `videoField` / `qrScanner`) | **止まる**(iOS が背面のカメラを許さない) | 画面を出したまま使う。AI は頼まれたら「画面を出したまま(自動ロックを切って)」と案内する(`internal/ai/live_activity_rules.go`) |
 | 音声入力(マイク・WhisperKit) | **止まる** | 録音は前面のみ。`audio` モードは足していない |
-| 音の再生・読み上げ | 生成アプリの部品には今は無い | 部品で読み上げ(音声案内)を足す時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れる。**審査用の版で残すかはその時に決める**(`strip-review-plist.sh` は今 location だけ外す) |
+| 音の再生・読み上げ(`speakButton`・`transcribeField`) | **止まる** | 前面だけで使う部品として足した(`UIBackgroundModes: audio` は入れていない)。背面で読み上げを続けたくなった時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れ、審査用の版で残すかをその時に決める |
 
 ### 17.5 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
@@ -883,6 +1001,8 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 
 **Core Bluetooth(BLE 直叩き)は後続**: MultipeerConnectivity が Bluetooth を内部で使うので iOS 同士はこれで足りる。BLE を直接使う意味があるのは Android / マイコン等の非 Apple 端末やバックグラウンドでのビーコン的な検出だが、GATT のサービス設計・分割転送(MTU ~180B)・ペアリング UX・`NSBluetoothAlwaysUsageDescription` とバックグラウンドモードが要り、デモの範囲を超える。必要になったら `NearbyShare.Payload` をそのまま運ぶ別トランスポートとして足す。
 
+**Mac(#964)**: `NearbyService` をそのまま Mac のターゲットに入れ、`MacAppRuntime` が `NearbyHost`。待ち受けの判定 `AppDSL.usesNearbyReceive` は `ios/Shared/Runtime/NearbyReceive.swift` で共有。すれ違い通信(§19.1)は Mac では使えない枠。詳細は [Mac の OS との連携](../mac/system-integration.md#近くの端末に送るnearbyshare)。
+
 確認:
 - 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
 - シミュレータ 2 台(同じ Mac)で送受信できた。DEBUG 用の環境変数: 送信側 `METAMON_AUTO_NEARBY_SEND=<entity>`(起動 3 秒後にシートを開き最初の相手へ送る)/ 受信側 `METAMON_AUTO_NEARBY_ACCEPT=1`(確認を 2 秒見せて受け取る)。例は `METAMON_INITIAL_EXAMPLE=attendance_nearby METAMON_MOCK=1`。
@@ -940,6 +1060,7 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - **描画**(`Metamon/Features/ScreenMap/`): カードは段ごとに中央揃え、幅に収まらなければ横スクロール。矢印は Canvas。下向きは直線、上向き・往復は進行方向の左へ曲げ、同じ段どうしはカードの下を回す
 - **この画面について話す**: カードを選ぶと出入りの一覧とボタン。押すと `ScreenMapUI.context` をセットして音声シートを開き、上部にチップ「画面「B」について話す」(× で外す)。送信時に **transcript の先頭へ「画面「B」(id: b)で: 」を付ける**(API の契約は変えない。「元に戻して」等の意図判定は付ける前の文で行う)。文脈は 1 回送ると消える
 - 確認: `METAMON_INITIAL_EXAMPLE=navigation METAMON_AUTO_SCREEN_MAP=b`(画面 b を選んだ状態で開く)、`METAMON_AUTO_SCREEN_MAP_TALK=1` で音声シートまで進む
+- **Mac(#970)**: 文脈・文言・カードの並べ方・矢印は `ios/Shared/ScreenMap/ScreenMapLayout.swift` で iOS と共有。矢印キーの移動(`ScreenGraph.neighbor`)とマップから画面を開く(`NavigationResolver.reveal`: 根から最短の矢印を `navigate` でたどる)は `ScreenGraph+Navigation.swift`(`ScreenGraphNavigationTests`)。見た目は `ios/MetamonMac/App/ScreenMap/MacScreenMapView.swift`(ツールバー・表示メニュー ⇧⌘E からシート)
 
 ## 21. キーボードの扱い(#143)
 
@@ -957,6 +1078,20 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 | シェアシート | `.scrollDismissesKeyboard(.interactively)` | |
 
 DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か field>` で表示 3 秒後にその入力欄へフォーカス、`METAMON_AUTO_BLUR=<秒>` でさらに n 秒後に閉じる。`voice`(音声画面)/ `voice-sheet`(生成後に発話シートを開いて入力)/ `chat`(対話の返答欄)も可。例: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=gallery-input METAMON_AUTO_OPEN=checkin_form METAMON_AUTO_FOCUS=pin`。ヘッドレス起動のシミュレータはハードウェアキーボード未接続なのでソフトキーボードが出る。
+
+### 21.1 横向き(#625)
+
+iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`Info.plist` の `UISupportedInterfaceOrientations`・`TARGETED_DEVICE_FAMILY = 1`)。横向き = 高さが compact(`verticalSizeClass == .compact`)。方針は「同じ部品のまま、幅を絞って中央に寄せる・飾りを小さくする・縦に収まらない所はスクロール」。並べ替え(2 カラム化)は音声画面だけ。
+
+| 場所 | 横向きの扱い | 実装 |
+|---|---|---|
+| 生成したアプリの画面(`GridScreenLayout`) | 高さ ÷ 12 では行が潰れるので、行の高さを固定(52pt)して画面ごと縦スクロール。幅は最大 640pt で中央寄せし、左右の余白(各 96pt 以上)にマイク FAB が収まるようにする。A〜F の列の割り付けは縦と同じ。voiceInput 画面も横ではスクロール | `GridMetrics.resolve`(純粋関数・`GridMetricsTests`)。横では最下段の FAB 退避(`GridBottomObstructionKey`)を上げず、余白が取れない幅だけ末尾に FAB ぶんの余白 |
+| 音声画面 / 発話シート(`VoiceInputView`) | 左 = 見出しとマイク(スクロール)、右 = 例文・文字入力・「探す」。ツルを出さず、マイクと見出しを小さく | `LandscapeLayout`(`LandscapeLayoutTests`)。文字・録音の状態は `VoiceInputView` の `@State` なので回転しても残る |
+| 対話(`ClarifyChatView`) | 幅 560pt まで中央寄せ。キーボード表示中は選択肢チップと「これでいく」を畳み、吹き出しと入力欄の場所を残す | `.readableWidth()`・`collapsesOffer` |
+| チュートリアル・引き継ぎの案内・変身一覧 | ツルを小さく・幅を絞る・高さが足りないシートは縦スクロール | `TutorialView`・`AccountLinkPromptSheet`・`AppSwitcherSheet` |
+| QR の読み取り | プレビューを端末の向きに合わせて回す(ドラレコと同じ `RotationCoordinator`) | `QrCameraController` |
+
+セーフエリア(横に来るノッチ・ダイナミックアイランド)は SwiftUI の既定に任せ、背景以外で `.ignoresSafeArea` を足さない。
 
 ## 22. アプリ内課金「Tailor It Pro」(StoreKit 2・Issue #77 の最小形)
 
@@ -1012,36 +1147,48 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 5. 有料機能の確認カード(22.7)は同じ「Tailor It Pro」の権利を見るだけなので、RevenueCat に移しても変更不要。
 
 ### 22.7 有料機能の確認カード(チャットの「これでいく」・Issue #77 の残り)
-有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「購入して作る」/「この機能なしで作る」を選んでもらう。
+有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「Pro にする」/「この機能なしで作る」を選んでもらう。課金画面は自動では開かず、「Pro にする」を押した時に開く(UX 点検 H4・2026-11-06 オーナーの決定)。
 
 | 項目 | 決定 |
 |---|---|
-| 何が有料か | backend の `paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
+| 何が有料か | backend の `internal/paid/paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
 | 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
 | 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
-| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
+| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。Pro にする = 課金画面(`ProGate.requestPro`)→ 買ったら有料機能込みの文で生成(閉じた・キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
 | 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
 | テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
-| 限界(後続) | サーバー強制なし(22.3 と同じ)。チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す |
+| 限界(後続) | チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す。サーバーの強制(402)は 22.9 |
 
 ### 22.8 有料機能は必ず課金画面を通す(Issue #414)
 共有・オンラインなど、サーバーに負荷のかかる有料機能を使う全経路で、Pro でなければ課金画面(`PaywallSheet`)に進む。判定は `MetamonServices/Purchase/PaidGate.swift`(純粋関数)、表示は `ProGate.requestPro(_:placement:closeNote:)`(課金画面を出し、閉じるまで待って「Pro になったか」を返す)。
 
 | 経路 | いつ判定 | 閉じた(買わなかった)時 |
 |---|---|---|
-| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`) | 確認カード(22.7)に戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「購入して作る」 |
+| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`)。確認カード(22.7)を出し、課金画面はカードの「Pro にする」で開く(自動では開かない・H4) | 確認カードに戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「Pro にする」 |
 | チャットを通らない生成(チャット OFF・「別のアプリ」・予備文の「このまま作る / このまま反映」・圏外の保留・状態カードの再送・#253 の修正) | 生成の後(できた DSL に shared / public の entity が**新しく**入ったか。もとから共有のアプリの修正は聞き直さない) | 共有を外す修正(`PaidGate.dropSharedDataInstruction`)を送る。外せなければ前の版へ(新規作成なら初期画面) |
 | 元に戻す / やり直す で共有の版に戻った | 戻した後 | 戻す前の版へ |
-| シェアリンクを開く(記録を共有するアプリ・自分のでない) | 参加の確認(#254)の前(`ShareLinkPreview.sharedData`) | 参加しない |
-| プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
 | 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
+
+共有アプリに**参加する人**(シェアリンク・「探す」のインストール)には課金画面を出さない(正典「課金・Pro」2026-11-06: 参加者は無料・作成者の Pro で持つ・UX 点検 H5)。作成者が Pro でない時の書き込みは、サーバーの 402 `creator_needs_pro` を受けて案内(22.9)だけを出す。
+
+### 22.9 サーバーの 402 `pro_required`(Issue #316)
+サーバーも有料の機能を止める(backend の [pro.md](../backend/features/pro.md) の「サーバーでの強制」)。端末の課金の制限が無効(DEBUG の既定・22.4)でも、サーバーは Pro でない uid の有料の機能を止めるので、**デモ端末でも共有・自動の動きを作るには Pro(Sandbox の購入)が要る**。判定は `MetamonServices/Protocols/ProRequired.swift`(`details.features` / `details.reason`)。
+
+| 経路 | 受けた時 |
+|---|---|
+| 生成・直し(`send`) | 何も保存されていない。課金画面(`.paidFeature(features)`)→ 買えばサーバーへの取引の送信(`serverSyncTask`)を待って同じ依頼を送り直す / 閉じたら「〇〇は Tailor It Pro が必要なため、保存しませんでした」。端末では Pro なのに 402 の時は課金画面を出さず案内だけ(送り直しを繰り返さない)。`AppRuntime+PaidGate.swift` の `presentProRequired` |
+| 共有の記録の書き込み(同期キュー) | `SyncEvent.proRequired`。書いた分は戻す。作成者なら課金画面、参加者(`creator_needs_pro`)は「作った人が Pro ではないため書き込めません(見ることはできます)」。印を付ける等の即時の書き込みは `message(for:)` の同じ文言 |
+| オンラインの AI(`POST /v1/text`) | `AITextError.needsPro` → 課金画面(`requestProForAIText`) |
+| 外の API の op(つないだサービス・#2001) | `MetamonServices/External/ExtDenial.swift` が 409 `ext_not_connected`(`details.provider`)・402(既存の `ProRequired` / `CoinDenial` で判定)・503 `ext_unavailable` / `ext_busy` を振り分け、`Features/Connections/ExtDenialSheet.swift` の `.extDenialSheets($denial, onMessage:)` が「次にすること」を出す。つないでいない → つなぐ案内のシート(名前は `GET /v1/me/connections` の `nameJa` / `nameEn` → 端末の名前 → id。「つなぐ」は設定の「つないだサービス」と同じ `ConnectFlow`・つなげたら閉じる。provider が分からない 409 はシートを出さず設定へ案内する一言)。Pro が要る → 課金画面(`features` が空なら「つないだサービス」)、作成者の Pro が要る時と端末は Pro なのにサーバーが知らない時は一言だけ。コイン → `CoinGate`(引き受けられなければ `CoinCopy.denialBody`)。止まっている・混んでいる → 一言だけ。一言の出し方は呼ぶ側に任せる。今の呼び出し口は DEBUG の設定の「開発用: 試験用のサービスを呼ぶ」(偽の provider `fakeOauth`・`METAMON_MOCK=1` + `METAMON_MOCK_EXT_ERROR=<code>` でエラーを仕込める)だけで、部品から呼ぶつなぎは部品の Issue で足す。審査用の版では案内の画面を外し、コインの断りは `.unavailable` 扱い |
+| 審査用の版 | 有料の機能を作らない(backend が共有を private に直し、serverRules を作らない)ので当たらない想定。当たっても課金画面は無いので文言だけ |
+| テスト | `MetamonTests/ProRequiredFlowTests.swift`・`MetamonServicesTests/RecordSyncTests.swift`(`testSyncQueueProRequired…`・`testProRequiredParsing`)・`AITextGateTests` |
 
 - 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。同梱文書を開き、その画面から公開ページ https://tailor-it.app/terms ・ /privacy も開ける)。
 - 出す場所: 確認カードの課金画面は `ClarifyChatView`(音声シートの中にも重ねられる・placement `.chat`)、それ以外は `PaywallHost`(placement `.root`。音声シートは閉じてから出す)。
 - オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
 - 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。
 - モックのストア: DEBUG で `METAMON_MOCK_STORE=1` なら App Store に触れず購入が即成功(¥500)。DEBUG のシミュレータは StoreKit の商品が取れなければ自動でモック(`simctl launch` で起動した時)。`0` で常に StoreKit。Release は常に StoreKit。
-- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
+- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 確認カード →「Pro にする」→ 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
 - 限界(後続): サーバー側で止める(#316)。Pro が切れた後に、自分で作った共有アプリを開く経路は止めていない(自分のデータが見られなくなるため・要判断)。
 
 ## 23. UI テスト(XCUITest・Issue #165)

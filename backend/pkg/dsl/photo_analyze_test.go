@@ -40,6 +40,39 @@ func TestPhotoAnalyzeValid(t *testing.T) {
 	}
 }
 
+// 拡張の kind(label / labels / barcode / peopleCount / color)と into の型。
+func TestPhotoAnalyzeMoreKinds(t *testing.T) {
+	app := photoAnalyzeApp(
+		PhotoAnalyze{Kind: "label", Into: "tag"},
+		PhotoAnalyze{Kind: "labels", Into: "memo"},
+		PhotoAnalyze{Kind: "peopleCount", Into: "angle"},
+	)
+	if err := app.Validate(); err != nil {
+		t.Fatalf("valid analyze rejected: %v", err)
+	}
+	if err := photoAnalyzeApp(PhotoAnalyze{Kind: "barcode", Into: "tag"}, PhotoAnalyze{Kind: "color", Into: "memo"}).Validate(); err != nil {
+		t.Fatalf("barcode / color rejected: %v", err)
+	}
+	for name, tc := range map[string]struct {
+		a    PhotoAnalyze
+		want string
+	}{
+		"label into enum":      {PhotoAnalyze{Kind: "label", Into: "category"}, "must be string|text"},
+		"barcode into number":  {PhotoAnalyze{Kind: "barcode", Into: "angle"}, "must be string|text"},
+		"people into text":     {PhotoAnalyze{Kind: "peopleCount", Into: "memo"}, "must be integer|number"},
+		"color into boolean":   {PhotoAnalyze{Kind: "color", Into: "done"}, "must be string|text"},
+		"options on labels":    {PhotoAnalyze{Kind: "labels", Into: "memo", Options: []string{"a", "b"}}, "options are only for kind classify"},
+		"joint on peopleCount": {PhotoAnalyze{Kind: "peopleCount", Into: "angle", Joint: "knee"}, "joint is only for kind jointAngle"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := photoAnalyzeApp(tc.a).Validate()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("want %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
 func TestPhotoAnalyzeSemanticErrors(t *testing.T) {
 	for name, tc := range map[string]struct {
 		a    PhotoAnalyze
@@ -55,7 +88,7 @@ func TestPhotoAnalyzeSemanticErrors(t *testing.T) {
 		"options on text":     {PhotoAnalyze{Kind: "text", Into: "memo", Options: []string{"a", "b"}}, "options are only for kind classify"},
 		"classify string":     {PhotoAnalyze{Kind: "classify", Into: "tag"}, "needs options (2+)"},
 		"classify bad option": {PhotoAnalyze{Kind: "classify", Into: "category", Options: []string{"食費", "車"}}, `option "車" is not an option`},
-		"unknown kind":        {PhotoAnalyze{Kind: "barcode", Into: "memo"}, `kind "barcode" must be one of`},
+		"unknown kind":        {PhotoAnalyze{Kind: "calories", Into: "memo"}, `kind "calories" must be one of`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			err := photoAnalyzeApp(tc.a).Validate()
@@ -90,9 +123,15 @@ func TestPhotoAnalyzeSchema(t *testing.T) {
 			t.Errorf("%s: should fail schema validation", name)
 		}
 	}
-	ok := `{"type":"photoField","field":"p","analyze":[{"kind":"text","into":"m"}]}`
-	if _, err := Parse([]byte(strings.Replace(base, "%s", ok, 1))); err != nil {
-		t.Fatalf("valid analyze rejected: %v", err)
+	for _, ok := range []string{
+		`{"type":"photoField","field":"p","analyze":[{"kind":"text","into":"m"}]}`,
+		`{"type":"photoField","field":"p","analyze":[{"kind":"labels","into":"m"}]}`,
+		`{"type":"photoField","field":"p","analyze":[{"kind":"barcode","into":"m"}]}`,
+		`{"type":"photoField","field":"p","analyze":[{"kind":"color","into":"m"}]}`,
+	} {
+		if _, err := Parse([]byte(strings.Replace(base, "%s", ok, 1))); err != nil {
+			t.Fatalf("valid analyze rejected: %v", err)
+		}
 	}
 }
 

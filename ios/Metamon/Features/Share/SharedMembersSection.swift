@@ -51,7 +51,7 @@ final class SharedMembersModel {
             } else if phase == .probing {
                 phase = .hidden // 共有かどうか分からない時は出さない
             } else {
-                phase = .failed(L10n.tr("参加している人を読み込めませんでした: \(error.localizedDescription)"))
+                phase = .failed(ErrorCopy.failure(L10n.tr("参加している人を読み込めませんでした"), error, context: "SharedMembersSection"))
             }
         }
     }
@@ -73,7 +73,24 @@ final class SharedMembersModel {
                 list = back
             }
             if justRemoved == member { justRemoved = nil }
-            return L10n.tr("外せませんでした。元に戻しました: \(error.localizedDescription)")
+            return ErrorCopy.failure(L10n.tr("外せませんでした。元に戻しました"), error, context: "SharedMembersSection")
+        }
+    }
+
+    /// 管理者が参加者を管理者にする / 外す(#272)。先に一覧に反映し、失敗したら戻して文言を返す。
+    func setAdmin(_ member: SharedMember, _ admin: Bool) async -> String? {
+        guard var current = list, let index = current.items.firstIndex(of: member) else { return nil }
+        current.items[index].isAdmin = admin
+        list = current
+        do {
+            try await client.setAdmin(appId: appId, uid: member.uid, admin: admin)
+            return nil
+        } catch {
+            if var back = list, let i = back.items.firstIndex(where: { $0.uid == member.uid }) {
+                back.items[i].isAdmin = member.isAdmin
+                list = back
+            }
+            return L10n.tr("管理者を変更できませんでした。元に戻しました: \(error.localizedDescription)")
         }
     }
 
@@ -86,7 +103,7 @@ final class SharedMembersModel {
             return nil
         } catch {
             phase = before
-            return L10n.tr("抜けられませんでした。元に戻しました: \(error.localizedDescription)")
+            return ErrorCopy.failure(L10n.tr("抜けられませんでした。元に戻しました"), error, context: "SharedMembersSection")
         }
     }
 }
@@ -169,9 +186,16 @@ struct SharedMembersSection: View {
                 .foregroundStyle(.secondary)
             VStack(spacing: 0) {
                 ForEach(list.items) { member in
-                    row(member, canRemove: list.role == .owner && !member.you && member.role != .owner)
+                    row(member, canRemove: list.role == .owner && !member.you && member.role != .owner,
+                        canSetAdmin: list.isAdmin && !member.you && member.role != .owner)
                     if member != list.items.last { Divider() }
                 }
+            }
+            if list.isFull {
+                Text("参加している人が上限(100 人)に達しています。これ以上は参加できません")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("members.full")
             }
             if let removed = model.justRemoved {
                 removedNotice(model, removed)
@@ -213,7 +237,7 @@ struct SharedMembersSection: View {
         }
     }
 
-    private func row(_ member: SharedMember, canRemove: Bool) -> some View {
+    private func row(_ member: SharedMember, canRemove: Bool, canSetAdmin: Bool) -> some View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: member.role == .owner ? "crown.fill" : "person.crop.circle.fill")
                 .font(.title3)
@@ -224,12 +248,27 @@ struct SharedMembersSection: View {
                     .accessibilityIdentifier("members.row")
                 HStack(spacing: Theme.Spacing.xs) {
                     if member.role == .owner, !member.displayName.isEmpty { Text("作成者") }
+                    if member.isAdmin { Text("管理者") } // #272(作成者も管理者)
                     if member.you { Text("あなた") }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
             Spacer()
+            if canSetAdmin {
+                Button(member.isAdmin ? L10n.tr("管理者から外す") : L10n.tr("管理者にする")) {
+                    Task {
+                        if let msg = await model.setAdmin(member, !member.isAdmin) {
+                            rt.toast = msg
+                        } else {
+                            await rt.reloadAppMembers() // 管理者だけのボタン・削除の可否を合わせる
+                        }
+                    }
+                }
+                .font(.footnote.weight(.medium))
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("members.admin")
+            }
             if canRemove {
                 Button("外す", role: .destructive) { confirmRemove = member }
                     .font(.footnote.weight(.medium))

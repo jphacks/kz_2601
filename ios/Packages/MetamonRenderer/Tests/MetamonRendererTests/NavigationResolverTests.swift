@@ -133,4 +133,35 @@ final class NavigationResolverTests: XCTestCase {
         s = go(s, "c", from: Route(screen: "a", stack: tabA), dsl, presentation: .sheet)
         XCTAssertNil(s.paths["sheet"], "前のモーダルの積み残しを持ち越さない")
     }
+
+    // MARK: - 保存の後(#1719)
+
+    /// タブ / main の根で行き先なしの保存: 閉じる先が無いので留まる(新規なら入力を空に戻す)。
+    func testSaveOnRootStays() {
+        let tab = Route(screen: "memo_form", stack: Route.tabStack("memo_form"))
+        let s = NavigationState(selectedTab: "memo_form")
+        XCTAssertFalse(NavigationResolver.canClose(s, tab))
+        XCTAssertEqual(NavigationResolver.afterSave(s, from: tab, screen: nil, isNewRecord: true), .stay(resetForm: true))
+        XCTAssertEqual(NavigationResolver.afterSave(s, from: tab, screen: nil, isNewRecord: false), .stay(resetForm: false),
+                       "既存の記録の編集は値を残す")
+        let main = Route(screen: "home")
+        XCTAssertEqual(NavigationResolver.afterSave(NavigationState(), from: main, screen: nil, isNewRecord: true), .stay(resetForm: true))
+        XCTAssertEqual(NavigationResolver.close(s, tab), s, "close は根では何もしない(back は今のまま)")
+    }
+
+    /// 積まれた画面・モーダルからは今までどおり閉じる。行き先があればそこへ。
+    func testSaveOffRootClosesOrNavigates() {
+        let stack = Route.tabStack("home")
+        let pushed = Route(screen: "memo_form", stack: stack)
+        let s = NavigationState(paths: [stack: [pushed]], selectedTab: "home")
+        XCTAssertEqual(NavigationResolver.afterSave(s, from: pushed, screen: nil, isNewRecord: true), .close)
+        let sheet = Route(screen: "memo_form", stack: "sheet")
+        XCTAssertEqual(NavigationResolver.afterSave(NavigationState(sheet: sheet), from: sheet, screen: nil, isNewRecord: true), .close)
+        let full = Route(screen: "memo_form", stack: "full")
+        XCTAssertEqual(NavigationResolver.afterSave(NavigationState(fullScreen: full), from: full, screen: nil, isNewRecord: false), .close)
+        let root = Route(screen: "memo_form", stack: Route.tabStack("memo_form"))
+        XCTAssertEqual(NavigationResolver.afterSave(NavigationState(), from: root, screen: "list", isNewRecord: true), .navigate("list"))
+        XCTAssertEqual(NavigationResolver.afterSave(NavigationState(), from: root, screen: "", isNewRecord: true), .stay(resetForm: true),
+                       "空の行き先は無いのと同じ")
+    }
 }
