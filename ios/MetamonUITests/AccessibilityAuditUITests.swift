@@ -32,7 +32,22 @@ final class AccessibilityAuditUITests: XCTestCase {
 
         settingsEntry.tap()
         XCTAssertTrue(app.staticTexts["settings.accountStatus"].waitForExistence(timeout: 15), "設定が開かない")
+        expandSettingsSheet()
         try audit(screen: "settings")
+    }
+
+    /// 設定は半分の高さ(medium)で開き、後ろの音声画面の文字が見えたまま要素としては覆われるので
+    /// 「Potentially inaccessible text」(elementDetection)になる。設定の中身は緩めずに監査したいので、上まで(large)引き上げてから監査する
+    private func expandSettingsSheet(file: StaticString = #filePath, line: UInt = #line) {
+        let window = app.windows.firstMatch
+        let bar = app.navigationBars["設定"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 5), "設定のナビゲーションバーが無い", file: file, line: line)
+        let before = bar.frame.minY
+        bar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02)))
+        let raised = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in bar.frame.minY < before - 100 }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [raised], timeout: 10), .completed,
+                       "設定のシートが上まで開かない(minY=\(bar.frame.minY))", file: file, line: line)
     }
 
     // MARK: - 許す一覧

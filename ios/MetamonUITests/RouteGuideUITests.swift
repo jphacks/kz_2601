@@ -30,7 +30,9 @@ final class RouteGuideUITests: XCTestCase {
     func testGuideToChosenSpotUntilArrival() {
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_INITIAL_EXAMPLE": "drive"]
-        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
+        // 引き継ぎの案内(#276)が前のテストの予約で出て画面を覆わないよう、出した扱いにする
+        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
+                               "-metamon.accountLinkPrompted", "YES"]
         app.launch()
 
         // 音声の設定は引数で渡さない(引数のドメインが勝ち、オフにしても読めなくなる)。前回オフのまま終わっていたらオンに戻す

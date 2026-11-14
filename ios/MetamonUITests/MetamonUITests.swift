@@ -26,8 +26,10 @@ final class MetamonUITests: XCTestCase {
         if let example { env["METAMON_INITIAL_EXAMPLE"] = example }
         env.merge(extra) { _, new in new }
         app.launchEnvironment = env
-        // 文言で探す要素があるので日本語に固定(シミュレータの既定は英語)。アプリ内の言語設定も上書き
-        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
+        // 文言で探す要素があるので日本語に固定(シミュレータの既定は英語)。アプリ内の言語設定も上書き。
+        // 「引き継ぎのためにサインイン」(#276)は前のテストが予約した次の起動で 1 回出て FAB を覆うので、出した扱いにする
+        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
+                               "-metamon.accountLinkPrompted", "YES"]
         app.launch()
         self.app = app
         return app
