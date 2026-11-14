@@ -37,16 +37,16 @@ final class MacAccessibilityStyleTests: XCTestCase {
 
     // MARK: - 文字の拡大 / 縮小
 
-    func testStepsAreOrderedAndDefaultIsLarge() {
+    func testStepsAreOrderedAndDefaultIsXLarge() {
         XCTAssertEqual(MacTextZoom.steps, MacTextZoom.steps.sorted())
-        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.defaultStep), .large)
+        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.defaultStep), .xLarge)
         XCTAssertTrue(MacTextZoom.isActualSize(MacTextZoom.defaultStep))
     }
 
     func testZoomInAndOutMoveOneStep() {
         let start = MacTextZoom.defaultStep
-        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.zoomedIn(start)), .xLarge)
-        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.zoomedOut(start)), .medium)
+        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.zoomedIn(start)), .xxLarge)
+        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.zoomedOut(start)), .large)
         XCTAssertFalse(MacTextZoom.isActualSize(MacTextZoom.zoomedIn(start)))
     }
 
@@ -71,7 +71,7 @@ final class MacAccessibilityStyleTests: XCTestCase {
 
         XCTAssertEqual(MacTextZoom.step(in: defaults), MacTextZoom.defaultStep, "保存が無ければ実際のサイズ")
         MacTextZoom.setStep(MacTextZoom.zoomedIn(MacTextZoom.defaultStep), in: defaults)
-        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.step(in: defaults)), .xLarge)
+        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.step(in: defaults)), .xxLarge)
         // `@AppStorage` と同じ鍵に入る
         XCTAssertEqual(defaults.integer(forKey: MacTextZoom.storageKey), MacTextZoom.defaultStep + 1)
         MacTextZoom.setStep(42, in: defaults)
