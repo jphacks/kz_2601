@@ -102,6 +102,8 @@ public enum HealthDataError: LocalizedError, Equatable {
 public enum HealthData {
     /// 部品とアプリ本体の保存処理が使う実体。アプリ起動時に 1 回だけ差し替える。
     public static var source: any HealthDataSource = LiveHealthData()
+    /// `healthStat` の `live`(#3694)が画面に出ている間だけ購読する歩数の更新(HealthLiveSteps.swift)。
+    public static var liveSource: any HealthLiveSource = LiveHealthLiveSource()
 }
 
 /// 1 日の境目(端末のタイムゾーン)で `days` 日分の 0:00 を古い順に返す。

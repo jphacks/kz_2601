@@ -18,6 +18,8 @@ func TestHealthStatSemanticErrors(t *testing.T) {
 		{Type: CompHealthStat, Metric: "weight", Label: "体重", Target: NumExpr(goal)},   // target on weight
 		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Target: NumExpr(zero)},    // target <= 0
 		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Entity: "memo"},           // entity not allowed
+		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Live: true},               // ok: live (#3694)
+		{Type: CompHealthStat, Metric: "weight", Label: "体重", Live: true},              // live on weight
 	}
 	err := app.Validate()
 	ve, ok := err.(*ValidationError)
@@ -32,13 +34,14 @@ func TestHealthStatSemanticErrors(t *testing.T) {
 		"healthStat target is only for metric steps",
 		"healthStat target must be > 0",
 		"healthStat reads device data; remove entity/field",
+		"healthStat live is only for metric steps",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing problem %q in:\n%s", want, joined)
 		}
 	}
-	if len(ve.Problems) != 6 {
-		t.Errorf("want 6 problems, got %v", ve.Problems)
+	if len(ve.Problems) != 7 {
+		t.Errorf("want 7 problems, got %v", ve.Problems)
 	}
 }
 
@@ -89,5 +92,17 @@ func TestHealthSchema(t *testing.T) {
 	bad := strings.Replace(string(raw), `"metric":"steps"`, `"metric":"sleep"`, 1)
 	if ValidateSchema([]byte(bad)) == nil {
 		t.Error("schema should reject metric sleep")
+	}
+	// live (#3694): boolean only; omitted round-trips as absent
+	live := strings.Replace(string(raw), `"metric":"steps"`, `"metric":"steps","live":true`, 1)
+	if err := ValidateSchema([]byte(live)); err != nil {
+		t.Errorf("schema should accept live: %v", err)
+	}
+	notBool := strings.Replace(string(raw), `"metric":"steps"`, `"metric":"steps","live":"yes"`, 1)
+	if ValidateSchema([]byte(notBool)) == nil {
+		t.Error("schema should reject live as a string")
+	}
+	if strings.Contains(string(raw), `"live"`) {
+		t.Error("live must be omitted when false")
 	}
 }

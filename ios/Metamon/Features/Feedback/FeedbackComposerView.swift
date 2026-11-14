@@ -236,7 +236,7 @@ struct FeedbackComposerView: View {
     }
 }
 
-/// どこからでも(シートの上でも)フィードバックの画面を出す。端末を振った時に使う。
+/// どこからでも(シートの上でも)フィードバックの画面を出す(DEBUG の自動で開く口が使う)。
 @MainActor
 enum FeedbackPresenter {
     /// 二重に開かない
@@ -264,41 +264,22 @@ enum FeedbackPresenter {
     }
 }
 
-/// 端末を振ったら、その時に見えている画面(シートも含む)を撮ってフィードバックの画面を開く。
-struct FeedbackShakeHost: ViewModifier {
+#if DEBUG
+/// ヘッドレス E2E 用: `METAMON_AUTO_FEEDBACK=<秒>` でその秒数後に、その時に見えている画面(シートも含む)を撮ってフィードバックの画面を開く。
+/// DEBUG だけ。端末を振って開く口は歩行中の誤発火(iOS の `motionShake`)のため外した(2026-11-14 の決定)。
+struct FeedbackAutoOpenHost: ViewModifier {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.services) private var services
 
     func body(content: Content) -> some View {
-        content
-            .onReceive(NotificationCenter.default.publisher(for: .feedbackDeviceShaken)) { _ in open() }
-            #if DEBUG
-            .task {
-                // ヘッドレス E2E 用: `METAMON_AUTO_FEEDBACK=<秒>` でその秒数後に振った時と同じく開く
-                guard let s = ProcessInfo.processInfo.environment["METAMON_AUTO_FEEDBACK"].flatMap(Double.init) else { return }
-                try? await Task.sleep(for: .seconds(s))
-                open()
-            }
-            #endif
-    }
-
-    private func open() {
-        guard !FeedbackPresenter.isOpen else { return }
-        let ctx = FeedbackContext.capture(runtime: rt, screenshot: FeedbackScreenshot.captureWindow())
-        FeedbackPresenter.present(context: ctx, client: services.feedback, notices: services.loopNotices)
+        content.task {
+            guard let s = ProcessInfo.processInfo.environment["METAMON_AUTO_FEEDBACK"].flatMap(Double.init) else { return }
+            try? await Task.sleep(for: .seconds(s))
+            guard !FeedbackPresenter.isOpen else { return }
+            let ctx = FeedbackContext.capture(runtime: rt, screenshot: FeedbackScreenshot.captureWindow())
+            FeedbackPresenter.present(context: ctx, client: services.feedback, notices: services.loopNotices)
+        }
     }
 }
-
-extension Notification.Name {
-    /// 端末を振った(`UIWindow.motionEnded`)。
-    static let feedbackDeviceShaken = Notification.Name("metamon.feedback.deviceShaken")
-}
-
-extension UIWindow {
-    // 振ったらフィードバックの画面を開く(RootView が受ける)。文字入力中の「取り消し」は first responder が先に受けるので邪魔しない
-    override open func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
-        if motion == .motionShake { NotificationCenter.default.post(name: .feedbackDeviceShaken, object: nil) }
-        super.motionEnded(motion, with: event)
-    }
-}
+#endif
 #endif
