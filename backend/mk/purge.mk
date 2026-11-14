@@ -5,6 +5,6 @@
 # make emulator は Auth エミュレータを起動しないので、-dry-run を外す時は PURGE_FLAGS=-delete-auth=false にする。
 PURGE_FLAGS ?= -dry-run
 .PHONY: run-purge
-run-purge:
+run-purge: ## 退会アカウントの消去をエミュレータに対して試す(既定は -dry-run)
 	FIRESTORE_EMULATOR_HOST=localhost:8089 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
 	GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/purge $(PURGE_FLAGS)

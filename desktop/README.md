@@ -9,6 +9,10 @@ iOS の機能の入口ごとの対応(有る / 代わり / 作らない / Issue)
 ## 目次
 
 - [動かす](#動かす)
+- [環境変数と JVM の引数](#環境変数と-jvm-の引数)
+  - [環境変数](#環境変数)
+  - [JVM の引数(`-D`)](#jvm-の引数-d)
+  - [OS や道具が入れる値(読むだけ)](#os-や道具が入れる値読むだけ)
 - [今できること](#今できること)
   - [描画](#描画)
   - [入力](#入力)
@@ -45,7 +49,70 @@ stg の appconfig を手元で試す(サインインが入るまでの確かめ�
 TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :desktop:listApps
 ```
 
+AI(会話 `/v1/chat`・作る `/v1/generate`)の接続先は、`TAILORIT_API=stg` なら stg の ai、`TAILORIT_AI_URL` で差し替え(手元の backend など。モックのままでも渡せる)。接続先がある時だけコマンドパレットに「新しいアプリを作る」が出て、AI へ送ることにまだ同意していなければ先に説明と同意を出す(同意の保存は Android と同じ鍵)。既定(どちらも無い)は通信しない。会話の「これでいく」で `/v1/generate?stream=1` を呼び、別のウィンドウに組み上がっていく画面を出す(読めない途中は前の画面のまま)。完成したらパレットのアプリの一覧に足してそのアプリのウィンドウを開く(作ったアプリは今の起動の間だけ)。失敗・途中で切れた時は案内と「もう一度」、作っている間に閉じると確認を出す。
+
 Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・まだ画面にはつながない)の API キーは `TAILORIT_FIREBASE_API_KEY` から読む(Firebase コンソールのプロジェクト設定 > 全般の「ウェブ API キー」。リポジトリ・ファイルには書かない)。`TAILORIT_IDENTITY_TOOLKIT_URL`・`TAILORIT_SECURE_TOKEN_URL` で接続先を差し替えられる(Auth エミュレーターなど)。
+
+## 環境変数と JVM の引数
+
+コードが読む切り替えの一覧(`System.getenv`・`System.getProperty` と、それに渡す `env[...]` から集めた)。同じ意味の環境変数と `-D` の両方がある時は `-D` が勝つ。値の例にトークンは書かない。
+
+- 「配布物」= msi・deb などで入れた形。環境変数は起動する前に設定すれば効く。`-D` は配布物の起動に引数で渡せないので `JAVA_TOOL_OPTIONS=-D…` で渡す(推測: jpackage の実行環境も `JAVA_TOOL_OPTIONS` を読む。配布物ではまだ試していない)。
+
+### 環境変数
+
+| 名前 | 既定 | 意味 | 配布物で効くか |
+|---|---|---|---|
+| `METAMON_BATTERY_LEVEL` | 無し(不明) | `METAMON_MOCK=1` の時の電池の残り(0〜1) | 効く |
+| `METAMON_BATTERY_STATE` | 残りがあれば unplugged、無ければ unknown | `METAMON_MOCK=1` の時の充電の状態(`unknown` / `unplugged` / `charging` / `full`) | 効く |
+| `METAMON_LOW_POWER` | 無し | `METAMON_MOCK=1` の時、`1` で省電力 | 効く |
+| `METAMON_MOCK` | 無し | `1` で電池を偽物にする(上の 3 つを読む) | 効く |
+| `TAILORIT_API` | モック | `stg` で stg の appconfig につなぐ(`TAILORIT_DEV_TOKEN` も要る)。それ以外の値はモック | 効く |
+| `TAILORIT_API_BASE` | 無し(モックの本) | lookupBook の送り先(`POST /v1/lookup/book`)。このホストの画像は押さずに読む | 効く |
+| `TAILORIT_APPCONFIG_URL` | stg の appconfig | `TAILORIT_API=stg` の時の接続先 | 効く |
+| `TAILORIT_DEV_TOKEN` | 無し | サインインが入るまでの Firebase の ID トークン。ファイルに書かない | 効く |
+| `TAILORIT_FIREBASE_API_KEY` | 無し(サインインしない) | Firebase Auth の REST クライアントの Web API キー(Firebase コンソールのプロジェクト設定 > 全般)。ファイルに書かない | 効く |
+| `TAILORIT_IDENTITY_TOOLKIT_URL` | Google の Identity Toolkit | Firebase Auth のサインインの接続先を差し替える(Auth エミュレーターなど) | 効く |
+| `TAILORIT_LANG` | OS の言語 | `ja` で始まれば日本語、それ以外は英語(`-Dtailorit.lang` が勝つ) | 効く |
+| `TAILORIT_MEDIA_HOSTS` | 無し | 押さずに読んでよい画像のホスト(カンマ区切り)。appconfig・`TAILORIT_API_BASE` のホストに足す | 効く |
+| `TAILORIT_SECURE_TOKEN_URL` | Google の Secure Token | Firebase Auth のトークン更新の接続先を差し替える(Auth エミュレーターなど) | 効く |
+| `TAILORIT_THEME` | OS に従う | `light` / `dark` で固定(`-Dtailorit.theme` が勝つ) | 効く |
+| `TAILORIT_VOICE` | off | `1` / `true` / `on` / `yes` で音声入力を使う(`-Dtailorit.voice` が勝つ) | 効く |
+| `TAILORIT_WHISPER_LIB` | 無し | whisper.cpp のライブラリのファイル(`-Dtailorit.whisper.lib` が勝つ) | 効く |
+| `TAILORIT_WHISPER_MODEL` | 無し(初回に落とす) | 手元のモデルのファイルを使う(`-Dtailorit.whisper.model` が勝つ)。`:whisper:transcribeWav` も読む | 効く |
+
+### JVM の引数(`-D`)
+
+| 名前 | 既定 | 意味 | 配布物で効くか |
+|---|---|---|---|
+| `-Dmetamon.dslDocsDir` | テストで Gradle が入れる | 適合テストが読む `docs/dsl` の場所 | 使わない(テストだけ) |
+| `-Dmetamon.repoLicense` | テストで Gradle が入れる | `LicensesTest` が比べる repo の `LICENSE` | 使わない(テストだけ) |
+| `-Dtailorit.dataDir` | OS ごとの保存先 | 端末の保存先を差し替える(テスト・複数の人を試す・同時に起動する) | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.example` | 前に開いたアプリ、無ければ `shopping` | 最初に開く同梱の例(引数の 1 つ目が勝つ) | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.lang` | 無し | `TAILORIT_LANG` と同じ。テストでは Gradle が `ja` に固定する | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.theme` | 無し | `TAILORIT_THEME` と同じ。テストでは Gradle が `light` に固定する | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.voice` | 無し | `TAILORIT_VOICE` と同じ | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.whisper.lib` | 無し | `TAILORIT_WHISPER_LIB` と同じ | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.whisper.model` | 無し | `TAILORIT_WHISPER_MODEL` と同じ | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.whisper.modelDir` | `:whisper:transcribeWav` で Gradle が入れる | `transcribeWav` がモデルを落とす場所 | 使わない(手元の確かめだけ) |
+| `-Dtailorit.whisper.nativeDir` | `:whisper:transcribeWav` で Gradle が入れる | whisper.cpp のライブラリを `<dir>/<os>-<arch>/` から探す | `JAVA_TOOL_OPTIONS` で(推測) |
+
+### OS や道具が入れる値(読むだけ)
+
+| 名前 | 使う所 |
+|---|---|
+| `APPDATA` | Windows の端末の保存先(`%APPDATA%\TailorIt`) |
+| `GTK_THEME` | Linux の明暗の最後の手がかり(`:dark`) |
+| `LOCALAPPDATA` | Windows で写真を既定のアプリで開く時の一時フォルダ |
+| `SystemRoot` | Windows の「ログイン時に開く」で使う `reg.exe` の場所 |
+| `XDG_CACHE_HOME` | Linux の一時ファイルの置き場(無ければ `~/.cache`) |
+| `XDG_CONFIG_HOME` | Linux の「ログイン時に開く」の置き場(無ければ `~/.config`) |
+| `XDG_DATA_HOME` | Linux の端末の保存先(無ければ `~/.local/share`) |
+| `XDG_RUNTIME_DIR` | Linux で写真を既定のアプリで開く時の一時フォルダ |
+| `-Dcompose.application.resources.dir` | Compose が入れる。配る形に同梱した whisper.cpp のライブラリの場所 |
+| `-Djpackage.app-path` | jpackage が入れる。あれば配布物として動いている(「ログイン時に開く」を出す) |
+
+ほかに Java の標準の値(`os.name`・`os.arch`・`os.version`・`user.home`・`user.name`・`java.io.tmpdir`・`java.home` など)を OS の判定と置き場に読む。
 
 ## 今できること
 
@@ -98,7 +165,7 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 ### 読み上げ
 
-- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows はナレーターで読む(Java Access Bridge を通すので `jabswitch -enable` が要る)。Linux の読み上げ(Orca)は対象外にする。Compose Desktop が Linux の読み上げに対応していないため([JetBrains のドキュメント](https://kotlinlang.org/docs/multiplatform/compose-desktop-accessibility.html))。
+- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows はナレーターで読む(Java Access Bridge を通すので `jabswitch -enable` が要る)。ナレーターが動いていて Access Bridge が無効な時は、起動時に 1 回だけ手順の案内を出す(コマンドパレットの「読み上げの案内」で再表示・`AccessBridgeAdvice.kt`)。配布物は jlink で作る実行環境の `conf/accessibility.properties` を有効にして作る(Windows の JDK で作った時だけ働く)。Linux の読み上げ(Orca)は対象外にする。Compose Desktop が Linux の読み上げに対応していないため([JetBrains のドキュメント](https://kotlinlang.org/docs/multiplatform/compose-desktop-accessibility.html))。
 
 ### ファイルとクリップボード
 
@@ -117,6 +184,35 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 ### ライセンス
 
 - ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。複数の種類から選べる依存(JNA の LGPL-2.1-or-later / Apache-2.0)は同じファイルの `electedLicenses` で選んだ種類だけを載せる(JNA は Apache-2.0)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
+
+### 取り込んでいる android/services のファイル
+
+`:services` は `android/services/src/main/kotlin/jp/kz2601/metamon/services/` のファイルを、`services/build.gradle.kts` の `include` で名指しして同じソースのまま取り込む(`android/` は変えない)。「直接は使わない」は、取り込んだ別のファイルが使うので一緒に入れている物。置き換え(shim)は `services/src/shim/kotlin/` にあり、宣言にだけ出る Android の型の空の代わりで、デスクトップからは呼ばない。
+
+| ファイル | 何に使っているか | 置き換え(shim) |
+|---|---|---|
+| `AppConfigClient.kt` | appconfig の API の口(型)。`net/DesktopApi.kt`・`store/DesktopStore.kt`・`store/SessionPersistence.kt` | 要らない |
+| `AuthService.kt` | 直接は使わない(`http/TokenProvider.kt` が使う) | 要る(`android.app.Activity`) |
+| `CrashReporter.kt` | 直接は使わない(`consent/CrashReportingPreference.kt` が使う) | 要らない |
+| `PlanUsage.kt` | 直接は使わない(`live/HttpAppConfigClient.kt` の `GET /v1/me/usage` が使う) | 要らない |
+| `consent/AiConsentStore.kt` | AI へ送る同意の状態を端末に残す(`store/DesktopStore.kt`) | 要らない |
+| `consent/CrashReportingPreference.kt` | 「クラッシュ報告を送る」の設定を端末に残す(`store/DesktopStore.kt`) | 要らない |
+| `consent/KeyValueStore.kt` | 小さな設定の置き場の型。デスクトップの実装は `store/JsonKeyValueStore.kt` | 要る(`android.content.Context`・`android.content.SharedPreferences`) |
+| `http/ApiError.kt` | 直接は使わない(backend の失敗応答。`http/MetamonHttp.kt` などが使う) | 要らない |
+| `http/ClientInfo.kt` | 全リクエストに付ける版の申告と `X-Client-Platform`(`net/ClientPlatform.kt`・`net/DesktopApi.kt`) | 要らない |
+| `http/ErrorCodes.kt` | 直接は使わない(backend の `error.code`。`http/ApiError.kt` などが使う) | 要らない |
+| `http/FailureKind.kt` | 失敗の種類の分け方(`auth/FirebaseAuthRestClient.kt`) | 要らない |
+| `http/MetamonHttp.kt` | HTTP の口(OkHttp)。`net/DesktopApi.kt`・`auth/FirebaseAuthRestClient.kt` | 要らない |
+| `http/SessionExpirySignal.kt` | 直接は使わない(`http/MetamonHttp.kt` が使う) | 要らない |
+| `http/SseParser.kt` | 使っていない(`http/*.kt` でまとめて入る) | 要らない |
+| `http/TokenProvider.kt` | Bearer の供給(`net/DesktopApi.kt`) | 要らない |
+| `http/WriteDenials.kt` | 直接は使わない(`local/SyncQueue.kt` が使う) | 要らない |
+| `live/HttpAppConfigClient.kt` | appconfig の REST の実装(`net/DesktopApi.kt`) | 要らない |
+| `local/DocumentCache.kt` | 最後に取った DSL を appId ごとに残す(`net/DesktopApi.kt`・`store/DesktopStore.kt`) | 要らない |
+| `local/RecordStore.kt` | 記録の端末の保存(`store/DesktopStore.kt`) | 要らない |
+| `local/SyncQueue.kt` | 保存・削除の送信待ちの列(`store/DesktopStore.kt`・`store/SessionPersistence.kt`) | 要らない |
+
+取り込みを足す・外す PR では、`services/build.gradle.kts` の `include` と同じ PR でこの表にも 1 行足す・消す(名前順)。
 
 ## whisper モジュール(音声入力・#1751)
 

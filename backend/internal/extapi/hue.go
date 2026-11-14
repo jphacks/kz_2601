@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,11 @@ import (
 //
 //	lights()   Rows: name / on・brightness 0-100 (or not reachable) / light id;
 //	           Cells: id, name, on, brightness, reachable
+//	setLight(id, on, brightness?)   write (the DSL asks for a confirmation):
+//	           Item: the new state / light id; ResultID: the light id
+//
+// setLight's id is a light id from lights() (a UUID); on is true / false;
+// brightness 1-100 only with on=true. A write op is never retried.
 //
 // Off by default and registered only with EXT_HUE_ENABLED=1. Answers are
 // never cached (an OAuth provider never is).
@@ -52,6 +58,7 @@ func hueProvider() Provider {
 	return Provider{ID: Hue, Billing: BillingFree, NeedsOAuth: true, NameJa: "Philips Hue", NameEn: "Philips Hue",
 		Ops: []OpSpec{
 			{Name: "lights"},
+			{Name: "setLight", Write: true, Args: []string{"id", "on", "brightness"}, Check: checkHueSetLight},
 		},
 		Hosts: hueHosts,
 		New: func(sec Secrets) (map[string]Operation, error) {
@@ -59,7 +66,7 @@ func hueProvider() Provider {
 			if err != nil {
 				return nil, err
 			}
-			return map[string]Operation{"lights": OperationFunc(c.lights)}, nil
+			return map[string]Operation{"lights": OperationFunc(c.lights), "setLight": OperationFunc(c.setLight)}, nil
 		},
 		NewOAuth: func(sec Secrets) (OAuthClient, error) { return newHue(sec, hueWireDefault) },
 	}
@@ -378,4 +385,72 @@ func (c *hue) lights(ctx context.Context, in Input) (Output, error) {
 		out.Cells = append(out.Cells, []string{l.ID, name, strconv.FormatBool(l.On.On), bri, strconv.FormatBool(reach)})
 	}
 	return out, nil
+}
+
+// hueIDRe is a CLIP v2 resource id (a UUID, lower case).
+var hueIDRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+type hueSet struct {
+	id         string
+	on         bool
+	brightness int // 0 = not changed
+}
+
+func hueSetArgs(a map[string]string) (hueSet, error) {
+	id := strings.TrimSpace(a["id"])
+	if !hueIDRe.MatchString(id) {
+		return hueSet{}, fmt.Errorf("%w: id must be a light id from lights()", ErrBadArgs)
+	}
+	s := hueSet{id: id}
+	switch strings.TrimSpace(a["on"]) {
+	case "true":
+		s.on = true
+	case "false":
+	default:
+		return hueSet{}, fmt.Errorf("%w: on must be true or false", ErrBadArgs)
+	}
+	b, err := argInt(a, "brightness", 0, 1, 100)
+	if err != nil {
+		return hueSet{}, err
+	}
+	if b > 0 && !s.on {
+		return hueSet{}, fmt.Errorf("%w: brightness is only for on=true", ErrBadArgs)
+	}
+	s.brightness = b
+	return s, nil
+}
+
+func checkHueSetLight(a map[string]string) error {
+	_, err := hueSetArgs(a)
+	return err
+}
+
+// setLight turns a light on or off (and sets its brightness).
+func (c *hue) setLight(ctx context.Context, in Input) (Output, error) {
+	if in.Token == nil || in.Token.AccessToken == "" {
+		return Output{}, ErrNotConnected
+	}
+	s, err := hueSetArgs(in.Args)
+	if err != nil {
+		return Output{}, err
+	}
+	key, err := c.appKey(ctx, in.Token)
+	if err != nil {
+		return Output{}, err
+	}
+	body := map[string]any{"on": map[string]bool{"on": s.on}}
+	if s.brightness > 0 {
+		body["dimming"] = map[string]int{"brightness": s.brightness}
+	}
+	if err := c.send(ctx, in.Token, key, http.MethodPut, "/route/clip/v2/resource/light/"+s.id, body, nil); err != nil {
+		return Output{}, err
+	}
+	title := "オフ"
+	switch {
+	case s.on && s.brightness > 0:
+		title = "オン・明るさ " + strconv.Itoa(s.brightness) + "%"
+	case s.on:
+		title = "オン"
+	}
+	return Output{ResultID: s.id, Item: &Row{Title: title, Value: s.id}}, nil
 }

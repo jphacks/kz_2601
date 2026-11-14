@@ -166,7 +166,9 @@ public actor RecordStore {
 
     /// 同期完了: 仮 id の行をサーバーのレコードに差し替える(create)/ pendingOp を落とす(update)。
     /// 送信中に消された行は削除待ちのまま残す(列の delete が送られるまで一覧に戻さない)。
-    public func markSynced(appId: String, entity: String, localId: String, server: Record) {
+    /// - Parameter keepingLocalChanges: 送っている間にもう一度書いた(次の update が列にある)。サーバーの応答で端末の内容を
+    ///   戻さず、update 待ちのまま残す(#3667: 保存の直後に前の内容へ戻らない)
+    public func markSynced(appId: String, entity: String, localId: String, server: Record, keepingLocalChanges: Bool = false) {
         var t = table(appId, entity)
         let local = t.first { $0.recordId == localId }
         let kept = local?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
@@ -175,7 +177,13 @@ public actor RecordStore {
         var row = LocalRecord(appId: appId, entity: entity, server: server)
         row.clientId = localId.hasPrefix("local-") ? String(localId.dropFirst("local-".count)) : nil
         if row.marks == nil { row.marks = kept }
-        if local?.pendingOp == .delete { row.pendingOp = .delete }
+        if local?.pendingOp == .delete {
+            row.pendingOp = .delete
+        } else if keepingLocalChanges, let local {
+            row.data = server.data.merging(local.data) { _, mine in mine }
+            row.updatedAt = local.updatedAt
+            row.pendingOp = .update
+        }
         t.append(row)
         save(appId, entity, t)
     }

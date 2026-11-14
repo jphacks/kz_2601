@@ -1,9 +1,13 @@
 package draft
 
 import (
+	"context"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/jphacks/kz_2601/backend/internal/loop"
 )
 
 // Related issues (#2288): open issues whose title is close to a cluster's
@@ -118,4 +122,44 @@ func terms(s string) map[string]bool {
 
 func isJapanese(r rune) bool {
 	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) || r == 'ー'
+}
+
+// relate sets d.Related from the open issues (read once per run). Append
+// drafts already point at their issue and get none. When the issues cannot
+// be read, d keeps what an earlier run found.
+func (b *Builder) relate(ctx context.Context, d *loop.Draft, summary string, res *Result) {
+	if b.OpenIssues == nil {
+		return
+	}
+	if d.AppendIssue > 0 {
+		d.Related = nil
+		return
+	}
+	if !b.issuesRead {
+		b.issuesRead = true
+		b.issues, res.RelatedErr = b.OpenIssues(ctx)
+	}
+	if res.RelatedErr != nil {
+		return
+	}
+	d.Related = nil
+	for _, r := range FindRelated(summary, b.issues) {
+		d.Related = append(d.Related, loop.RelatedIssue{Repo: b.RelatedRepo, Number: r.Number, Title: r.Title})
+	}
+}
+
+// LoopIssueNumbers lists the issues the loop filed in repo, so that reading
+// related issues leaves them out.
+func LoopIssueNumbers(ctx context.Context, s loop.Store, repo string) ([]int, error) {
+	ds, err := s.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPublished, Limit: 500})
+	if err != nil {
+		return nil, err
+	}
+	var out []int
+	for _, d := range ds {
+		if d.IssueNumber > 0 && d.IssueRepo == repo && !slices.Contains(out, d.IssueNumber) {
+			out = append(out, d.IssueNumber)
+		}
+	}
+	return out, nil
 }

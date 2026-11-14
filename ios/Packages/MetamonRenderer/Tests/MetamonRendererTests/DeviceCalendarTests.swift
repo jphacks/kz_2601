@@ -213,3 +213,142 @@ final class DeviceCalendarTests: XCTestCase {
         } catch {}
     }
 }
+
+/// リマインダーを足す口(#2222)。期日あり / なし・許可なし・リストが無い の 4 分岐を偽物で確かめる。
+final class DeviceCalendarAddReminderTests: XCTestCase {
+    private var cal: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        return c
+    }()
+    private let due = ISO8601DateFormatter().date(from: "2026-11-20T17:30:00+09:00")!
+    private let todo = DeviceCalendarInfo(id: "todo", name: "リマインダー", colorHex: nil)
+    private let work = DeviceCalendarInfo(id: "work", name: "仕事", colorHex: nil)
+
+    private func fake(access: DeviceCalendarAccess = .fullAccess,
+                      lists: [DeviceCalendarInfo]? = nil,
+                      writeError: DeviceCalendarError? = nil) -> FakeDeviceCalendar {
+        FakeDeviceCalendar(access: [.events: access, .reminders: access], grantOnRequest: access,
+                           reminderLists: lists ?? [todo, work], writeError: writeError)
+    }
+
+    // MARK: 期日あり
+
+    func testAddsReminderWithDueDateAndTime() async throws {
+        let f = fake()
+        let id = try await f.addReminder(title: "牛乳を買う", due: due, dueHasTime: true, notes: "低脂肪", listId: nil)
+        let got = try XCTUnwrap(f.written.first)
+        XCTAssertEqual(f.written.count, 1)
+        XCTAssertEqual(got.reminder.id, id)
+        XCTAssertEqual(got.reminder.title, "牛乳を買う")
+        XCTAssertEqual(got.reminder.due, due)
+        XCTAssertTrue(got.reminder.dueHasTime)
+        XCTAssertEqual(got.notes, "低脂肪")
+        XCTAssertNotNil(got.dueComponents?.hour)
+    }
+
+    func testDueWithoutTimeKeepsOnlyYearMonthDay() throws {
+        let comps = try XCTUnwrap(DeviceCalendarQuery.dueComponents(due: due, hasTime: false, calendar: cal))
+        XCTAssertEqual(comps.year, 2026)
+        XCTAssertEqual(comps.month, 11)
+        XCTAssertEqual(comps.day, 20)
+        XCTAssertNil(comps.hour)
+        let withTime = DeviceCalendarQuery.dueComponents(due: due, hasTime: true, calendar: cal)
+        XCTAssertEqual(withTime?.hour, 17)
+        XCTAssertEqual(withTime?.minute, 30)
+    }
+
+    // MARK: 期日なし
+
+    func testAddsReminderWithoutDueDate() async throws {
+        let f = fake()
+        _ = try await f.addReminder(title: "本を返す", due: nil, dueHasTime: true, notes: nil, listId: nil)
+        let got = try XCTUnwrap(f.written.first)
+        XCTAssertNil(got.dueComponents) // 期日なしは dueDateComponents を入れない
+        XCTAssertNil(got.reminder.due)
+        XCTAssertFalse(got.reminder.dueHasTime)
+        XCTAssertNil(DeviceCalendarQuery.dueComponents(due: nil, hasTime: true, calendar: cal))
+    }
+
+    // MARK: 許可なし
+
+    func testAddWithoutFullAccessThrowsAndWritesNothing() async {
+        for state in [DeviceCalendarAccess.notDetermined, .denied, .restricted, .writeOnly] {
+            XCTAssertFalse(state.canAddReminder)
+            let f = fake(access: state)
+            do {
+                _ = try await f.addReminder(title: "秘密", due: nil, dueHasTime: false, notes: nil, listId: nil)
+                XCTFail("\(state) で書けてしまった")
+            } catch {
+                XCTAssertEqual(error as? DeviceCalendarError, .notAuthorized(state))
+            }
+            XCTAssertTrue(f.written.isEmpty)
+        }
+        XCTAssertTrue(DeviceCalendarAccess.fullAccess.canAddReminder)
+    }
+
+    func testResultIsNotAuthorizedWhenAccessDenied() async {
+        let f = fake(access: .denied)
+        let result = await DeviceCalendar.addReminder(title: "秘密", due: nil, dueHasTime: false, notes: nil, listId: nil, to: f)
+        XCTAssertEqual(result, .notAuthorized(.denied))
+        XCTAssertNil(result.addedId)
+        XCTAssertTrue(f.written.isEmpty)
+    }
+
+    // MARK: リストが無い
+
+    func testAddWithoutAnyListThrowsNoReminderList() async {
+        let f = fake(lists: [])
+        do {
+            _ = try await f.addReminder(title: "買い物", due: nil, dueHasTime: false, notes: nil, listId: nil)
+            XCTFail("リストが無いのに書けてしまった")
+        } catch {
+            XCTAssertEqual(error as? DeviceCalendarError, .noReminderList)
+        }
+        let result = await DeviceCalendar.addReminder(title: "買い物", due: nil, dueHasTime: false, notes: nil, listId: nil, to: f)
+        XCTAssertEqual(result, .noList)
+    }
+
+    func testUnknownListIdIsNoList() async {
+        let f = fake()
+        let result = await DeviceCalendar.addReminder(title: "買い物", due: due, dueHasTime: true, notes: nil, listId: "none", to: f)
+        XCTAssertEqual(result, .noList)
+        XCTAssertTrue(f.written.isEmpty)
+    }
+
+    // MARK: 書く先の選び方
+
+    func testWriteTargetPrefersGivenIdThenDefaultThenFirst() {
+        let lists = [todo, work]
+        XCTAssertEqual(DeviceCalendarQuery.writeTarget(lists, id: "work", defaultList: todo, identify: \.id)?.id, "work")
+        XCTAssertEqual(DeviceCalendarQuery.writeTarget(lists, id: nil, defaultList: work, identify: \.id)?.id, "work")
+        XCTAssertEqual(DeviceCalendarQuery.writeTarget(lists, id: nil, defaultList: nil, identify: \.id)?.id, "todo")
+        XCTAssertNil(DeviceCalendarQuery.writeTarget([DeviceCalendarInfo](), id: nil, defaultList: nil, identify: \.id))
+        XCTAssertNil(DeviceCalendarQuery.writeTarget(lists, id: "none", defaultList: todo, identify: \.id))
+    }
+
+    func testAddsToNamedList() async throws {
+        let f = fake()
+        _ = try await f.addReminder(title: "資料を作る", due: nil, dueHasTime: false, notes: nil, listId: "work")
+        XCTAssertEqual(f.written.first?.reminder.list.id, "work")
+    }
+
+    // MARK: 結果の形
+
+    func testResultAddedCarriesIdAndSaveFailureIsFailed() async {
+        let f = fake()
+        let ok = await DeviceCalendar.addReminder(title: "牛乳", due: due, dueHasTime: true, notes: nil, listId: nil, to: f)
+        XCTAssertEqual(ok, .added(id: "fake-added-1"))
+        XCTAssertEqual(ok.addedId, "fake-added-1")
+
+        let broken = fake(writeError: .writeFailed)
+        let bad = await DeviceCalendar.addReminder(title: "牛乳", due: due, dueHasTime: true, notes: nil, listId: nil, to: broken)
+        XCTAssertEqual(bad, .failed)
+        XCTAssertTrue(broken.written.isEmpty)
+    }
+
+    func testErrorDescriptionsHideNothingSensitive() {
+        XCTAssertNotNil(DeviceCalendarError.noReminderList.errorDescription)
+        XCTAssertNotNil(DeviceCalendarError.writeFailed.errorDescription)
+    }
+}

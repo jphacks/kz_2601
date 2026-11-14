@@ -376,3 +376,77 @@ func TestSharePageNotFoundIsHTML(t *testing.T) {
 		t.Errorf("api: %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestNewAppCheck(t *testing.T) {
+	envOf := func(m map[string]string) func(string) string {
+		return func(k string) string { return m[k] }
+	}
+	for _, tc := range []struct {
+		name      string
+		env       map[string]string
+		wantMode  string
+		wantBuilt int
+		token     string
+		want      int
+	}{
+		{"off ignores a missing header", nil, appcheck.ModeOff, 0, "", http.StatusOK},
+		{"off ignores a bad token", nil, appcheck.ModeOff, 0, "bad", http.StatusOK},
+		{"log never rejects", map[string]string{"APP_CHECK_MODE": "log"}, appcheck.ModeLog, 1, "", http.StatusOK},
+		{"log never rejects a bad token", map[string]string{"APP_CHECK_MODE": "log"}, appcheck.ModeLog, 1, "bad", http.StatusOK},
+		{"enforce accepts a valid token", map[string]string{"APP_CHECK_MODE": "enforce"}, appcheck.ModeEnforce, 1, "ok", http.StatusOK},
+		{"enforce rejects a missing token", map[string]string{"APP_CHECK_MODE": "enforce"}, appcheck.ModeEnforce, 1, "", http.StatusUnauthorized},
+		{"enforce rejects a bad token", map[string]string{"APP_CHECK_MODE": " ENFORCE "}, appcheck.ModeEnforce, 1, "bad", http.StatusUnauthorized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, logs := capLogger()
+			built := 0
+			mw, mode, err := newAppCheck(envOf(tc.env), logger, func() (appcheck.Verifier, error) {
+				built++
+				return okVerifier{}, nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode != tc.wantMode {
+				t.Fatalf("mode = %q, want %q", mode, tc.wantMode)
+			}
+			if built != tc.wantBuilt {
+				t.Errorf("verifier built %d times, want %d", built, tc.wantBuilt)
+			}
+			if !strings.Contains(logs.String(), "mode="+tc.wantMode) {
+				t.Errorf("log lacks the mode:\n%s", logs)
+			}
+			req := httptest.NewRequest(http.MethodGet, "/v1/apps", nil)
+			if tc.token != "" {
+				req.Header.Set(appcheck.Header, tc.token)
+			}
+			rec := httptest.NewRecorder()
+			mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})).ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("status %d, want %d (%s)", rec.Code, tc.want, rec.Body.String())
+			}
+			if tc.want == http.StatusUnauthorized && !strings.Contains(rec.Body.String(), httpx.CodeAppCheckFailed) {
+				t.Fatalf("body %s", rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestNewAppCheckRefusesBadMode(t *testing.T) {
+	logger, _ := capLogger()
+	mw, mode, err := newAppCheck(func(string) string { return "bogus" }, logger, func() (appcheck.Verifier, error) {
+		t.Error("verifier built for a bad mode")
+		return nil, nil
+	})
+	if err == nil {
+		t.Fatal("no error")
+	}
+	if mw != nil {
+		t.Error("middleware returned with the error")
+	}
+	if mode != "" {
+		t.Errorf("mode = %q", mode)
+	}
+}

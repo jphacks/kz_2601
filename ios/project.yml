@@ -118,6 +118,8 @@ targets:
           - "**/GoogleService-Info*.plist"
       # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
       - path: MetamonWidget/Shared
+      # 共有シートの拡張と共有する受け取り箱(ShareInbox)。両ターゲットにコンパイルする(#2224)
+      - path: MetamonShare/Shared
       # Mac と共有するランタイムの部品(UIKit に依存しない: 遷移・確認・保存/削除の前段・文言)。#939
       # Brand.xcassets(アクセント色・ツルの絵)もここ(#935)
       - path: Shared
@@ -136,13 +138,20 @@ targets:
       - package: MetamonServices
       # ホーム画面ウィジェット(埋め込み)
       - target: MetamonWidget
+      # 共有シートで受け取る拡張(埋め込み・#2224)
+      - target: MetamonShare
     # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
     # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)/
     # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)/
     # Push(aps-environment・#683。環境は METAMON_APS_ENV。自動署名で App ID に Push Notifications が付く)/
-    # Associated Domains(Universal Links・#331。applinks:$(METAMON_APPLINKS_DOMAIN)。自動署名で App ID に Associated Domains が付く)。
+    # Associated Domains(Universal Links・#331。applinks:$(METAMON_APPLINKS_DOMAIN)。自動署名で App ID に Associated Domains が付く)/
+    # HomeKit(DeviceHomeSource・#2245。家・部屋・機器を読むだけ。自動署名で App ID に HomeKit が付く)/
+    # NFC Tag Reading(com.apple.developer.nfc.readersession.formats = NDEF・#2233。App ID に NFC Tag Reading を足す人の作業が要る)。
+    # Communication Notifications(集中モード中かを読む INFocusStatusCenter に要る・#1990。com.apple.developer.usernotifications.communication)。
+    # プロビジョニングプロファイルにこの能力が無いと、署名する実機 / Release のビルドはコード署名で失敗する。
+    # 自動署名なら次の実機ビルドで App ID に足される想定(未確認)。シミュレータは署名しないので影響しない。
     # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
-    # Review(審査用)は HealthKit・Push・Associated Domains を外した Metamon/Metamon-Review.entitlements。
+    # Review(審査用)は HealthKit・HomeKit・NFC・Push・Associated Domains・Communication Notifications を外した Metamon/Metamon-Review.entitlements。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)
@@ -168,7 +177,7 @@ targets:
         # dSYM を Crashlytics へ送るスクリプト(#296)がサンドボックスの外(SourcePackages・ネット)を使うため
         Release:
           ENABLE_USER_SCRIPT_SANDBOXING: NO
-        # App Store 審査用(#245): コード・部品の登録・権限の説明・entitlement(HealthKit)を外す
+        # App Store 審査用(#245): コード・部品の登録・権限の説明・entitlement(HealthKit・HomeKit)を外す
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           CODE_SIGN_ENTITLEMENTS: Metamon/Metamon-Review.entitlements
@@ -282,11 +291,33 @@ targets:
       - path: MetamonWidgetTests
       - path: MetamonWidget/Views
       - path: MetamonWidget/Shared
+      # ボタンのウィジェット(#2238)の View が押した時に呼ぶ Intent。ウィジェット側の Bridge は何もしない
+      - path: Metamon/Features/Intents/ControlIntents.swift
+      - path: MetamonWidget/Controls/ControlIntentBridge.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widgettests
         TARGETED_DEVICE_FAMILY: "1"
+
+  # 共有シートで受け取る Share Extension(#2224)。受けた 文字・URL・画像・PDF を App Group の ShareInbox に置き、
+  # `tailorit://share-inbox` で本体を開くだけ(振り分けは #1775 の決定のあと)。Bundle ID は本体の子。
+  MetamonShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MetamonShare
+    entitlements:
+      path: MetamonShare/MetamonShare.entitlements
+      properties:
+        com.apple.security.application-groups: [group.jp.kz2601.metamon]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX).share
+        PRODUCT_NAME: MetamonShare
+        INFOPLIST_FILE: MetamonShare/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
 
   # UI テスト(XCUITest・#165)。モック(METAMON_MOCK=1)+ DEBUG フックで起動し、FAB のドラッグ / 長押し・チップ・チェック丸・フォームを実際に指で操作する。
   MetamonUITests:
@@ -353,6 +384,10 @@ targets:
       - path: Metamon/Features/Connections/ConnectedServices.swift
       # フィードバックの「直ったら知らせてほしい」(#364): 許可の聞き方と同意の保存は iOS のファイルをそのまま使う(push の登録だけ MacPushHost)
       - path: Metamon/Features/Notices/FeedbackFixedOptIn.swift
+      # 外の API の断り(#3078): コインの断りの文言は iOS のファイルをそのまま使う(判定は Shared/Connections/ExtDenialRoute.swift)
+      - path: Metamon/Features/Coins/CoinCopy.swift
+      # Pro が要る断りの文言(外の API の断りで使う)も iOS のファイルをそのまま使う
+      - path: Metamon/Features/Purchase/ProRequiredCopy.swift
       # 近くの人に送る(#964): MultipeerConnectivity の通信は iOS のファイルをそのまま使う(iPhone・iPad と送り合える)。
       # すれ違い通信(passby)は NearbyInteraction・持ち歩く前提なので Mac には入れない(「この Mac では使えません」)
       - path: Metamon/Features/Nearby/NearbyService.swift

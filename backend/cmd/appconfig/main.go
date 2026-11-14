@@ -47,7 +47,14 @@ func main() {
 	st, closeStore := newStore(ctx, target, logger)
 	defer closeStore()
 
-	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
+	appCheck, _, err := newAppCheck(os.Getenv, logger, func() (appcheck.Verifier, error) {
+		return appcheck.NewFirebaseVerifier(ctx, project)
+	})
+	if err != nil {
+		logger.Error("refusing to start", slog.Any("error", err))
+		os.Exit(1)
+	}
+	authed := newAuthed(appCheck, auth.Middleware(verifier, mode), st)
 	ents := newEntitlements(st, logger)
 	gp, err := googlePlayFromEnv(ctx, os.Getenv) // Android Pro purchases; nil = 503 not_configured
 	if err != nil {
@@ -150,16 +157,13 @@ func newVerifier(ctx context.Context, mode, project string, logger *slog.Logger)
 // API only: /health, /s/{token}, /account/delete and /v1/client-config (needed to tell old
 // builds to update) stay open. APP_CHECK_MODE=off (default) | log | enforce,
 // APP_CHECK_APP_IDS optional. docs/infra/app-check.md
-func newAppCheck(ctx context.Context, project string, logger *slog.Logger) func(http.Handler) http.Handler {
-	mw, mode, err := appcheck.FromEnv(os.Getenv, logger, func() (appcheck.Verifier, error) {
-		return appcheck.NewFirebaseVerifier(ctx, project)
-	})
+func newAppCheck(getenv func(string) string, logger *slog.Logger, newVerifier func() (appcheck.Verifier, error)) (func(http.Handler) http.Handler, string, error) {
+	mw, mode, err := appcheck.FromEnv(getenv, logger, newVerifier)
 	if err != nil {
-		logger.Error("refusing to start", slog.Any("error", err))
-		os.Exit(1)
+		return nil, "", err
 	}
 	logger.Info("app check", slog.String("mode", mode))
-	return mw
+	return mw, mode, nil
 }
 
 // guardTarget exits when a stg process would use the production Firestore
