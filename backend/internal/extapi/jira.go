@@ -16,7 +16,7 @@ import (
 	"unicode/utf8"
 )
 
-// Jira Cloud (REST API 3, OAuth 2.0 3LO): free (one `runs` a call),
+// Jira Cloud (REST API 3, OAuth 2.0 3LO): free and NoCharge (no `runs`, not Pro only),
 // per-user OAuth.
 //
 //	myIssues(limit?, jql?)                              read:jira-work
@@ -62,6 +62,8 @@ var jiraHosts = []string{"https://auth.atlassian.com", "https://api.atlassian.co
 
 func init() {
 	register(Provider{ID: Jira, Billing: BillingFree, NeedsOAuth: true, NameJa: "Jira", NameEn: "Jira",
+		// Atlassian Developer Terms 8.3: 直接・間接に課金しない(無料の版でも使える)・本人のデータは本人に
+		Terms: Terms{NoCharge: true, ShowOwnDataOnly: true},
 		Ops: []OpSpec{
 			{Name: "myIssues", Scopes: []string{jiraScopeRead, jiraScopeOffline}, Args: []string{"limit", "jql"}, Check: checkJiraMyIssues},
 			{Name: "projects", Scopes: []string{jiraScopeRead, jiraScopeOffline}, Args: []string{"limit"}, Check: checkJiraProjects},

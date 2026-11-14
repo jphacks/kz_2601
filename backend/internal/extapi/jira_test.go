@@ -226,12 +226,12 @@ func TestJiraFlow(t *testing.T) {
 	if fs, _ := f.lastBody["fields"].([]any); len(fs) != 4 {
 		t.Fatalf("fields %v", f.lastBody["fields"])
 	}
-	if e.runs() != 1 || res.Charge.Coins != 0 {
-		t.Fatalf("runs = %d (free: one `runs` a call)", e.runs())
+	if e.runs() != 0 || res.Charge.Coins != 0 {
+		t.Fatalf("runs = %d (NoCharge: Atlassian 8.3, nothing is counted)", e.runs())
 	}
 
 	// read-only grant: adding is 409 and gives the run back
-	if _, err := e.call(e.req(Jira, "addIssue", map[string]string{"projectKey": "ACME", "summary": "x"})); !errors.Is(err, ErrNotConnected) || e.runs() != 1 || len(f.added) != 0 {
+	if _, err := e.call(e.req(Jira, "addIssue", map[string]string{"projectKey": "ACME", "summary": "x"})); !errors.Is(err, ErrNotConnected) || e.runs() != 0 || len(f.added) != 0 {
 		t.Fatalf("addIssue without scope: %v runs=%d", err, e.runs())
 	}
 	e.connectJira(f, []string{jiraScopeWrite}, "write:jira-work offline_access")
@@ -485,5 +485,14 @@ func TestJiraDefinition(t *testing.T) {
 		if f == p.FeatureKey() {
 			t.Fatal("in the review build")
 		}
+	}
+}
+
+// Atlassian Developer Terms 8.3: never charged, never Pro only; the data
+// stays with the person who connected.
+func TestJiraTerms(t *testing.T) {
+	p, _ := Lookup(Jira)
+	if !p.Terms.NoCharge || !p.Terms.ShowOwnDataOnly || p.Terms.NoAI {
+		t.Fatalf("%+v", p.Terms)
 	}
 }
