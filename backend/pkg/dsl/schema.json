@@ -4358,7 +4358,7 @@
         },
         "live": {
           "type": "boolean",
-          "description": "metric steps だけ。true で、画面に出ている間も歩数が増え続け、そのたびに絵が育つ(healthStat の live と同じ)。「リアルタイム」「歩くたびに」「歩くと実がなる」のように、見ている間に増えてほしい時に付ける。"
+          "description": "metric steps だけ。歩数は画面に出ている間いつも歩数計を購読して増え、そのたびに絵が育つ(この部品では省略しても true と同じ)。歩数を使う時は明示して \"live\": true を書く。"
         },
         "entity": {
           "type": "string",
