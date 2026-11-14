@@ -494,3 +494,41 @@ func TestFeedsCheckRedirect(t *testing.T) {
 		}
 	}
 }
+
+// sleepCtx returns true only when the wait ran out; a cancel before or
+// during the wait ends it at once.
+func TestSleepCtx(t *testing.T) {
+	const long = time.Minute
+	for _, c := range []struct {
+		name string
+		d    time.Duration
+		ctx  func() (context.Context, context.CancelFunc)
+		want bool
+	}{
+		{"no wait at all", 0, func() (context.Context, context.CancelFunc) {
+			return context.WithCancel(context.Background())
+		}, true},
+		{"cancelled before the wait", long, func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			return ctx, cancel
+		}, false},
+		{"cancelled during the wait", long, func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			time.AfterFunc(time.Millisecond, cancel)
+			return ctx, cancel
+		}, false},
+	} {
+		ctx, cancel := c.ctx()
+		start := time.Now()
+		got := sleepCtx(ctx, c.d)
+		took := time.Since(start)
+		cancel()
+		if got != c.want {
+			t.Errorf("%s: sleepCtx = %t, want %t", c.name, got, c.want)
+		}
+		if took > 50*time.Millisecond {
+			t.Errorf("%s: took %v, want under 50ms", c.name, took)
+		}
+	}
+}
