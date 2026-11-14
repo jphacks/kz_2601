@@ -14,3 +14,9 @@ cover: ## パッケージごとの網羅率を低い順の表で出す
 	      pct = substr($$0, RSTART + 10, RLENGTH - 11); pkg = $$2; sub("^" mod, "", pkg); \
 	      printf "%s\t%s\n", pct, pkg }' "$$out" | sort -n -k1,1 | awk -F'\t' '{ printf "| %s%% | %s |\n", $$1, $$2 }'; \
 	  rm -f "$$out"
+
+# 関数の単位で 0.0% の物の一覧(#2790)。中身は scripts/go-cover-zero.sh(#3268)に任せる。
+# エミュレータが要る物は別の段に出る。CI では回さない(手元で使う)。COVER_PKGS で対象を絞れる。
+.PHONY: cover-zero
+cover-zero: ## 網羅率が 0% の関数を一覧で出す
+	@../scripts/go-cover-zero.sh $(COVER_PKGS)

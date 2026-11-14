@@ -2,6 +2,7 @@ package oauth1
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -160,5 +161,48 @@ func TestSignEncodesSecrets(t *testing.T) {
 func TestCollectBadQuery(t *testing.T) {
 	if _, err := Collect(&url.URL{RawQuery: "a=%zz"}, "", nil); err == nil {
 		t.Fatal("bad escape accepted")
+	}
+}
+
+// Header signs the protocol parameters with the query and the body, and
+// ParseHeader reads them back; a fake provider checks the signature the
+// same way the real one does.
+func TestHeaderRoundTrip(t *testing.T) {
+	u := mustURL(t, "https://api.example.net/v2/home/money?mapping=1&limit=20")
+	body := "amount=1200&comment=%E3%82%B3%E3%83%BC%E3%83%92%E3%83%BC"
+	h, err := Header("POST", u, body, "ck", "cs", "tok", "ts", "nonce1", 1700000000, Param{"oauth_verifier", "v 1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(h, "OAuth ") || !strings.Contains(h, `oauth_verifier="v%201"`) || !strings.Contains(h, `oauth_token="tok"`) {
+		t.Fatalf("header %s", h)
+	}
+	params, ok := ParseHeader(h)
+	if !ok {
+		t.Fatalf("unreadable header %s", h)
+	}
+	var sig string
+	var protocol []Param
+	for _, p := range params {
+		if p.Key == "oauth_signature" {
+			sig = p.Value
+			continue
+		}
+		protocol = append(protocol, p)
+	}
+	all, err := Collect(u, body, protocol)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := SignHMACSHA1(BaseString("POST", u, all), "cs", "ts"); sig != want || sig == "" {
+		t.Fatalf("signature %q, want %q", sig, want)
+	}
+	if _, ok := ParseHeader("Bearer x"); ok {
+		t.Fatal("not an OAuth header")
+	}
+	// no token yet (the request token step): no oauth_token
+	h, _ = Header("POST", u, "", "ck", "cs", "", "", "n", 1, Param{"oauth_callback", "https://r.example/cb?state=s"})
+	if strings.Contains(h, "oauth_token=") || !strings.Contains(h, `oauth_callback="https%3A%2F%2Fr.example%2Fcb%3Fstate%3Ds"`) {
+		t.Fatalf("header %s", h)
 	}
 }
