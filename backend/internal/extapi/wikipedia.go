@@ -40,6 +40,7 @@ var wikipediaHosts = []string{"https://ja.wikipedia.org", "https://en.wikipedia.
 
 func init() {
 	register(Provider{ID: Wikipedia, Billing: BillingFree, Hosts: wikipediaHosts,
+		Terms: Terms{Attribution: "出典: Wikipedia(CC BY-SA 4.0・各行から記事を開けます)"},
 		Ops: []OpSpec{
 			{Name: "summary", Args: []string{"title", "lang"}, Check: checkWikipediaSummary, CacheTTL: time.Hour},
 			{Name: "search", Args: []string{"q", "lang", "limit"}, Check: checkWikipediaSearch, CacheTTL: time.Hour},
@@ -76,6 +77,10 @@ func wikipediaText(a map[string]string, name string, max int) (string, error) {
 	}
 	if strings.IndexFunc(t, unicode.IsControl) >= 0 {
 		return "", fmt.Errorf("%w: %s must be one line", ErrBadArgs, name)
+	}
+	if t == "." || t == ".." {
+		// MediaWiki に無い題名。パスの区切りとして読まれないよう先に断る
+		return "", fmt.Errorf("%w: %s is not a page title", ErrBadArgs, name)
 	}
 	return t, nil
 }

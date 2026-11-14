@@ -16,7 +16,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 入口 | 設定の「フィードバックを送る」と、端末を振ったとき。**TestFlight などの通常の版だけ**。審査用の版(App Store)には入れていない |
+| 入口 | 設定の「フィードバックを送る」。**TestFlight などの通常の版だけ**。審査用の版(App Store)には入れていない |
 | 必ず送るもの | 本文(2000 字まで)・種類(不具合 / 要望 / その他)・ユーザー ID(uid)・同意文の版・送った日時 |
 | 本人が選んだ時だけ送るもの(既定はすべてオフ) | 今の画面のスクショ(JPEG・512 KiB まで)/ 今のアプリの設計(DSL。アプリ名・画面の文言・項目の名前を含む)/ アプリの版・OS・機種・表示言語 |
 | 送らないもの | 記録(入力したデータ)の中身・名前・メールアドレス・位置 |
@@ -32,7 +32,7 @@
 §1 に足す:
 
 > ### 1.10 フィードバック(利用できる場合)
-> - アプリ内の「フィードバックを送る」(または端末を振る)から、不具合や要望を送れます。送るのは、書いた本文、種類、ユーザー ID(uid)、送った日時です。
+> - アプリ内の設定の「フィードバックを送る」から、不具合や要望を送れます。送るのは、書いた本文、種類、ユーザー ID(uid)、送った日時です。
 > - 次のものは、送る画面で本人がオンにした場合だけ送ります(既定はすべてオフです)。送る前に中身を表示します。
 >   - 今の画面のスクリーンショット
 >   - 今のアプリの設計(DSL。アプリの名前・画面の文言・項目の名前を含みます)
@@ -55,7 +55,7 @@
 Add to §1:
 
 > ### 1.10 Feedback (where available)
-> - You can send bug reports and suggestions from "Send feedback" in the app (or by shaking the device). We receive the text you write, its type, your user ID (uid), and the time it was sent.
+> - You can send bug reports and suggestions from "Send feedback" in the app's Settings. We receive the text you write, its type, your user ID (uid), and the time it was sent.
 > - The following are sent only if you turn them on in the feedback screen (all are off by default). Their contents are shown before you send.
 >   - A screenshot of the current screen
 >   - The design of the current app (DSL, including the app name, screen text, and field names)

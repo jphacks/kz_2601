@@ -58,7 +58,7 @@ var (
 )
 
 func init() {
-	register(Provider{ID: EStat, Billing: BillingFree, Hosts: []string{estatHost},
+	register(Provider{ID: EStat, Billing: BillingFree, Hosts: []string{estatHost}, Terms: Terms{Attribution: EStatAttribution},
 		Ops: []OpSpec{
 			{Name: "searchStats", Args: []string{"q", "limit"}, Check: checkEStatSearch, CacheTTL: time.Hour},
 			{Name: "statsData", Args: []string{"statsDataId", "limit"}, Check: checkEStatData, CacheTTL: 24 * time.Hour},

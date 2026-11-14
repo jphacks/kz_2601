@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-const yolpTestKey = "dj00aiZpPTAwMDAwMDAwMDAwMCZzPWNvbnN1bWVyc2VjcmV0Jng9MDA-"
+// 偽の鍵(gitleaks に掛からない値)。
+var yolpTestKey = strings.Repeat("y", 32)
 
 // yolpServer は map.yahooapis.jp の代わり(本物は呼ばない)。
 type yolpServer struct {
