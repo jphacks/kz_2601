@@ -13,10 +13,13 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/loop/github"
 )
 
-type fakePublisher struct{ titles, bodies, comments []string }
+type fakePublisher struct {
+	titles, bodies, comments []string
+	labels                   [][]string
+}
 
-func (f *fakePublisher) CreateIssue(_ context.Context, repo, title, body string, _ []string) (*github.Issue, error) {
-	f.titles, f.bodies = append(f.titles, title), append(f.bodies, body)
+func (f *fakePublisher) CreateIssue(_ context.Context, repo, title, body string, labels []string) (*github.Issue, error) {
+	f.titles, f.bodies, f.labels = append(f.titles, title), append(f.bodies, body), append(f.labels, labels)
 	return &github.Issue{Number: 77, URL: "https://github.com/" + repo + "/issues/77"}, nil
 }
 
