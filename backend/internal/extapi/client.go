@@ -86,10 +86,15 @@ func (c *Client) Call(ctx context.Context, b CallBody) (CallAnswer, error) {
 
 // Start is POST /internal/ext/connections/start: the consent URL.
 func (c *Client) Start(ctx context.Context, uid, provider string, scopes []string) (string, error) {
+	return c.StartWith(ctx, uid, provider, scopes, nil)
+}
+
+// StartWith is Start with the provider's connect args (Backlog's space).
+func (c *Client) StartWith(ctx context.Context, uid, provider string, scopes []string, args map[string]string) (string, error) {
 	var out struct {
 		AuthURL string `json:"authUrl"`
 	}
-	if err := c.post(ctx, "/internal/ext/connections/start", ConnBody{UID: uid, Provider: provider, Scopes: scopes}, &out); err != nil {
+	if err := c.post(ctx, "/internal/ext/connections/start", ConnBody{UID: uid, Provider: provider, Scopes: scopes, Args: args}, &out); err != nil {
 		return "", err
 	}
 	if out.AuthURL == "" {

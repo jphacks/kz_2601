@@ -90,8 +90,16 @@ type Provider struct {
 	NameJa, NameEn string
 	Ops            []OpSpec
 	// Hosts are the only scheme://host the provider's client may reach
-	// (NewHTTPClient).
+	// (NewHTTPClient). "https://*.example.com" allows one label under that
+	// domain (AllowedURL): for a provider whose host is per account.
 	Hosts []string
+	// ConnectArgs are the names of the arguments Start takes when the
+	// person connects (Backlog's space); any other name is refused.
+	ConnectArgs []string
+	// ConnectHost turns the connect args into the person's https host
+	// (Token.Host): the OAuth client (HostedOAuthClient) and the ops talk to
+	// it. An error is 400; nil = the provider has one fixed host.
+	ConnectHost func(args map[string]string) (string, error)
 	// GlobalDaily is the provider's own default environment-wide calls per
 	// day, from its documented daily quota (0 = DefaultLimits.GlobalDaily).
 	// Not for NeedsOAuth. EXT_GLOBAL_DAILY / EXT_GLOBAL_DAILY_<PROVIDER> win.
@@ -222,6 +230,9 @@ func (p Provider) check() error {
 	}
 	if p.NeedsOAuth && (p.NameJa == "" || p.NameEn == "") {
 		return fmt.Errorf("%s: an OAuth provider needs NameJa and NameEn", p.ID)
+	}
+	if (p.ConnectHost == nil) != (len(p.ConnectArgs) == 0) || (p.ConnectHost != nil && !p.NeedsOAuth) {
+		return fmt.Errorf("%s: ConnectArgs and ConnectHost go together, on an OAuth provider", p.ID)
 	}
 	return p.Terms.check(p)
 }
