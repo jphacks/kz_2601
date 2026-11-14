@@ -293,7 +293,15 @@ func connectable(enabled, features []string) []connectableProvider {
 	return out
 }
 
-// startConnection: POST /v1/me/connections/{provider}/start {"scopes": [...]} → {"authUrl"}
+// extStartWith is a runner that takes connect args (Backlog's space;
+// extapi.Provider.ConnectArgs). *extapi.Client has it.
+type extStartWith interface {
+	StartWith(ctx context.Context, uid, provider string, scopes []string, args map[string]string) (string, error)
+}
+
+// startConnection: POST /v1/me/connections/{provider}/start
+// {"scopes": [...], "args": {"space": ...}} → {"authUrl"}. args are only for a
+// provider with ConnectArgs (a name it does not take is 400).
 func (h *Handler) startConnection(w http.ResponseWriter, r *http.Request) {
 	p, err := extProvider(r, true)
 	if err != nil {
@@ -301,7 +309,8 @@ func (h *Handler) startConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Scopes []string `json:"scopes"`
+		Scopes []string          `json:"scopes"`
+		Args   map[string]string `json:"args"`
 	}
 	if r.ContentLength != 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
@@ -313,11 +322,22 @@ func (h *Handler) startConnection(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "too many scopes").With("field", "scopes"))
 		return
 	}
+	for k, v := range in.Args {
+		if !slices.Contains(p.ConnectArgs, k) || len(v) > extapi.MaxArgLen {
+			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown connect argument").With("field", "args"))
+			return
+		}
+	}
 	if h.ext == nil {
 		fail(w, extOff())
 		return
 	}
-	u, err := h.ext.Start(r.Context(), uidOf(r), p.ID, in.Scopes)
+	var u string
+	if sw, ok := h.ext.(extStartWith); ok && len(in.Args) > 0 {
+		u, err = sw.StartWith(r.Context(), uidOf(r), p.ID, in.Scopes, in.Args)
+	} else {
+		u, err = h.ext.Start(r.Context(), uidOf(r), p.ID, in.Scopes)
+	}
 	if err != nil {
 		fail(w, extErr(err, p.ID))
 		return

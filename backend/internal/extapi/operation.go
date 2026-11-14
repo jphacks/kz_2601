@@ -103,6 +103,9 @@ type Token struct {
 	RefreshToken string
 	Expiry       time.Time
 	Scopes       []string
+	// Host is the person's https host of a provider whose host is per
+	// account (Provider.ConnectHost, Backlog's space); "" otherwise.
+	Host string
 }
 
 // LogValue keeps the token out of logs.
@@ -143,4 +146,13 @@ type OAuthClient interface {
 	// ErrInvalidGrant when it renews t first and the refresh token is
 	// refused: gone, or renewed elsewhere meanwhile).
 	Revoke(ctx context.Context, t Token) error
+}
+
+// HostedOAuthClient is the OAuthClient of a provider whose endpoints are on
+// the person's own host (Provider.ConnectHost): Start and the callback pass
+// the host; Refresh, Revoke and the ops read it from Token.Host.
+type HostedOAuthClient interface {
+	OAuthClient
+	AuthURLOn(host, state, codeChallenge, redirectURI string, scopes []string) string
+	ExchangeOn(ctx context.Context, host, code, codeVerifier, redirectURI string) (Token, error)
 }
