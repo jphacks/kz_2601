@@ -156,6 +156,8 @@ type Draft struct {
 	AppVersions []string `firestore:"appVersions,omitempty"`
 	Status      string   `firestore:"status"`
 
+	// ReviewedBy is the person who approved or rejected the draft, or
+	// ActorLoop when auto-issue filed it without a person.
 	ReviewedBy   string    `firestore:"reviewedBy,omitempty"`
 	ReviewedAt   time.Time `firestore:"reviewedAt,omitempty"`
 	RejectReason string    `firestore:"rejectReason,omitempty"`
