@@ -98,9 +98,9 @@ locals {
   # triage は LLM の費用がかかるので再試行しない(次の日に新しい項目と一緒に拾う)
   # auto-issue は GitHub に書くので再試行しない(失敗した下書きは次の日の実行が拾う)。上限の環境変数は extra_env
   feedback_loop_commands = {
-    ingest       = { stage_envs = ["LOOP_INTAKE"], timeout = "900s", max_retries = 1, extra_env = {} }
-    triage       = { stage_envs = ["LOOP_TRIAGE"], timeout = "1800s", max_retries = 0, extra_env = {} }
-    draft        = { stage_envs = ["LOOP_DRAFT"], timeout = "900s", max_retries = 1, extra_env = {} }
+    ingest = { stage_envs = ["LOOP_INTAKE"], timeout = "900s", max_retries = 1, extra_env = {} }
+    triage = { stage_envs = ["LOOP_TRIAGE"], timeout = "1800s", max_retries = 0, extra_env = {} }
+    draft  = { stage_envs = ["LOOP_DRAFT"], timeout = "900s", max_retries = 1, extra_env = {} }
     "auto-issue" = {
       stage_envs  = ["LOOP_PUBLISH", "LOOP_ISSUE_AUTO"]
       timeout     = "900s"
