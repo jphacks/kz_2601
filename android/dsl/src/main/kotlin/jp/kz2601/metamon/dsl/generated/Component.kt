@@ -87,6 +87,7 @@ enum class ComponentType(val wire: String, val isContainer: Boolean = false) {
     CHAT_THREAD("chatThread"),
     AI_CHAT("aiChat"),
     HEALTH_STAT("healthStat"),
+    GROWTH("growth"),
     DASHCAM("dashcam"),
     FILE_IMPORT("fileImport"),
     SENSOR_VALUE("sensorValue"),

@@ -108,6 +108,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompTranscribeField, dsl.CompSpeakButton,
 		// calls (#447)
 		dsl.CompCallButton,
+		// growth: a picture that grows with a number
+		dsl.CompGrowth,
 	} {
 		goTypes[string(ct)] = true
 	}

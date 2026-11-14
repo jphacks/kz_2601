@@ -880,6 +880,9 @@
           "$ref": "#/$defs/HealthStat"
         },
         {
+          "$ref": "#/$defs/Growth"
+        },
+        {
           "$ref": "#/$defs/Dashcam"
         },
         {
@@ -4314,6 +4317,95 @@
       },
       "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
       "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "Growth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "target"
+      ],
+      "properties": {
+        "type": {
+          "const": "growth"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 歩いて育てる木・貯金の木)。"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "tree",
+            "flower",
+            "plant"
+          ],
+          "description": "育つ絵柄。tree=木に実がなる(既定・step ごとに実が 1 つ・target で収穫)/ flower=花が咲く(step ごとに花が 1 輪・target で満開)/ plant=芽が出て木に育つ(step ごとに葉が 1 枚・target で大きな木)。"
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "steps"
+          ],
+          "description": "数値を端末の歩数から読む(steps=今日の歩数。healthStat と同じ歩数計・entity も記録も不要)。entity / value と一緒に使わない。"
+        },
+        "live": {
+          "type": "boolean",
+          "description": "metric steps だけ。true で、画面に出ている間も歩数が増え続け、そのたびに絵が育つ(healthStat の live と同じ)。「リアルタイム」「歩くたびに」「歩くと実がなる」のように、見ている間に増えてほしい時に付ける。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "数値を記録の集計から読む: aggregate(field)(既定 sum)。例: 貯金の entity の金額の合計。"
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum"
+          ],
+          "description": "entity の時だけ。count=記録の件数 / sum=field の合計(既定)。"
+        },
+        "field": {
+          "type": "string",
+          "description": "合計する数値の field(aggregate count 以外は必須)。"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "数値を計算式から読む(stat.value と同じ Expr)。カウンタなら {\"setting\":\"<fieldId>\"}、今月の合計なら agg。metric / entity と一緒に使わない。"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/ExprSetting"
+            }
+          ],
+          "description": "育ち切る(収穫・満開)値(> 0)。例: 歩数 8000・貯金 100000。利用者が変える目標なら {\"setting\":\"<fieldId>\"}。"
+        },
+        "step": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "実・花・葉が 1 つ増える量(例: 1000 歩ごとに実が 1 つ)。省略 = target の 1/10。target ÷ step は 30 以下。"
+        },
+        "unit": {
+          "type": "string",
+          "description": "数値の後ろに付ける単位(例: 歩・円・回)。metric steps は省略で「歩」。"
+        }
+      },
+      "description": "数値が増えるほど絵が育つカード(木に実がなる・花が咲く・芽が木になる)。数値は歩数(metric)・記録の集計(entity)・計算式(value)のどれか 1 つから読み、step ごとに実・花・葉が 1 つ増え、増えた瞬間にポンと出る。target に届くと収穫・満開。数値と目標も出す。「歩くと木に実がなる」「歩くほど花が咲く」「貯金が増えると木が育つ」「勉強した回数で植物を育てる」など、積み上がりを育つ見た目で楽しみたい時に選ぶ(ただの達成率なら progressBar)。",
+      "x-usage": "絵が主役なので全幅 6〜8 行(例 A1:F7)。歩数なら metric steps(「リアルタイム」「歩くたびに」なら live: true)で entity 不要・同じ画面に歩数のカードを並べなくてよい。貯金・回数なら記録の entity + aggregate sum/count、その追加フォームは別の画面。step は「1000 歩ごとに 1 つ」のように言われた時だけ。"
     },
     "FilterMe": {
       "type": "object",

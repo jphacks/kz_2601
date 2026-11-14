@@ -99,7 +99,7 @@ func hiddenDisplayRefs(c *Component) []displayRef {
 	// stat / chart / progressBar / gauge: the aggregated value (count reads no field).
 	if c.Aggregate != "count" {
 		switch c.Type {
-		case CompStat, CompChart, CompProgressBar, CompGauge:
+		case CompStat, CompChart, CompProgressBar, CompGauge, CompGrowth:
 			addRef("field", c.Field)
 		}
 	}

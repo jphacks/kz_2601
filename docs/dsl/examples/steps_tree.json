@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "歩いて育てる木",
+    "description": "歩くたびに木に実がなる歩数計。1000 歩ごとに実が 1 つ、8000 歩で収穫",
+    "icon": "tree",
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [],
+  "screens": [
+    {
+      "id": "home",
+      "title": "今日の木",
+      "components": [
+        { "type": "growth", "id": "tree", "area": "A1:F10", "kind": "tree", "label": "歩いて育てる木", "metric": "steps", "live": true, "target": 8000, "step": 1000 }
+      ]
+    }
+  ]
+}
