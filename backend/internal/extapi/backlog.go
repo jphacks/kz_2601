@@ -171,12 +171,15 @@ func (c *backlog) token(ctx context.Context, host string, form url.Values) (Toke
 	req.Header.Set("User-Agent", backlogUserAgent)
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return Token{}, err
+		return Token{}, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ReadBody(resp.Body)
 	if err != nil {
-		return Token{}, err
+		if ctx.Err() != nil {
+			return Token{}, ctx.Err()
+		}
+		return Token{}, &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the token answer failed")}
 	}
 	if resp.StatusCode != http.StatusOK {
 		var e struct {

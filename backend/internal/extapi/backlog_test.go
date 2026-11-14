@@ -333,6 +333,24 @@ func TestBacklogErrors(t *testing.T) {
 	}
 }
 
+// トークン口の通信失敗は共通の upstream(やり直し可・502)で、秘密を文に出さない。
+func TestBacklogTokenTransportError(t *testing.T) {
+	f, srv := newFakeBacklog(t)
+	c, err := newBacklog(Secrets{ClientID: backlogTestID, ClientSecret: backlogTestSecret}, f.wire(srv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Close()
+	_, err = c.ExchangeOn(context.Background(), backlogTestHost, "bl-code", "", "https://runner.example/oauth/callback/backlog")
+	var pe *ProviderError
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream || StatusOf(Reason(err)) != http.StatusBadGateway {
+		t.Fatalf("transport: %v", err)
+	}
+	if strings.Contains(err.Error(), backlogTestSecret) || strings.Contains(err.Error(), "bl-code") {
+		t.Fatalf("secret in the error: %v", err)
+	}
+}
+
 func TestBacklogCheck(t *testing.T) {
 	p, _ := Lookup(Backlog)
 	bad := map[string][]map[string]string{
