@@ -144,3 +144,23 @@ type OAuthClient interface {
 	// refused: gone, or renewed elsewhere meanwhile).
 	Revoke(ctx context.Context, t Token) error
 }
+
+// OAuth1Client is the OAuth 1.0a form of OAuthClient (Zaim). The consent
+// URL needs a request token from the provider first, so Begin reaches the
+// network (AuthURL does not; Start calls Begin instead and ignores AuthURL),
+// and the callback brings oauth_token + oauth_verifier instead of a code
+// (Callback takes the verifier as the code and calls Exchange1 instead of
+// Exchange). The request token and its secret wait in the state
+// (OAuthState.RequestToken / Verifier) between the two, as the PKCE
+// verifier does. An access token has no expiry and no refresh (Refresh is
+// ErrInvalidGrant); its token secret rides in Token.RefreshToken, sealed
+// with the token.
+type OAuth1Client interface {
+	OAuthClient
+	// Begin gets a request token whose callback is redirectURI and returns
+	// the consent URL, the request token and its secret.
+	Begin(ctx context.Context, redirectURI string) (authURL, requestToken, secret string, err error)
+	// Exchange1 turns the authorized request token and the callback's
+	// oauth_verifier into the access token.
+	Exchange1(ctx context.Context, requestToken, secret, verifier string) (Token, error)
+}
