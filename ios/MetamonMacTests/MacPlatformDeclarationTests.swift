@@ -15,7 +15,7 @@ final class MacPlatformDeclarationTests: XCTestCase {
     }
 
     func testMacDeclarationIsFixed() {
-        XCTAssertEqual(unavailable, ["healthStat", "sensorValue", "locationTracker", "dashcam"])
+        XCTAssertEqual(unavailable, ["healthStat", "sensorValue", "locationTracker", "dashcam", "growth"])
         let allowed = Set(ClientCapabilities.allowedComponents ?? [])
         XCTAssertTrue(allowed.isDisjoint(with: unavailable), "Mac で描けない部品を AI に作らせない")
         XCTAssertFalse(allowed.contains(ComponentType.unknown.rawValue))

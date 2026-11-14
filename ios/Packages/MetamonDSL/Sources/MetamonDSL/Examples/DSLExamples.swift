@@ -47,6 +47,7 @@ public enum DSLExamples {
             "ai_counselor",
             "nearby_spots",
             "schedule_poll",
+            "steps_tree",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }

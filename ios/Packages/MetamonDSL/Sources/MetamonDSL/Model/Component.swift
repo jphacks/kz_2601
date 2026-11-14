@@ -77,6 +77,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case feed
     // leaf(共有のアプリの参加者どうしの音声・ビデオ通話・#447)。label は共用
     case callButton
+    // leaf(数値が増えるほど絵が育つ: 木に実がなる・花が咲く)。label / kind / metric / live / entity / aggregate / field / filter / value / target / step / unit は共用
+    case growth
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
