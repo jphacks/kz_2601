@@ -156,8 +156,9 @@ struct MacRootView: View {
                             captureThumbnail()
                         }
                 } else {
-                    MacEmptyState(pose: .point, title: "アプリを選んでください",
-                                  message: "左の一覧から選ぶと、ここに表示します。")
+                    // 何も選んでいない時は「作る」入口(話して / 文字で・例のチップは文字で作るに入れて開く)
+                    MacCreateLanding(enabled: canCompose, speak: speak, type: newApp,
+                                     example: { open(.create, draft: $0) })
                 }
             }
             .frame(minWidth: 480, minHeight: 400)
