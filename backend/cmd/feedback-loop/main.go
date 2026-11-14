@@ -1,8 +1,10 @@
 // Command feedback-loop runs the steps of the self-improvement loop (#364)
 // that read feedback: ingest (#368), triage (#376), issue drafts and their
 // human approval (#369), 「あなたの声で直りました」 (#374), audit and stop
-// switches (#375). It never pushes code, never merges and never creates an
-// issue without a human's `drafts approve`.
+// switches (#375). It never pushes code and never merges. An issue is
+// created by a human's `drafts approve`, or by `auto-issue` while
+// LOOP_ISSUE_AUTO=on (owner decision 2026-11-14: filing is automatic,
+// merging stays human).
 //
 // Operations, environment and the order of the steps:
 // docs/backend/features/feedback-loop.md.
@@ -16,6 +18,7 @@
 //	feedback-loop triage-label-export -out FILE [-days 7]
 //	feedback-loop draft [-max-new 20]
 //	feedback-loop drafts list|show|edit|approve|reject|publish ...
+//	feedback-loop auto-issue [-dry-run]
 //	feedback-loop fixed [-dry-run]
 //	feedback-loop switch show|set ...   feedback-loop audit [-summary]
 //
@@ -100,6 +103,7 @@ const usageText = `usage: feedback-loop <command> [flags]
   triage-label-export -out FILE [-days 7]    write a week of inbox text (masked) as a template for triage-eval labels
   draft [-max-new 20]                        build issue drafts from triaged clusters (private queue)
   drafts list|show|edit|approve|reject|publish   the human review of drafts (see: drafts)
+  auto-issue [-dry-run]                      file checked drafts as issues without a person (LOOP_ISSUE_AUTO=on + LOOP_PUBLISH=on; caps per run / day)
   fixed [-dry-run]                           tell senders when a merged PR fixed their issue (#374)
   notices -uid UID                           one user's 「あなたの声で直りました」 notices
   purge [-dry-run]                           erase expired copies, copies whose feedback is gone, deleted accounts' copies
@@ -107,7 +111,7 @@ const usageText = `usage: feedback-loop <command> [flags]
   audit [-since 168h] [-draft ID] [-item ID] [-summary]   the audit log / weekly review
 
 Every automatic stage runs only while LOOP_<STAGE>=on (intake, triage, draft,
-publish, notify) and loop_control/switches does not say off.
+publish, issue_auto, notify) and loop_control/switches does not say off.
 `
 
 // app holds what the commands use (tests build it with in-memory parts).
@@ -170,6 +174,8 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.draftBuild(ctx, rest)
 	case "drafts":
 		return a.drafts(ctx, rest)
+	case "auto-issue":
+		return a.autoIssue(ctx, rest)
 	case "fixed":
 		return a.fixedRun(ctx, rest)
 	case "notices":
