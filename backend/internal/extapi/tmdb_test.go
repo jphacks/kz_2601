@@ -10,9 +10,10 @@ import (
 	"time"
 )
 
-const (
-	tmdbTestKey   = "0123456789abcdef0123456789abcdef"          // a v3 api_key
-	tmdbTestToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJ0In0.c2ln" // a v4 read access token (JWT shape)
+// 偽の鍵(gitleaks に掛からない値)。
+var (
+	tmdbTestKey   = strings.Repeat("k", 32)                                                                // a v3 api_key
+	tmdbTestToken = strings.Repeat("h", 20) + "." + strings.Repeat("p", 20) + "." + strings.Repeat("s", 8) // a v4 read access token (JWT shape)
 )
 
 // tmdbServer is a fake TMDB: it records the request and answers status with
