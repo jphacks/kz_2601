@@ -47,6 +47,8 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 
 部品ごとの Mac での見た目・操作の違い(代わりのやり方)は [`../mac/interactions.md`](../mac/interactions.md) と [`../mac/system-integration.md`](../mac/system-integration.md) にあります。
 
+`healthStat` の `live`(#3694・「リアルタイム」と言われた時だけ true)は iOS(CoreMotion + HealthKit の変化通知)と Android(`TYPE_STEP_COUNTER`)で、カードが画面に出ていて前面にいる間だけ歩数計を購読する。Mac はヘルスケアが無いので対象外(部品ごと「使えない(枠)」)。
+
 ## 表
 
 <!-- platform-table:begin -->
