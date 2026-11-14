@@ -1,0 +1,4 @@
+{"errors": [], "data": [
+  {"id": "e0000000-0000-4000-8000-000000000001", "type": "zigbee_connectivity", "owner": {"rid": "d0000000-0000-4000-8000-000000000001", "rtype": "device"}, "status": "connected"},
+  {"id": "e0000000-0000-4000-8000-000000000004", "type": "zigbee_connectivity", "owner": {"rid": "d0000000-0000-4000-8000-000000000004", "rtype": "device"}, "status": "connectivity_issue"}
+]}

@@ -22,6 +22,8 @@ import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.notify.TrayNotifier
+import jp.kz2601.metamon.desktop.settings.UpcomingNotifications
+import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -41,7 +43,7 @@ import java.time.LocalDate
 import java.util.prefs.Preferences
 import androidx.compose.ui.window.Notification as TrayNotification
 
-// トレイ / メニューバーに常駐する(#1761): 前にあるアプリの集計・開く・すぐ記録・音声(使えない旨)・走っているタイマー・閉じてもトレイに残す・終了。
+// トレイ / メニューバーに常駐する(#1761): 前にあるアプリの集計・開く・すぐ記録・音声(TAILORIT_VOICE=1 の時だけ録音)・走っているタイマー・閉じてもトレイに残す・終了。
 
 /** トレイのメニューの 1 行(画面に頼らない形。テストはこれを比べる)。 */
 sealed interface TrayItem {
@@ -59,9 +61,12 @@ sealed interface TrayItem {
 
     /** そのアプリを別のウィンドウで開く(開いていれば前に出す・#1763)。 */
     data class OpenApp(val appId: String, val label: String) : TrayItem
+
+    /** 予約した通知 1 件。選ぶと取り消す。 */
+    data class CancelNotification(val id: String, val label: String) : TrayItem
 }
 
-enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, OPEN_AT_LOGIN, QUIT }
+enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, ACCOUNT, CLOSE_TO_TRAY, OPEN_AT_LOGIN, QUIT }
 
 /** 走っている(または止めてある)timerDisplay 1 つ。seconds は countdown なら残り、他は経過。 */
 data class TimerStatus(val key: String, val name: String, val seconds: Int, val countdown: Boolean, val running: Boolean)
@@ -100,6 +105,8 @@ object TrayMenu {
      * [openAtLogin] は「ログイン時に開く」の今の状態。null(この OS・この動かし方では使えない)なら出さない。
      * [openAtLoginBusy] の間(読み込み・切り替え中)は押せない。[openAtLoginRevision] は [TrayItem.Toggle.revision] に入れる。
      * [stats] は前にあるアプリの集計。先頭に押せない行で出す(Mac のメニューバーと同じく上に)。
+     * [voiceEnabled] は音声入力が有効か(`TAILORIT_VOICE=1`)。有効なら「音声」で録音を始める / 止める。
+     * [account] なら「アカウント」(#2374)を設定の行の前に出す。
      */
     fun items(
         appName: String,
@@ -111,6 +118,9 @@ object TrayMenu {
         stats: List<TrayStat> = emptyList(),
         openAtLoginBusy: Boolean = false,
         openAtLoginRevision: Int = 0,
+        upcoming: UpcomingNotifications = UpcomingNotifications.EMPTY,
+        voiceEnabled: Boolean = false,
+        account: Boolean = false,
     ): List<TrayItem> = buildList {
         if (stats.isNotEmpty()) {
             stats.forEach { add(TrayItem.Info(it.text)) }
@@ -118,14 +128,31 @@ object TrayMenu {
         }
         add(TrayItem.Command(TrayCommand.OPEN, Strings.format("desktop_tray_open", appName)))
         add(TrayItem.Command(TrayCommand.QUICK_RECORD, Strings["desktop_tray_quick_record"], enabled = canQuickRecord))
-        // 音声はデスクトップ版ではまだ使えない(openVoice と同じ)。押せない行で場所だけ取る
-        add(TrayItem.Command(TrayCommand.VOICE, Strings["desktop_tray_voice"], enabled = false))
+        // 音声入力が無効な時は openVoice と同じく使えない。押せない行で場所だけ取る
+        add(
+            if (voiceEnabled) TrayItem.Command(TrayCommand.VOICE, Strings["desktop_tray_voice_toggle"])
+            else TrayItem.Command(TrayCommand.VOICE, Strings["desktop_tray_voice"], enabled = false),
+        )
         if (apps.isNotEmpty()) add(TrayItem.Submenu(Strings["desktop_tray_new_window"], apps.map { (id, name) -> TrayItem.OpenApp(id, name) }))
         if (timers.isNotEmpty()) {
             add(TrayItem.Separator)
             timers.forEach { add(TrayItem.Info(timerLabel(it))) }
         }
+        if (!upcoming.isEmpty) {
+            add(TrayItem.Separator)
+            add(
+                TrayItem.Submenu(
+                    Strings["desktop_tray_upcoming"],
+                    buildList {
+                        add(TrayItem.Info(Strings["desktop_tray_upcoming_hint"]))
+                        upcoming.rows.forEach { add(TrayItem.CancelNotification(it.id, UpcomingNotifications.label(it))) }
+                        if (upcoming.hidden > 0) add(TrayItem.Info(Strings.format("desktop_tray_upcoming_more", upcoming.hidden)))
+                    },
+                ),
+            )
+        }
         add(TrayItem.Separator)
+        if (account) add(TrayItem.Command(TrayCommand.ACCOUNT, Strings["account_menu"]))
         add(TrayItem.Toggle(TrayCommand.CLOSE_TO_TRAY, Strings["desktop_tray_close_to_tray"], closeToTray))
         if (openAtLogin != null) {
             add(TrayItem.Toggle(TrayCommand.OPEN_AT_LOGIN, Strings["desktop_tray_open_at_login"], openAtLogin, !openAtLoginBusy, openAtLoginRevision))
@@ -205,6 +232,10 @@ class TrayController(
     private val loginItem: LoginItem? = null,
     /** [loginItem] を動かす所(レジストリ・ファイルを触るので UI のスレッドでは動かさない)。 */
     private val loginItemDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** 音声入力が有効か(`TAILORIT_VOICE=1`)。無効ならトレイの「音声」は押せない。 */
+    val voiceEnabled: Boolean = VoiceFlag.enabled(),
+    /** メニューに「アカウント」(#2374)を出す。 */
+    private val accountMenu: Boolean = false,
 ) {
     /** 「ログイン時に開く」の状態。OS 側から読むまでは off。null は使えない。 */
     var openAtLogin: Boolean? by mutableStateOf(if (loginItem != null) false else null)
@@ -298,6 +329,11 @@ class TrayController(
     var focusRequests by mutableIntStateOf(0)
         private set
 
+    /** 増えたら前にあるウィンドウが openVoice を 1 回動かす(録音を始める / 止める)。 */
+    var voiceRequests by mutableIntStateOf(0)
+        private set
+    private var voicePending = false
+
     /** 「すぐ記録」を受け取るウィンドウを決める(Main: 前にあるアプリの、アプリのウィンドウ。無ければ開く)。null を返せば前にある物。 */
     var findQuickRecordWindow: () -> Int? = { null }
 
@@ -319,6 +355,21 @@ class TrayController(
         quickRecordRequests++
     }
 
+    /** トレイの「音声」: 前にあるウィンドウの openVoice と同じ録音を始める / 止める。結果はそのウィンドウに出るので前に出す。 */
+    fun voice() {
+        if (!voiceEnabled) return
+        voicePending = true
+        open()
+        voiceRequests++
+    }
+
+    /** 前にあるウィンドウが「音声」を受け取る。1 回だけ true。 */
+    fun takeVoice(isActive: () -> Boolean): Boolean {
+        if (!voicePending || !isActive()) return false
+        voicePending = false
+        return true
+    }
+
     /**
      * ウィンドウが「すぐ記録」を受け取る。行き先なら 1 回だけ true。
      * 行き先を開いたばかりで、記録を読み終えて画面ができた後に受け取っても動く。
@@ -329,6 +380,25 @@ class TrayController(
         if (if (target != null) windowId != target else !isActive()) return false
         quickRecordPending = false
         quickRecordWindow = null
+        return true
+    }
+
+    /** 増えたら前にあるウィンドウがアカウントの画面を開く([takeAccount])。 */
+    var accountRequests by mutableIntStateOf(0)
+        private set
+    private var accountPending = false
+
+    /** トレイの「アカウント」: ウィンドウを出し、前にある 1 枚でアカウントの画面を開く。 */
+    fun openAccount() {
+        accountPending = true
+        open()
+        accountRequests++
+    }
+
+    /** 前にあるウィンドウが受け取る。1 回だけ true。 */
+    fun takeAccount(isActive: () -> Boolean): Boolean {
+        if (!accountPending || !isActive()) return false
+        accountPending = false
         return true
     }
 
@@ -351,15 +421,15 @@ class TrayController(
             }
         }
 
-    fun items(timers: List<TimerStatus>, stats: List<TrayStat> = stats()): List<TrayItem> =
-        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats, openAtLoginBusy, openAtLoginRevision)
+    fun items(timers: List<TimerStatus>, stats: List<TrayStat> = stats(), upcoming: UpcomingNotifications = UpcomingNotifications.EMPTY): List<TrayItem> =
+        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats, openAtLoginBusy, openAtLoginRevision, upcoming, voiceEnabled, accountMenu)
 
     companion object {
         fun create(dsl: AppDSL): TrayController {
             val traySupported = runCatching { isTraySupported }.getOrDefault(false)
             // トレイが無いとメニューから切り替えられないので出さない
             val loginItem = if (traySupported) Autostart.forCurrentOs() else null
-            return TrayController(dsl, traySupported, apps = BundledApps.all(), loginItem = loginItem)
+            return TrayController(dsl, traySupported, apps = BundledApps.all(), loginItem = loginItem, accountMenu = true)
         }
     }
 }
@@ -376,6 +446,7 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
         onDispose { TrayNotifier.sink = null }
     }
     var timers by remember { mutableStateOf(DesktopTimers.active()) }
+    var upcoming by remember { mutableStateOf(UpcomingNotifications.of(Notifier.Tray.upcoming())) }
     // 「今月」などの集計の基準日。日付が替わったら集計を計算し直す
     var today by remember { mutableStateOf(TrayStats.today()) }
     val scope = rememberCoroutineScope()
@@ -383,6 +454,7 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
     LaunchedEffect(Unit) {
         while (true) {
             timers = DesktopTimers.active()
+            upcoming = UpcomingNotifications.of(Notifier.Tray.upcoming())
             today = TrayStats.today()
             // 走っているタイマーがある間だけ毎秒、無ければ間を空ける
             delay(if (timers.any { it.running }) 1_000 else 3_000)
@@ -394,7 +466,7 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
     val loading = records?.loading
     val stats = remember(c.dsl, store, loading, today) { c.stats() }
     Tray(icon = TrayIconPainter, state = state, tooltip = TrayMenu.tooltip(c.dsl.app.name, timers), onAction = c::open) {
-        TrayItems(c, c.items(timers, stats), scope, ::exitApplication)
+        TrayItems(c, c.items(timers, stats, upcoming), scope, ::exitApplication)
     }
 }
 
@@ -406,6 +478,8 @@ private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, scope:
                 when (item.command) {
                     TrayCommand.OPEN -> c.open()
                     TrayCommand.QUICK_RECORD -> c.quickRecord()
+                    TrayCommand.VOICE -> c.voice()
+                    TrayCommand.ACCOUNT -> c.openAccount()
                     TrayCommand.QUIT -> quit()
                     else -> Unit
                 }
@@ -423,12 +497,13 @@ private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, scope:
             TrayItem.Separator -> Separator()
             is TrayItem.Submenu -> Menu(item.label) { TrayItems(c, item.items, scope, quit) }
             is TrayItem.OpenApp -> Item(item.label) { c.openApp(item.appId) }
+            is TrayItem.CancelNotification -> Item(item.label) { Notifier.Tray.cancel(item.id) }
         }
     }
 }
 
 /**
- * DesktopApp の中で呼ぶ: トレイの「すぐ記録」をこのセッションの遷移にする。
+ * DesktopApp の中で呼ぶ: トレイの「すぐ記録」をこのセッションの遷移に、「音声」をこのセッションの openVoice にする。
  * 行き先はトレイが決めたウィンドウ([windowId]・詳細には入れない)。決めていなければ前にある 1 枚([isActive])。
  */
 @Composable
@@ -440,6 +515,9 @@ fun TrayHook(session: DesktopSession, windowId: Int? = null, isActive: () -> Boo
         if (a.screen?.let { session.dsl.screen(it) } == null) return@LaunchedEffect
         // もう開いていれば重ねない
         if (session.top.screen != a.screen) session.dispatch(a, ActionContext(session.top, null))
+    }
+    LaunchedEffect(c.voiceRequests) {
+        if (c.takeVoice(isActive)) session.dispatch(Action(type = ActionType.OPEN_VOICE), ActionContext(session.top, null))
     }
 }
 

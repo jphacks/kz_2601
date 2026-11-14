@@ -11,6 +11,7 @@
 1. [重さの区分(SEV)](#1-重さの区分sev)
 2. [誰がいつ対応するか](#2-誰がいつ対応するか)
 3. [最初の 15 分](#3-最初の-15-分)
+   - [OS ごとに絞って見る](#os-ごとに絞って見る)
 4. [道具: アプリ内のお知らせ](#4-道具-アプリ内のお知らせ)
 5. [手順 A: Claude API の障害・上限](#5-手順-a-claude-api-の障害上限)
 6. [手順 B: 悪いデプロイを戻す](#6-手順-b-悪いデプロイを戻す)
@@ -85,6 +86,37 @@
 - [ ] **8. 15 分ごとに状況をメモ**し、補助と共有する。
 
 **終わりの宣言**: 症状が消え、ログ・ダッシュボードが平常に戻ってから 30 分見る → お知らせを外す(または「復旧しました」に差し替えて翌日外す)→ SEV1・SEV2 は 2 日以内に振り返りを書く。
+
+### OS ごとに絞って見る
+
+特定の OS(ios・android・macos・windows・linux)だけで起きていそうな時の絞り込みです。ログの鍵は `backend/internal/httpx/client.go` の `ClientAttrs` が付ける `clientPlatform`(`clientVersion`・`clientBuild`・`clientDslVersion` も同じ所)。付く行・値の丸め方は [observability.md](../infra/observability.md#クライアントの属性)。
+
+- `clientPlatform` が付くのは `http.request`(アクセスログ)と `appcheck` の行。**`ai.usage` には付かない**ので、AI の失敗を OS で見る時は先に `http.request` で絞り、同じ `requestId` を `ai.usage` で引く。
+- ヘッダが無い・知らない値のリクエストは `other`。
+
+例(`ai-prod` で windows の 5xx。サービス名・OS を替えて使う):
+
+```sh
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="ai-prod" AND jsonPayload.event="http.request" AND jsonPayload.clientPlatform="windows" AND jsonPayload.status>=500' \
+  --project=jphacks-kz2601 --freshness=1h --limit=50 --format='value(timestamp,jsonPayload.path,jsonPayload.status,jsonPayload.clientVersion,jsonPayload.clientBuild,jsonPayload.requestId)'
+```
+
+```
+jsonPayload.event="http.request" AND jsonPayload.clientPlatform="linux" AND jsonPayload.status>=400
+jsonPayload.event="http.request" AND jsonPayload.clientPlatform="ios" AND jsonPayload.clientBuild="12"
+jsonPayload.event="http.request" AND jsonPayload.clientPlatform="other"
+jsonPayload.requestId="<上で見つけた requestId>"
+```
+
+どの OS・どの版に偏っているかは、`clientPlatform`・`clientBuild` ごとに件数を数えて比べる(上のコマンドの `--format` を `json` にして集計するか、Logs Explorer の「ログ分析」で `GROUP BY`)。
+
+**デスクトップ版と Mac 版を分ける**: Mac アプリとデスクトップ版を macOS で動かした時は、どちらも `clientPlatform="macos"` になる([client-platforms.md](../backend/client-platforms.md))。分けるのは `User-Agent`。デスクトップ版は `TailorIt-Desktop/<版> (<OS> <OS の版>; <arch>)` を付ける(`desktop/app/.../net/ClientPlatform.kt` の `desktopUserAgent`)。アプリの `jsonPayload` には User-Agent を出さないので、Cloud Run のリクエストログの `httpRequest.userAgent` で見る:
+
+```
+resource.type="cloud_run_revision" AND resource.labels.service_name="ai-prod" AND httpRequest.userAgent:"TailorIt-Desktop/"
+```
+
+見つけた行の `trace`(Cloud Run のリクエストログとアプリのログは同じ trace でまとまる)から、同じリクエストの `http.request` を引いて `clientPlatform` を確かめる。
 
 ## 4. 道具: アプリ内のお知らせ
 

@@ -9,7 +9,6 @@ object ConformanceAllowlist {
     val unavailableTypes: Map<String, String> = mapOf(
         "aiButton" to "AI の呼び出し(/v1/ai)をデスクトップにまだつないでいない",
         "aiChat" to "AI の呼び出し(/v1/ai)をデスクトップにまだつないでいない",
-        "chatThread" to "共有レコードの購読(会話の同期)がまだ無い",
         "dashcam" to "カメラの常時録画。パソコンのカメラは使わない",
         "healthStat" to "ヘルスケアのデータ(HealthKit / Health Connect)がパソコンに無い",
         "locationTracker" to "位置情報(GPS)がパソコンに無い",
@@ -26,7 +25,7 @@ object ConformanceAllowlist {
     )
 
     /** DSL に書いた値をそのまま写すだけの props。読み込みは :dsl(iOS・Android と同じ)のテストで見るので、ここではまだ比べない。 */
-    private const val DSL_ECHO = "DSL に書いた値をそのまま写すだけ(読み込みは :dsl のテストで見る)"
+    internal const val DSL_ECHO = "DSL に書いた値をそのまま写すだけ(読み込みは :dsl のテストで見る)"
 
     private fun echo(vararg keys: String): Map<String, String> = keys.associateWith { DSL_ECHO }
 
@@ -35,14 +34,13 @@ object ConformanceAllowlist {
         "audioRecorder" to echo("field"),
         "bracket" to echo("entity"),
         "card" to echo("title"),
+        "chatThread" to echo("entity", "placeholder"),
         "colorPicker" to echo("field"),
         "datePicker" to echo("field"),
-        "disclosure" to echo("expanded", "title"),
         "drawingField" to echo("field"),
         "fileImport" to echo("entity", "label"),
         "emptyState" to echo("message", "title"),
         "flashcards" to echo("entity"),
-        "grid" to echo("columns"),
         "image" to echo("field") + ("hasImage" to "画像が有るか(読み込みの結果)をまだ出していない"),
         "link" to mapOf("opens" to "押した先(アプリ内 / ブラウザ)の判定をまだ出していない"),
         "locationButton" to echo("field"),

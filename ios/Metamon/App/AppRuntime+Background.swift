@@ -13,17 +13,21 @@ extension AppRuntime {
     }
 
     /// `BGAppRefreshTask` の本体。OS の持ち時間(約 30 秒)内で終わる量だけやる。
+    /// 飛ばす条件と順番は Mac と共有(`BackgroundRefreshCycle`・#2253)。iOS は回線を見ずに起こされたら走らせる(従来どおり)
     func backgroundRefresh() async {
         // サインアウト後も予約は残って起こされる。トークン無しで送らない(未送信は次のサインインまで端末に残す)
-        guard services.auth.currentUser != nil else {
-            print("[Metamon] background(bg-refresh): signed out, skipped")
-            return
-        }
-        await syncAll(reason: "bg-refresh")
+        await BackgroundRefreshCycle.perform(reason: "bg-refresh", signedIn: services.auth.currentUser != nil, online: true,
+                                             drain: { await drainQueue(reason: "bg-refresh") },
+                                             refetch: { await refetchOpen(reason: "bg-refresh") })
     }
 
     /// 未送信 → DSL → 表示中の records の順。どれかが失敗しても残りは続ける(ローカル表示はそのまま)。
     private func syncAll(reason: String) async {
+        await drainQueue(reason: reason)
+        await refetchOpen(reason: reason)
+    }
+
+    private func drainQueue(reason: String) async {
         let pendingBefore = await recordSync.queue.count
         await recordSync.queue.resume()
         // 前面復帰では RecordSyncEngine.setForeground も同時に流し始めるので、そちらの送信が終わるまで待つ(最大 10 秒)
@@ -34,7 +38,9 @@ extension AppRuntime {
         }
         let pendingAfter = await recordSync.queue.count
         print("[Metamon] background(\(reason)): queue sent=\(pendingBefore - pendingAfter) pending=\(pendingAfter)")
+    }
 
+    private func refetchOpen(reason: String) async {
         let appId = document.appId
         if services.isLive {
             do {
@@ -55,8 +61,8 @@ extension AppRuntime {
 /// `BGTaskScheduler` の予約。識別子は Info.plist の `BGTaskSchedulerPermittedIdentifiers` と一致させる。
 enum BackgroundRefresh {
     static let identifier = "jp.kz2601.metamon.refresh"
-    /// OS への希望(これより早くは起こさない)。実際の間隔は OS が利用状況から決める。
-    static let interval: TimeInterval = 15 * 60
+    /// OS への希望(これより早くは起こさない)。実際の間隔は OS が利用状況から決める。Mac と同じ値(#2253)
+    static let interval: TimeInterval = BackgroundRefreshCycle.interval
 
     static func schedule(now: Date = .now) {
         let request = BGAppRefreshTaskRequest(identifier: identifier)

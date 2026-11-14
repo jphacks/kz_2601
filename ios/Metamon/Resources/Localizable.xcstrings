@@ -193,6 +193,23 @@
         }
       }
     },
+    "%@(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@(%2$@)"
+          }
+        }
+      }
+    },
     "%@: %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1177,6 +1194,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 秒ほど待ってから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "%lld 項目は入りませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fields couldn't be filled in"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項目は入りませんでした"
           }
         }
       }
@@ -4785,6 +4819,23 @@
         }
       }
     },
+    "このアプリには入力の画面がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no input screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリには入力の画面がありません"
+          }
+        }
+      }
+    },
     "このアプリには自動の動きがありません。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6620,6 +6671,23 @@
         }
       }
     },
+    "ふつう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ふつう"
+          }
+        }
+      }
+    },
     "ふつう 10 秒ほど" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7371,6 +7439,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "ゆっくり" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゆっくり"
           }
         }
       }
@@ -9959,6 +10044,40 @@
         }
       }
     },
+    "パーソナルボイス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personal Voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パーソナルボイス"
+          }
+        }
+      }
+    },
+    "パーソナルボイスを使う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Personal Voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パーソナルボイスを使う"
+          }
+        }
+      }
+    },
     "フィードバック" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10282,6 +10401,23 @@
         }
       }
     },
+    "プレミアム" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレミアム"
+          }
+        }
+      }
+    },
     "プロフィールの送信が終わってから送れます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10601,6 +10737,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ミュートを解除"
+          }
+        }
+      }
+    },
+    "メッセージ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージ"
           }
         }
       }
@@ -14867,6 +15020,57 @@
         }
       }
     },
+    "声で頼む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask by voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で頼む"
+          }
+        }
+      }
+    },
+    "声と速さは、生成したアプリの読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The voice and rate also apply to read-aloud buttons and directions in the apps you build. If the chosen voice is removed from this device, it goes back to Automatic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声と速さは、生成したアプリの読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。"
+          }
+        }
+      }
+    },
+    "声と速さは、記録帳の読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The voice and rate also apply to read-aloud buttons and directions in your record books. If the chosen voice is removed from this device, it goes back to Automatic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声と速さは、記録帳の読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。"
+          }
+        }
+      }
+    },
     "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15695,6 +15899,23 @@
         }
       }
     },
+    "拡張" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enhanced"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拡張"
+          }
+        }
+      }
+    },
     "持てるアプリの数(%lld 個)に達しました。使わないアプリを削除してから、もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16405,6 +16626,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "日本時間の 0 時に 0 に戻ります。"
+          }
+        }
+      }
+    },
+    "日本語の声" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanese voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本語の声"
           }
         }
       }
@@ -19039,6 +19277,23 @@
         }
       }
     },
+    "英語の声" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語の声"
+          }
+        }
+      }
+    },
     "薬の飲み忘れ防止" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19952,6 +20207,23 @@
         }
       }
     },
+    "試験用の通知" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試験用の通知"
+          }
+        }
+      }
+    },
     "話しかけて変える" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20326,6 +20598,23 @@
         }
       }
     },
+    "読み上げの速さ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaking rate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げの速さ"
+          }
+        }
+      }
+    },
     "読み込み中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20696,6 +20985,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)"
+          }
+        }
+      }
+    },
+    "返信" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信"
           }
         }
       }
@@ -21562,6 +21868,23 @@
         }
       }
     },
+    "速め" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速め"
+          }
+        }
+      }
+    },
     "連絡先(任意) メールや SNS など" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -21915,6 +22238,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音中。タップで終了"
+          }
+        }
+      }
+    },
+    "長押しして「記録する」か「返信」を押してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold, then tap Record or Reply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しして「記録する」か「返信」を押してください"
           }
         }
       }
