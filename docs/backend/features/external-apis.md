@@ -430,7 +430,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | 口 | 中身 |
 |---|---|
 | `POST /v1/apps/{appId}/ext/{provider}/{op}` | `{"args": {...}}` → `{rows / item / resultId}`。有料の provider は `X-Coins-Charged` / `X-Coins-Balance` |
-| `GET /v1/me/connections` | `connections`: つないだサービスの一覧(provider・状態・scope・日付。トークンは返さない)。`providers`: つなげるサービスの一覧(下) |
+| `GET /v1/me/connections` | `connections`: つないだサービスの一覧(provider・状態・scope・日付。トークンは返さない)。`providers`: つなげるサービスの一覧(下)。`keyless`: つながなくても使えるサービスの一覧(下) |
 | `POST /v1/me/connections/{provider}/start` | `{"scopes"?, "args"?}` → `{authUrl}`(`args` は Backlog の `{"space": "acme.backlog.jp"}`。provider が取らない名前は 400)(OAuth の要る provider だけ。ほかは 404) |
 | `DELETE /v1/me/connections/{provider}` | 切る(204) |
 
@@ -441,6 +441,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 - 偽の provider(`fakeOauth`)は runner が動かしている時だけ出す。本番では動かないので出ない
 - `?supportedFeatures=a,b`(generate と同じ値・くり返しも可)を付けると、`externalCall.<id>` が入っている provider だけにする。審査用の版は OAuth の provider のキーを送らない(`ReviewBuildFeatures`・決定 6)ので何も出ない。付けなければ絞らない
 - 別の口にせず一覧に入れたのは、画面が 1 回の呼び出しで「つないだもの」と「つなげるもの」を出せるから
+- `keyless`は OAuth の要らない provider の一覧(形と `enabled`・`supportedFeatures` の絞り方・偽の provider の出し方は `providers` と同じ)。端末は「鍵なしで使えるもの」として名前だけ出す(つなぐボタンは無い)。`NameJa` / `NameEn` は OAuth の provider だけ必須なので、無い provider は空で返り、端末が id から名前を出す。新しい provider は何もしなくても端末の一覧に出る(端末は provider の一覧を持たない)
 
 `POST /v1/apps/{appId}/ext/...` で appconfig が確かめること:
 

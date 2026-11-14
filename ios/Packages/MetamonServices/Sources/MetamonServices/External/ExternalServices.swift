@@ -79,13 +79,16 @@ public struct ExtProvider: Codable, Equatable, Sendable {
 }
 
 /// `GET /v1/me/connections` の答え。`providers` が nil = 古いサーバー(フィールドが無い)。
-public struct ExtConnectionList: Decodable, Equatable, Sendable {
+/// `keyless` はつながなくても使えるサービス(OAuth の要らない provider)。nil = 古いサーバー。
+public struct ExtConnectionList: Codable, Equatable, Sendable {
     public var connections: [ExtConnection]
     public var providers: [ExtProvider]?
+    public var keyless: [ExtProvider]?
 
-    public init(connections: [ExtConnection], providers: [ExtProvider]?) {
+    public init(connections: [ExtConnection], providers: [ExtProvider]?, keyless: [ExtProvider]? = nil) {
         self.connections = connections
         self.providers = providers
+        self.keyless = keyless
     }
 }
 
@@ -259,6 +262,8 @@ public actor MockExternalServicesClient: ExternalServicesClient {
     public private(set) var stored: [ExtConnection]
     /// nil = 古いサーバーのまね(`providers` を返さない)
     public private(set) var providers: [ExtProvider]?
+    /// つながなくても使えるサービス(`providers` が nil の時は返さない)
+    public private(set) var keyless: [ExtProvider]
     /// 直前の `connections(supportedFeatures:)` に渡された値(テスト用)
     public private(set) var lastSupportedFeatures: [String]??
     /// 次の呼び出しで投げるエラー(テスト用)
@@ -266,15 +271,23 @@ public actor MockExternalServicesClient: ExternalServicesClient {
     public private(set) var disconnected: [String] = []
     public private(set) var started: [String] = []
 
-    public init(connections: [ExtConnection] = [], providers: [ExtProvider]? = MockExternalServicesClient.defaultProviders) {
+    public init(connections: [ExtConnection] = [], providers: [ExtProvider]? = MockExternalServicesClient.defaultProviders,
+                keyless: [ExtProvider] = MockExternalServicesClient.defaultKeyless) {
         self.stored = connections
         self.providers = providers
+        self.keyless = keyless
     }
 
     public static let defaultProviders = [
         ExtProvider(id: "fakeOauth", nameJa: "試験用のサービス", nameEn: "Test service"),
         ExtProvider(id: "googleCalendar", nameJa: "Google カレンダー", nameEn: "Google Calendar"),
         ExtProvider(id: "todoist", nameJa: "Todoist", nameEn: "Todoist"),
+    ]
+
+    /// 名前の無いものはサーバーと同じく空(端末が id から名前を出す)
+    public static let defaultKeyless = [
+        ExtProvider(id: "frankfurter", nameJa: "", nameEn: ""),
+        ExtProvider(id: "openWeather", nameJa: "OpenWeather", nameEn: "OpenWeather"),
     ]
 
     public func setNextError(_ error: Error?) { nextError = error }
@@ -290,12 +303,12 @@ public actor MockExternalServicesClient: ExternalServicesClient {
         try throwIfNeeded()
         lastSupportedFeatures = .some(supportedFeatures)
         // サーバーと同じく `externalCall.<id>` で絞る
-        let shown = providers.map { list in
+        func narrow(_ list: [ExtProvider]) -> [ExtProvider] {
             guard let supportedFeatures else { return list }
             let keys = Set(supportedFeatures)
             return list.filter { keys.contains("externalCall.\($0.id)") }
         }
-        return ExtConnectionList(connections: stored, providers: shown)
+        return ExtConnectionList(connections: stored, providers: providers.map(narrow), keyless: providers == nil ? nil : narrow(keyless))
     }
 
     public func startConnection(provider: String, scopes: [String]?) async throws -> URL {
