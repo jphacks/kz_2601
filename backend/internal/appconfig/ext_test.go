@@ -263,6 +263,20 @@ func TestExtRunnerLimit(t *testing.T) {
 	}
 }
 
+// oauthProviderIDs is the expected GET /v1/me/connections providers, from
+// the registry (sorted by id): every OAuth provider as "id:enabled", the
+// fakes only when withFakes. A new provider file needs no change here.
+func oauthProviderIDs(enabled map[string]bool, withFakes bool) []string {
+	out := []string{}
+	for _, p := range extapi.Providers() {
+		if !p.NeedsOAuth || (p.Fake && !withFakes) {
+			continue
+		}
+		out = append(out, fmt.Sprintf("%s:%v", p.ID, enabled[p.ID]))
+	}
+	return out
+}
+
 // providerIDs returns GET /v1/me/connections providers as "id:enabled".
 func providerIDs(t *testing.T, r resp) []string {
 	t.Helper()
@@ -287,8 +301,8 @@ func providerIDs(t *testing.T, r resp) []string {
 func TestExtConnectableProviders(t *testing.T) {
 	e := newExtEnv(t, 100)
 	got := providerIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil))
-	want := []string{"asana:false", "fakeOauth:true", "github:false", "googleCalendar:false", "googleDrive:false", "googleSheets:false", "googleTasks:false", "linear:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false", "vercel:false", "withings:false"}
-	if !slices.Equal(got, want) {
+	want := oauthProviderIDs(map[string]bool{extapi.FakeOAuth: true}, true)
+	if len(want) < 2 || !slices.Equal(got, want) {
 		t.Fatalf("providers: %v", got)
 	}
 	got = providerIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections?supportedFeatures=externalCall.todoist,externalCall.fakeOauth&supportedFeatures=feed.v2", nil, nil))
@@ -367,7 +381,7 @@ func TestExtOff(t *testing.T) {
 		t.Fatalf("list off: %d %s", r.code, r.raw)
 	}
 	// the services are still listed, all off, the fake not at all
-	if got := providerIDs(t, r); !slices.Equal(got, []string{"asana:false", "github:false", "googleCalendar:false", "googleDrive:false", "googleSheets:false", "googleTasks:false", "linear:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false", "vercel:false", "withings:false"}) {
+	if got := providerIDs(t, r); !slices.Equal(got, oauthProviderIDs(nil, false)) {
 		t.Fatalf("providers off: %v", got)
 	}
 }
