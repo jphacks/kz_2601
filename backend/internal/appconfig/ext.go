@@ -119,6 +119,12 @@ func (h *Handler) extCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := uidOf(r)
+	if p.Terms.ShowOwnDataOnly {
+		if err := h.extOwnDataOnly(r, appID, creator, uid); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	if wait, ok := h.extUsers.take(uid); !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(wait))
 		httpx.ErrorWithDetails(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "しばらくしてからもう一度試してください。",
@@ -145,7 +151,30 @@ func (h *Handler) extCall(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(coins.HeaderCharged, strconv.FormatInt(ans.CoinsCharged, 10))
 		w.Header().Set(coins.HeaderBalance, strconv.FormatInt(ans.CoinsBalance, 10))
 	}
-	httpx.WriteJSON(w, http.StatusOK, ans.Result)
+	httpx.WriteJSON(w, http.StatusOK, p.WithTerms(ans.Result))
+}
+
+// reasonOwnDataOnly is details.reason of a ShowOwnDataOnly provider called
+// from a shared app (its terms show a person's data only to that person).
+const reasonOwnDataOnly = "provider_own_data_only"
+
+// extOwnDataOnly refuses a ShowOwnDataOnly provider (Strava, Jira ...) in
+// another person's app or in an app whose published DSL has a shared /
+// public entity: the data must stay with the person who connected.
+func (h *Handler) extOwnDataOnly(r *http.Request, appID, creator, uid string) error {
+	refused := apiErr(http.StatusForbidden, httpx.CodeForbidden, "このサービスのデータは、つないだ本人だけが自分のアプリで見られます。").
+		With("reason", reasonOwnDataOnly)
+	if creator != uid {
+		return refused
+	}
+	a, _, err := h.publishedDSL(r.Context(), appID)
+	if err != nil {
+		return err
+	}
+	if a != nil && hasSharedEntity(a) {
+		return refused
+	}
+	return nil
 }
 
 // extCreator returns whose `runs` the call is: the creator of a shared app
@@ -291,7 +320,7 @@ func listProviders(enabled, features []string, oauth bool) []connectableProvider
 	out := []connectableProvider{}
 	for _, p := range extapi.Providers() {
 		on := slices.Contains(enabled, p.ID)
-		if p.NeedsOAuth != oauth || (p.Fake && !on) || (allow != nil && !allow[p.FeatureKey()]) {
+		if p.NeedsOAuth != oauth || (p.Fake && !on) || (allow != nil && !allow[p.FeatureKey()]) || p.Sunset(time.Now()) {
 			continue
 		}
 		out = append(out, connectableProvider{ID: p.ID, NameJa: p.NameJa, NameEn: p.NameEn, Enabled: on})

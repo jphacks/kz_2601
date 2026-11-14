@@ -224,7 +224,7 @@ class VoicePolishTest {
         val engine = FakeEngine()
         val vm = vm(speechOn = false, engine = engine)
         advanceUntilIdle()
-        assertFalse(vm.speakGreeting("どんなアプリが欲しいですか?"))
+        assertFalse(vm.speakGreeting("どんなアプリに変身しましょうか?"))
         vm.submit("家計簿")
         advanceUntilIdle()
         assertTrue(engine.spoken.isEmpty())
@@ -247,11 +247,11 @@ class VoicePolishTest {
         val engine = FakeEngine()
         val initial = vm(speechOn = true, engine = engine)
         advanceUntilIdle()
-        assertTrue(initial.speakGreeting("どんなアプリが欲しいですか?"))
+        assertTrue(initial.speakGreeting("どんなアプリに変身しましょうか?"))
         // 相談が始まったら読まない
         initial.submit("家計簿")
         advanceUntilIdle()
-        assertFalse(initial.speakGreeting("どんなアプリが欲しいですか?"))
+        assertFalse(initial.speakGreeting("どんなアプリに変身しましょうか?"))
         // 作ったアプリの上(FAB のシート)では読まない
         val editing = vm(speechOn = true, engine = FakeEngine(), voiceOnly = false)
         advanceUntilIdle()
@@ -267,7 +267,7 @@ class VoicePolishTest {
         advanceUntilIdle()
         assertEquals(1, engine.stops)
         // 録音中は質問が来ても読まない
-        assertFalse(vm.speakGreeting("どんなアプリが欲しいですか?"))
+        assertFalse(vm.speakGreeting("どんなアプリに変身しましょうか?"))
     }
 
     @Test

@@ -302,7 +302,7 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 
 | 経過 | stage | create の文言 | edit の文言 | 備考 |
 |---|---|---|---|---|
-| 0〜3s | normal | どんなアプリにするか考えています… + 経過秒の横に目安「ふつう 10 秒ほど」(0〜10s だけ)+ 小さい **キャンセル** | 変更を反映しています… + **中止** | キャンセル / 中止は最初から出す(言い間違いに気づいたらすぐ止める・UX 点検 M6) |
+| 0〜3s | normal | 何に変身するか考えています… + 経過秒の横に目安「ふつう 10 秒ほど」(0〜10s だけ)+ 小さい **キャンセル** | 変更を反映しています… + **中止** | キャンセル / 中止は最初から出す(言い間違いに気づいたらすぐ止める・UX 点検 M6) |
 | 3〜6s | normal | 必要な画面とデータを決めています… | 〃 | |
 | 6〜9s | normal | 画面を組み立てています… | 〃 | create p50 はここで完了 |
 | 9〜10s | normal | 細部を整えています… | 〃 | (以後 3s 周期で巡回) |
@@ -499,7 +499,7 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
   │     タップ → AppRuntime.switchApp(to:): 今の画面をサムネに撮る → DeviceAppID.set(appId) → GET /dsl(失敗時 DocumentCache)→ apply()(変身アニメ)→ startSync()
   │                 records は apply() で破棄し、画面が要求する entity を load(entities:) の既存経路で読み直す
   ├─ 「+ 新しいアプリ」 → startFresh(.newApp): DeviceAppID.rotate() + 初期状態(音声画面)。挨拶は「新しいアプリですね」
-  └─ 「Tailor It に戻る(初期画面)」 → startFresh(.home): 同上。挨拶は「おかえりなさい。次は何を作りますか?」
+  └─ 「Tailor It に戻る(初期画面)」 → startFresh(.home): 同上。挨拶は「おかえりなさい。次は何に変身しましょうか?」
 一覧の取得: GET /v1/apps(uid スコープ・HTTPAppConfigClient.listApps)→ AppSummary.visible(): status=archived と未生成(currentVersion<=1)を除外、現在のアプリを先頭、以降は更新日時順
             失敗時は AppListCache(Application Support/metamon-dsl/apps.json)の保存済み一覧(toast「オフライン」)
 サムネ: AppThumbnailStore(Application Support/metamon-thumbs/<appId>.jpg・1/3 スケール JPEG)。撮るのは「切替・一覧を開く直前」と「apply の 1.2 秒後(RootView.onChange(version))」
@@ -521,10 +521,10 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 
 | 状況(`Greeting.Context`) | 判定 | 見出し |
 |---|---|---|
-| firstVisit | 起動回数 0(`UserDefaults metamon.visitCount`・`Greeting.launchIsReturning`)| どんなアプリが欲しいですか? |
-| returning | 2 回目以降の起動で初期画面 | おかえりなさい。今日は何を作りますか? |
-| newApp | 変身一覧「+ 新しいアプリ」/ 発話「別のアプリ」(`AppRuntime.homeEntry = .newApp`) | 新しいアプリですね。どんなアプリにしますか? |
-| home | 「Tailor It に戻る」/ アプリのリセット(`.home`) | おかえりなさい。次は何を作りますか? |
+| firstVisit | 起動回数 0(`UserDefaults metamon.visitCount`・`Greeting.launchIsReturning`)| どんなアプリに変身しましょうか? |
+| returning | 2 回目以降の起動で初期画面 | おかえりなさい。今日は何に変身しましょうか? |
+| newApp | 変身一覧「+ 新しいアプリ」/ 発話「別のアプリ」(`AppRuntime.homeEntry = .newApp`) | 新しいアプリですね。何に変身しましょうか? |
+| home | 「Tailor It に戻る」/ アプリのリセット(`.home`) | おかえりなさい。次は何に変身しましょうか? |
 | editing | 既にアプリがある(FAB からの音声シート) | このアプリをどう変えますか? |
 
 初期画面の見出しは DSL の `voiceInput.prompt` ではなく Greeting を使う(生成アプリ内の `voiceInput` 部品は従来どおり `prompt` を表示)。

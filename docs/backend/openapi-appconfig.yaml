@@ -1563,7 +1563,7 @@ paths:
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { description: '通話が off(`details.reason: calls_disabled`)・共有のアプリでない(`no_shared_data`)・その部屋の callButton が無い(`no_call_button`)・続けようとした通話が終わっている(`call_ended`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '429': { description: '1 時間の上限(`EXT_USER_PER_HOUR`)。`Retry-After` と details(scope=user・limit・retryAfterSec)。runner の provider ごとの回数の上限(#1715)も 429 で、details の scope は user_hourly / user_daily / app_hourly / app_daily / global_daily / provider_paused(provider が 429 を返した後の 1 分)・provider・retryAfterSec', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: '1 時間の上限(`EXT_USER_PER_HOUR`)。`Retry-After` と details(scope=user・limit・retryAfterSec)。runner の provider ごとの回数の上限(#1715)も 429 で、details の scope は user_minute / user_hourly / user_daily / app_hourly / app_daily / global_daily / provider_paused(provider が 429 を返した後の 1 分)・provider・retryAfterSec', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /calls/webhook:
     post:
@@ -2034,6 +2034,7 @@ paths:
       description: |
         DSL の `externalCall` / `externalList` が使う。appconfig は人(ID トークン・App Check)とアプリと引数を確かめ、サービス間の認証(OIDC)で runner の `/internal/ext/call` に渡す。API キーと利用者のトークンは runner だけが持ち、端末には来ない。
         - **誰の枠か**: 共有のアプリ(公開の DSL に public / shared の entity がある)は**作成者**の `runs`(作成者の Pro)。呼べるのは参加者(public の entity があるアプリは入れた人も)。それ以外は 403 `not_member`。自分のアプリ・自分の写しの private のアプリは呼び出した人の `runs`。有料の provider のコインは押した人
+        - **規約の設定**(external-api-terms-modes.md): 課金を禁じる provider(`NoCharge`)は Pro でなくても呼べて数えない。本人のデータは本人だけの provider(`ShowOwnDataOnly`)は、共有・公開の entity があるアプリと他の人のアプリでは 403 `forbidden`(`details.reason: provider_own_data_only`)。API が終わった provider は 503 `ext_unavailable`
         - **Pro だけ**(決定 1): 作成者が Pro でなければ 402 `pro_required`。呼び出した人が作成者でない時は `details.reason: creator_needs_pro`(課金画面ではなく案内を出す)。`PRO_GATE_MODE` に関係なく runner が確かめる
         - **引数**: op が決めた名前だけ(ほかは 400)・値は文字列で 4096 バイトまで・URL に見える値は 400・op ごとの値の検査(通貨の記号など)も 400。runner でも同じ検査をする
         - **冪等**: `X-Request-Id` を有料の provider のコインの押さえの鍵にする(送らなければサーバーが作る)
@@ -2457,6 +2458,8 @@ components:
         rows: { type: array, items: { $ref: '#/components/schemas/ExtRow' } }
         item: { $ref: '#/components/schemas/ExtRow' }
         resultId: { type: string, description: 書く op が作ったものの id(DSL の resultIdField) }
+        attribution: { type: string, description: 'provider の規約が求める表示(1 行)。あれば行の下に出す(external-api-terms-modes.md)' }
+        noAI: { type: boolean, description: 'true なら規約によりこの結果を AI の材料(aiButton の外部データなど)に入れない' }
     ExtRow:
       type: object
       required: [title]

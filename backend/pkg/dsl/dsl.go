@@ -656,7 +656,7 @@ func Initial() App {
 			ID:    "home",
 			Title: "",
 			Components: []Component{
-				{Type: CompVoiceInput, ID: "mic", Area: "A1:F12", Prompt: "どんなアプリが欲しい？", Size: "large"},
+				{Type: CompVoiceInput, ID: "mic", Area: "A1:F12", Prompt: "どんなアプリに変身しましょうか？", Size: "large"},
 			},
 		}},
 	}
