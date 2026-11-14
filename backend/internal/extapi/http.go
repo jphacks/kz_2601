@@ -181,7 +181,11 @@ func (s *Service) Routes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /oauth/callback/{provider}", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		to := s.Callback(r.Context(), r.PathValue("provider"), q.Get("state"), q.Get("code"))
+		code := q.Get("code")
+		if code == "" {
+			code = q.Get("oauth_verifier") // OAuth 1.0a (OAuth1Client)
+		}
+		to := s.Callback(r.Context(), r.PathValue("provider"), q.Get("state"), code)
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		http.Redirect(w, r, to, http.StatusFound)
