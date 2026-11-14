@@ -53,6 +53,7 @@ registry の順(名前順)。偽の provider(`fakeFree`・`fakePaid`・`fakeOaut
 | `vercel` | 無料・OAuth(integration) | Vercel の integration の規約(要確認。名前と URL も分からない) | 要確認 | 要確認 | 要確認。今の作り: キャッシュしない | |
 | `withings` | 無料・OAuth | Withings の公開 API の規約(要確認。名前と URL も分からない) | 要確認 | 要確認 | 要確認。今の作り: 健康のデータはキャッシュもログもしない・記録に書かない(`withings.go`) | |
 | `youtube` | 無料・運営の鍵(1 日の割り当て) | [YouTube API サービス利用規約](https://developers.google.com/youtube/terms/api-services-terms-of-service)・[開発者ポリシー](https://developers.google.com/youtube/terms/developer-policies)(repo の文書)。[external-apis.md「YouTube の規約」](external-apis.md#youtube-の規約1699) | 要確認(割り当ては規約 15・ポリシー III.D.3) | 規約 10.3・ポリシー III.F.2。コード `YouTubeAttribution` = `YouTube` | ポリシー III.E.4.b〜e(30 日まで)。今の作り: 1 時間 / 30 分キャッシュ | |
+| `zaim` | 無料・OAuth 1.0a | Zaim API 利用規約(推測: 開発者のページ `https://dev.zaim.net/` の「利用規約」。名前と場所は人が確かめる)。[Zaim REST API](https://dev.zaim.net/home/api)(推測) | 要確認(個人の家計のデータを読み書きするので、商用・再販・利用者の同意の節を最初に確かめる) | 要確認 | 要確認。今の作り: 記録(金額・品目・場所・メモ)はキャッシュもログもしない・`Output.Cells` はサーバーの中だけ(`zaim.go`) | |
 
 #1954 の Atlassian(Trello)は registry に無い(認可の形が合わず provider を作っていない・[external-apis.md「Trello を入れていない理由」](external-apis.md#trello-を入れていない理由1682設計のメモ))。入れる時はこの表に足す。
 
