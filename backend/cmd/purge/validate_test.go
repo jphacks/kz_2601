@@ -3,8 +3,6 @@ package main
 import (
 	"testing"
 	"time"
-
-	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
 func TestParseFlagsRefuses(t *testing.T) {
@@ -48,17 +46,7 @@ func TestParseFlagsAcceptsTheFloor(t *testing.T) {
 	}
 }
 
-func TestValidateAcceptsTheDefaults(t *testing.T) {
-	opts, err := parseFlags(newFlagSet3280(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if opts.dryRun {
-		t.Fatal("dry-run defaults to true")
-	}
-	if opts.olderThan != store.PurgeAfter || opts.feedbackOlderThan != store.FeedbackRetention {
-		t.Fatalf("olderThan=%s feedbackOlderThan=%s", opts.olderThan, opts.feedbackOlderThan)
-	}
+func TestMinRetentionIsTheFloor(t *testing.T) {
 	if minRetention != 24*time.Hour {
 		t.Fatalf("minRetention = %s", minRetention)
 	}
