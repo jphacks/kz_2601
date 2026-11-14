@@ -1,6 +1,7 @@
 #if !APP_STORE_REVIEW
 import XCTest
 import UserNotifications
+import MetamonDSL
 import MetamonServices
 @testable import Metamon
 
@@ -278,6 +279,70 @@ final class MacPushTests: XCTestCase {
         XCTAssertFalse(MacPushHost.shared.consentAllowed(appId: "app1"), "次の利用者の控えは変わらない")
         uid = "u1"
         XCTAssertFalse(MacPushHost.shared.consentAllowed(appId: "app1"), "前の利用者の控えも書き戻さない")
+    }
+
+    /// 参加者一覧を決まった役割で返す相手(ネットにはつながない)
+    private final class FakeMembership: MembershipClient, @unchecked Sendable {
+        let role: SharedMember.Role
+        let failing: Bool
+
+        init(role: SharedMember.Role, failing: Bool = false) {
+            self.role = role
+            self.failing = failing
+        }
+
+        func previewShare(token: String) async throws -> ShareLinkPreview { ShareLinkPreview(token: token, name: "") }
+        func importShare(token: String, displayName: String) async throws -> InstalledApp { fatalError("unused") }
+        func hasMembersOnlyData(appId: String) async throws -> Bool { true }
+        func members(appId: String) async throws -> SharedMemberList {
+            if failing { throw URLError(.notConnectedToInternet) }
+            return SharedMemberList(items: [SharedMember(uid: "u1", role: role, you: true)], role: role)
+        }
+        func removeMember(appId: String, uid: String) async throws {}
+        func leave(appId: String) async throws {}
+        func setAdmin(appId: String, uid: String, admin: Bool) async throws {}
+    }
+
+    /// `scope` だけ違う entity を並べた DSL(画面は使わない)
+    private func dsl(scopes: [String?]) throws -> AppDSL {
+        let entities = scopes.enumerated().map { index, scope in
+            let field = scope.map { ",\"scope\":\"\($0)\"" } ?? ""
+            return "{\"id\":\"e\(index)\",\"name\":\"記録\(index)\"\(field),\"fields\":[]}"
+        }
+        let json = """
+        {"schemaVersion":1,"app":{"name":"共有の記録"},"initialScreen":"home",
+         "entities":[\(entities.joined(separator: ","))],
+         "screens":[{"id":"home","title":"ホーム","components":[]}]}
+        """
+        return try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+    }
+
+    private func installHost(members: (any MembershipClient)?, push: Bool = true) {
+        let pushClient: (any PushDeviceClient)? = push ? client : nil
+        MacPushHost.shared.install(client: pushClient, members: members, defaults: defaults, environment: .sandbox,
+                                   uid: { [unowned self] in uid }, authorization: { [unowned self] in status },
+                                   requestToken: { [unowned self] in requests += 1 }, openApp: { [unowned self] in opened.append($0) },
+                                   releaseToken: { [unowned self] in releases += 1 })
+    }
+
+    /// 切り替えを出すのは、共有の記録があって自分が作成者でない時だけ(作成者には同意なしで届く)
+    func testCanSetConsentOnlyForSharedDataYouDidNotCreate() async throws {
+        let shared = try dsl(scopes: [nil, "shared"])
+        let cases: [(name: String, dsl: AppDSL, members: FakeMembership?, push: Bool, shown: Bool)] = [
+            ("共有の記録が無い", try dsl(scopes: [nil, nil]), FakeMembership(role: .member), true, false),
+            ("記録が 1 つも無い", try dsl(scopes: []), FakeMembership(role: .member), true, false),
+            ("共有の記録があり参加者", shared, FakeMembership(role: .member), true, true),
+            ("公開の記録があり参加者", try dsl(scopes: ["public"]), FakeMembership(role: .member), true, true),
+            ("共有の記録があり作成者", shared, FakeMembership(role: .owner), true, false),
+            ("役割を確かめられない", shared, FakeMembership(role: .member, failing: true), true, true),
+            ("参加者を聞く相手がいない", shared, nil, true, true),
+            ("プッシュを使わない版(モック)", shared, FakeMembership(role: .member), false, false),
+        ]
+        for c in cases {
+            installHost(members: c.members, push: c.push)
+            let shown = await MacPushHost.shared.canSetConsent(appId: "app1", dsl: c.dsl)
+            XCTAssertEqual(shown, c.shown, c.name)
+        }
     }
 
     func testConsentIsSavedOnlyWhenSent() async {
