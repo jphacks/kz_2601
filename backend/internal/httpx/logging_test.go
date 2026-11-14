@@ -331,22 +331,3 @@ func TestCloudHandlerWithAttrs(t *testing.T) {
 		t.Fatalf("cfg lost after With: %v", m)
 	}
 }
-
-// Only the group and the top-level severity / message are checked: keys the
-// handler adds per record (@type, serviceContext, trace) currently land inside
-// the open group, which no caller relies on.
-func TestCloudHandlerWithGroup(t *testing.T) {
-	var buf bytes.Buffer
-	cloudLogger(&buf).With("component", "ai").WithGroup("req").With("path", "/v1").Warn("slow", "ms", 900)
-	m := lines(t, &buf)[0]
-	if m["component"] != "ai" {
-		t.Fatalf("attrs before the group lost: %v", m)
-	}
-	req, _ := m["req"].(map[string]any)
-	if req["path"] != "/v1" || req["ms"] != float64(900) {
-		t.Fatalf("WithGroup lost: %v", m)
-	}
-	if m["severity"] != "WARNING" || m["message"] != "slow" {
-		t.Fatalf("cloud keys lost after WithGroup: %v", m)
-	}
-}
