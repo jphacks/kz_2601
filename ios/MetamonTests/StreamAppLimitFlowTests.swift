@@ -39,6 +39,19 @@ final class StreamAppLimitFlowTests: XCTestCase {
                                                    "updatedAt": .string("2026-11-01T00:00:00Z")])])])
     }
 
+    /// 置き換えシートの出し元(テスト用の id)。テストのホストの根に本物のシートを出さない
+    /// (CI の遅い runner で根にシートを出すとメインが止まり、待ちの間にカードを見落とした)。
+    private let presenter = UUID()
+
+    override func setUp() async throws {
+        AppLimitGate.shared.presenterAppeared(presenter)
+    }
+
+    override func tearDown() async throws {
+        AppLimitGate.shared.presenterDisappeared(presenter)
+        AppLimitGate.shared.dismiss()
+    }
+
     private func makeRuntime(_ ai: RefusingAI) throws -> AppRuntime {
         var services = BuildConfig.make(environment: .mock)
         services.ai = ai
@@ -55,9 +68,10 @@ final class StreamAppLimitFlowTests: XCTestCase {
     private func speakAndWaitForCard(_ rt: AppRuntime, _ ai: RefusingAI) async throws -> ErrorPresentation {
         await rt.submitUtterance("歩数計作って", source: .voice)
         XCTAssertEqual(rt.chatTurn?.kind, .ready)
-        let deadline = ContinuousClock.now + .seconds(8)
-        while ContinuousClock.now < deadline {
+        let deadline = ContinuousClock.now + .seconds(15)
+        while true {
             if ai.streamed > 0, rt.morphJob == nil, let card = rt.errorCard { return card }
+            guard ContinuousClock.now < deadline else { break } // 期限の後にもう 1 回見てから落とす
             try await Task.sleep(for: .milliseconds(20))
         }
         XCTFail("状態カードが出ない(streamed=\(ai.streamed))")
@@ -76,10 +90,10 @@ final class StreamAppLimitFlowTests: XCTestCase {
         XCTAssertNotEqual(card.title, ErrorCopy.rejectedTitle, "「言い方を変えて」は出さない", file: file, line: line)
         XCTAssertEqual(card.transcript.isEmpty, false, "置き換えた後に同じ依頼で作り直せる", file: file, line: line)
         XCTAssertTrue(rt.isChatting, "上限で止めた時は会話を消さない(DELETE /v1/chat しない)", file: file, line: line)
-        // 置き換えシートをすぐ出す(テストのホストに出し元があればシート、無ければトースト)
+        // 置き換えシートをすぐ出す(出し元はテスト用の presenter)
         let gate = AppLimitGate.shared
-        XCTAssertTrue(gate.request?.limit == limit || rt.toast == AppLimitCopy.toast(limit),
-                      "置き換えシート(またはトースト)を出す", file: file, line: line)
+        XCTAssertEqual(gate.request?.presenter, presenter, file: file, line: line)
+        XCTAssertEqual(gate.request?.limit, limit, "置き換えシートを出す", file: file, line: line)
         gate.dismiss()
     }
 
