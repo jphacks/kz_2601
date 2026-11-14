@@ -60,7 +60,8 @@ final class ExternalServicesClientTests: XCTestCase {
         XCTAssertEqual(answer.keyless, [ExtProvider(id: "frankfurter", nameJa: "", nameEn: "", enabled: true),
                                         ExtProvider(id: "openWeather", nameJa: "OpenWeather", nameEn: "OpenWeather", enabled: false)])
         StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[],"providers":[]}"#)])
-        XCTAssertNil(try await client.connections(supportedFeatures: nil).keyless)
+        let old = try await client.connections(supportedFeatures: nil)
+        XCTAssertNil(old.keyless)
     }
 
     /// 最後の一覧の控え(オフライン用): 保存 → 読む → 消す。日付・状態・providers・keyless が往復する

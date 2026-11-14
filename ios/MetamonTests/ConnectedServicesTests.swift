@@ -131,8 +131,9 @@ final class ConnectedServicesTests: XCTestCase {
     func testCatalogNamesAndSymbols() {
         XCTAssertTrue(ConnectedServiceCatalog.knownIDs.count >= 20)
         for id in ConnectedServiceCatalog.knownIDs {
-            XCTAssertNotEqual(ConnectedServiceCatalog.name(id, english: false), id, id)
-            XCTAssertNotEqual(ConnectedServiceCatalog.name(id, english: true), id, id)
+            // connpass のように id と同じ綴りの名前もあるので、空でないことだけ見る(知らない id は下で確かめる)
+            XCTAssertFalse(ConnectedServiceCatalog.name(id, english: false).isEmpty, id)
+            XCTAssertFalse(ConnectedServiceCatalog.name(id, english: true).isEmpty, id)
             XCTAssertNotEqual(ConnectedServiceCatalog.symbol(id), ConnectedServiceCatalog.fallbackSymbol, id)
             XCTAssertNotNil(UIImage(systemName: ConnectedServiceCatalog.symbol(id)), id)
         }
