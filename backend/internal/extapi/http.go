@@ -70,6 +70,8 @@ type ConnBody struct {
 	UID      string   `json:"uid"`
 	Provider string   `json:"provider"`
 	Scopes   []string `json:"scopes,omitempty"`
+	// Args are the provider's connect args (Provider.ConnectArgs; start only).
+	Args map[string]string `json:"args,omitempty"`
 }
 
 // FailBody is the internal answer of a failed call: the reason, and for
@@ -116,7 +118,7 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		if !httpx.DecodeBody(w, r, &b) {
 			return
 		}
-		u, err := s.Start(r.Context(), b.UID, b.Provider, b.Scopes)
+		u, err := s.StartWith(r.Context(), b.UID, b.Provider, b.Scopes, b.Args)
 		if err != nil {
 			s.fail(w, err)
 			return
@@ -181,7 +183,11 @@ func (s *Service) Routes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /oauth/callback/{provider}", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		to := s.Callback(r.Context(), r.PathValue("provider"), q.Get("state"), q.Get("code"))
+		code := q.Get("code")
+		if code == "" {
+			code = q.Get("oauth_verifier") // OAuth 1.0a (OAuth1Client)
+		}
+		to := s.Callback(r.Context(), r.PathValue("provider"), q.Get("state"), code)
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		http.Redirect(w, r, to, http.StatusFound)

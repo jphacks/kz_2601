@@ -1,20 +1,21 @@
 # 自己改善ループの定期の実行(#368「定期的に取り込む」・docs/backend/features/feedback-loop.md)。
-# 既定は feedback_loop_enabled = false で、何も作らない。true にするのは人の承認の後。
+# 既定は feedback_loop_enabled = true(オーナーの決定 2026-11-14: Issue の起票まで自動)。
 # 2 段で入れる(purge.tf と同じ):
 #   1. feedback_loop_enabled = true → SA・IAM・Secret の入れ物(値は人が入れる)
 #   2. Secret の値を入れ、イメージの digest を feedback_loop_job_image に入れる → ジョブと Scheduler
 #
 # イメージは distroless(シェルが無い)で、feedback-loop は 1 回の実行で 1 コマンドだけ。
 # そこで 1 コマンド = 1 ジョブにし、Scheduler の時刻をずらして順に動かす:
-#   ingest → triage → draft(1 日 1 回)、fixed と purge(1 日 1 回)。
-# drafts approve(Issue の作成)は定期にしない(人の承認 1)。
+#   ingest → triage → draft → auto-issue(1 日 1 回)、fixed と purge(1 日 1 回)。
+# auto-issue(Issue の作成)は LOOP_ISSUE_AUTO=on と LOOP_PUBLISH=on の両方で動き、1 回・1 日の上限がある。
+# PR のマージは今までどおり人。
 
 # ---- 変数(この機能の分だけ。variables.tf には足さない) ----
 
 variable "feedback_loop_enabled" {
-  description = "自己改善ループの SA・IAM・Secret の入れ物・ジョブ・Scheduler を作るか。既定は false(何も作らない)"
+  description = "自己改善ループの SA・IAM・Secret の入れ物・ジョブ・Scheduler を作るか。既定は true(2026-11-14 の決定)。false で何も作らない"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "feedback_loop_job_image" {
@@ -24,19 +25,32 @@ variable "feedback_loop_job_image" {
 }
 
 variable "feedback_loop_schedules" {
-  description = "コマンドごとの cron(Asia/Tokyo)。前の段の timeout より後にずらす。キーは ingest / triage / draft / fixed / purge"
+  description = "コマンドごとの cron(Asia/Tokyo)。前の段の timeout より後にずらす。キーは ingest / triage / draft / auto-issue / fixed / purge"
   type        = map(string)
   default = {
-    ingest = "0 5 * * *"
-    triage = "20 5 * * *"
-    draft  = "0 6 * * *"
-    fixed  = "30 6 * * *"
-    purge  = "50 6 * * *"
+    ingest       = "0 5 * * *"
+    triage       = "20 5 * * *"
+    draft        = "0 6 * * *"
+    "auto-issue" = "15 6 * * *"
+    fixed        = "30 6 * * *"
+    purge        = "50 6 * * *"
   }
   validation {
-    condition     = length(setsubtract(["ingest", "triage", "draft", "fixed", "purge"], keys(var.feedback_loop_schedules))) == 0
-    error_message = "feedback_loop_schedules には ingest / triage / draft / fixed / purge のすべてが要る。"
+    condition     = length(setsubtract(["ingest", "triage", "draft", "auto-issue", "fixed", "purge"], keys(var.feedback_loop_schedules))) == 0
+    error_message = "feedback_loop_schedules には ingest / triage / draft / auto-issue / fixed / purge のすべてが要る。"
   }
+}
+
+variable "feedback_loop_issue_auto_max_per_run" {
+  description = "auto-issue が 1 回の実行で出す Issue(コメント含む)の上限(LOOP_ISSUE_AUTO_MAX_PER_RUN)"
+  type        = number
+  default     = 10
+}
+
+variable "feedback_loop_issue_auto_max_per_day" {
+  description = "auto-issue が直近 24 時間で出す Issue(コメント含む)の上限(LOOP_ISSUE_AUTO_MAX_PER_DAY)"
+  type        = number
+  default     = 30
 }
 
 variable "feedback_loop_paused" {
@@ -46,7 +60,7 @@ variable "feedback_loop_paused" {
 }
 
 variable "feedback_loop_env" {
-  description = "全部のジョブに入れる秘密でない環境変数(LOOP_CONSENT_VERSIONS・LOOP_ISSUE_REPO・LOOP_SOURCE_APPSTORE など)。秘密は入れない(feedback_loop_secret_env へ)"
+  description = "全部のジョブに入れる秘密でない環境変数(LOOP_CONSENT_VERSIONS・LOOP_ISSUE_REPO・LOOP_ISSUE_LABELS・LOOP_RELATED_ISSUES・LOOP_SOURCE_APPSTORE など)。auto-issue には LOOP_ISSUE_REPO が要る(無いと起動しない)。秘密は入れない(feedback_loop_secret_env へ)"
   type        = map(string)
   default     = {}
   validation {
@@ -54,8 +68,8 @@ variable "feedback_loop_env" {
     error_message = "鍵・トークンは feedback_loop_env に入れない。feedback_loop_secret_env で Secret Manager の名前を指す。"
   }
   validation {
-    condition     = length(setintersection(keys(var.feedback_loop_env), ["GOOGLE_CLOUD_PROJECT", "APP_ENV", "LOOP_INTAKE", "LOOP_TRIAGE", "LOOP_DRAFT", "LOOP_PUBLISH", "LOOP_NOTIFY"])) == 0
-    error_message = "接続先と段のスイッチはジョブごとに決めてある(LOOP_PUBLISH は定期にしない)。feedback_loop_env には入れない。"
+    condition     = length(setintersection(keys(var.feedback_loop_env), ["GOOGLE_CLOUD_PROJECT", "APP_ENV", "LOOP_INTAKE", "LOOP_TRIAGE", "LOOP_DRAFT", "LOOP_PUBLISH", "LOOP_ISSUE_AUTO", "LOOP_NOTIFY", "LOOP_ISSUE_AUTO_MAX_PER_RUN", "LOOP_ISSUE_AUTO_MAX_PER_DAY"])) == 0
+    error_message = "接続先と段のスイッチはジョブごとに決めてある(LOOP_PUBLISH と LOOP_ISSUE_AUTO は auto-issue のジョブだけ)。上限は feedback_loop_issue_auto_max_per_* で。feedback_loop_env には入れない。"
   }
 }
 
@@ -63,11 +77,12 @@ variable "feedback_loop_secret_env" {
   description = "コマンドごとに Secret Manager から入れる環境変数の名前(Secret の ID = 環境変数の名前・version は latest)。LOOP_ で始まるものは入れ物をここで作る。それ以外(APNS_* など)は既にある Secret を指し、読む権限だけを付ける。値の入っていない Secret を指すとジョブの起動が失敗するので、値を入れてから足す"
   type        = map(list(string))
   default = {
-    ingest = []
-    triage = ["LOOP_ANTHROPIC_API_KEY"]
-    draft  = []
-    fixed  = ["LOOP_GITHUB_TOKEN"]
-    purge  = []
+    ingest       = []
+    triage       = ["LOOP_ANTHROPIC_API_KEY"]
+    draft        = ["LOOP_GITHUB_TOKEN"] # LOOP_RELATED_ISSUES=on で開いている Issue の題名を読む時だけ使う
+    "auto-issue" = ["LOOP_GITHUB_TOKEN"]
+    fixed        = ["LOOP_GITHUB_TOKEN"]
+    purge        = []
   }
 }
 
@@ -81,12 +96,22 @@ locals {
 
   # コマンド → その段のスイッチ(LOOP_<段>=on)・timeout・再試行
   # triage は LLM の費用がかかるので再試行しない(次の日に新しい項目と一緒に拾う)
+  # auto-issue は GitHub に書くので再試行しない(失敗した下書きは次の日の実行が拾う)。上限の環境変数は extra_env
   feedback_loop_commands = {
-    ingest = { stage_env = "LOOP_INTAKE", timeout = "900s", max_retries = 1 }
-    triage = { stage_env = "LOOP_TRIAGE", timeout = "1800s", max_retries = 0 }
-    draft  = { stage_env = "LOOP_DRAFT", timeout = "900s", max_retries = 1 }
-    fixed  = { stage_env = "LOOP_NOTIFY", timeout = "900s", max_retries = 1 }
-    purge  = { stage_env = "", timeout = "1800s", max_retries = 1 }
+    ingest = { stage_envs = ["LOOP_INTAKE"], timeout = "900s", max_retries = 1, extra_env = {} }
+    triage = { stage_envs = ["LOOP_TRIAGE"], timeout = "1800s", max_retries = 0, extra_env = {} }
+    draft  = { stage_envs = ["LOOP_DRAFT"], timeout = "900s", max_retries = 1, extra_env = {} }
+    "auto-issue" = {
+      stage_envs  = ["LOOP_PUBLISH", "LOOP_ISSUE_AUTO"]
+      timeout     = "900s"
+      max_retries = 0
+      extra_env = {
+        LOOP_ISSUE_AUTO_MAX_PER_RUN = tostring(var.feedback_loop_issue_auto_max_per_run)
+        LOOP_ISSUE_AUTO_MAX_PER_DAY = tostring(var.feedback_loop_issue_auto_max_per_day)
+      }
+    }
+    fixed = { stage_envs = ["LOOP_NOTIFY"], timeout = "900s", max_retries = 1, extra_env = {} }
+    purge = { stage_envs = [], timeout = "1800s", max_retries = 1, extra_env = {} }
   }
 
   feedback_loop_secret_ids = toset(flatten([
@@ -195,10 +220,19 @@ resource "google_cloud_run_v2_job" "feedback_loop" {
 
         # この段のスイッチだけを on にする(loop_control/switches が off なら、それでも止まる)
         dynamic "env" {
-          for_each = toset(compact([each.value.stage_env]))
+          for_each = toset(each.value.stage_envs)
           content {
             name  = env.value
             value = "on"
+          }
+        }
+
+        # このコマンドだけの設定(auto-issue の上限)
+        dynamic "env" {
+          for_each = each.value.extra_env
+          content {
+            name  = env.key
+            value = env.value
           }
         }
 

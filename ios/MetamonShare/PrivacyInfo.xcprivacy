@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  共有シートの拡張(MetamonShare・#2224)のプライバシーマニフェスト。
+  受けた物を App Group の ShareInbox(ファイル)に置いて本体を開くだけ。端末の外には何も送らないので、集めるデータは無い
+  (本体がサーバーに送る時の申告は Metamon/PrivacyInfo.xcprivacy 側)。
+  理由が要る API は使わない: UserDefaults・ファイルの日時・空き容量・起動時間・キーボード(ShareInbox は受け取った日時を JSON に書く)。
+  使う API が増えたら、ここに理由を足す。
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

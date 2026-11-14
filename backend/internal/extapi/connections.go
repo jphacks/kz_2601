@@ -119,12 +119,13 @@ type sealedToken struct {
 	R string    `json:"r,omitempty"`
 	E time.Time `json:"e,omitzero"`
 	S []string  `json:"s,omitempty"`
+	H string    `json:"h,omitempty"`
 }
 
 func aad(uid, provider string) []byte { return []byte("ext/v1\x00" + uid + "\x00" + provider) }
 
 func (c *Connections) seal(ctx context.Context, uid, provider string, t Token) ([]byte, error) {
-	pt, err := json.Marshal(sealedToken{A: t.AccessToken, R: t.RefreshToken, E: t.Expiry, S: t.Scopes})
+	pt, err := json.Marshal(sealedToken{A: t.AccessToken, R: t.RefreshToken, E: t.Expiry, S: t.Scopes, H: t.Host})
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +141,7 @@ func (c *Connections) open(ctx context.Context, uid, provider string, sealed []b
 	if err := json.Unmarshal(pt, &s); err != nil {
 		return Token{}, errors.New("extapi: sealed token is not readable")
 	}
-	return Token{AccessToken: s.A, RefreshToken: s.R, Expiry: s.E, Scopes: s.S}, nil
+	return Token{AccessToken: s.A, RefreshToken: s.R, Expiry: s.E, Scopes: s.S, Host: s.H}, nil
 }
 
 // Save stores t as uid's active connection of provider.

@@ -28,7 +28,7 @@ struct MacSettingsView: View {
             MacDetailSettings()
                 .tabItem { Label("詳細", systemImage: "info.circle") }
         }
-        .frame(width: 560)
+        .frame(width: 640)
         .frame(minHeight: 360)
     }
 }

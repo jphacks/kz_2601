@@ -60,6 +60,13 @@ public enum RenderTheme {
         public static let separator = Color.platformSeparator
         /// ブランド色の**文字**(リンク・secondary ボタン・値)。面に対し AA(4.5:1)を満たすトーン(#68 SemanticPalette で検算)
         public static let brandText = SemanticPalette.color(SemanticPalette.brand)
+        /// 見出し・ラベル・空の案内などの補足の文字。iOS は `.secondary` のまま。
+        /// Mac の `.secondary`(secondaryLabelColor)は iOS より薄く小さい見出しが読みにくいので、本文の色を少しだけ薄めた色にする
+        #if os(macOS)
+        public static let secondaryText = Color(nsColor: .labelColor).opacity(0.78)
+        #else
+        public static let secondaryText = HierarchicalShapeStyle.secondary
+        #endif
         /// semantic(AA を満たす #68 のトーン。文字にも塗りにも使う)
         public static let positive = SemanticPalette.color(SemanticPalette.green)
         public static let negative = SemanticPalette.color(SemanticPalette.red)
@@ -263,7 +270,7 @@ struct EmptyPlaceholder: View {
             }
             Text(text)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(RenderTheme.Colors.secondaryText)
                 .multilineTextAlignment(.center)
             if let cta, state == .empty {
                 if let onCTA {

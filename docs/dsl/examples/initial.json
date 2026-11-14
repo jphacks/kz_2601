@@ -13,7 +13,7 @@
       "id": "home",
       "title": "",
       "components": [
-        { "type": "voiceInput", "id": "mic", "area": "A1:F12", "prompt": "どんなアプリが欲しい？", "size": "large" }
+        { "type": "voiceInput", "id": "mic", "area": "A1:F12", "prompt": "どんなアプリに変身しましょうか？", "size": "large" }
       ]
     }
   ]

@@ -119,6 +119,12 @@ func (h *Handler) extCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := uidOf(r)
+	if p.Terms.ShowOwnDataOnly {
+		if err := h.extOwnDataOnly(r, appID, creator, uid); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	if wait, ok := h.extUsers.take(uid); !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(wait))
 		httpx.ErrorWithDetails(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "しばらくしてからもう一度試してください。",
@@ -145,7 +151,30 @@ func (h *Handler) extCall(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(coins.HeaderCharged, strconv.FormatInt(ans.CoinsCharged, 10))
 		w.Header().Set(coins.HeaderBalance, strconv.FormatInt(ans.CoinsBalance, 10))
 	}
-	httpx.WriteJSON(w, http.StatusOK, ans.Result)
+	httpx.WriteJSON(w, http.StatusOK, p.WithTerms(ans.Result))
+}
+
+// reasonOwnDataOnly is details.reason of a ShowOwnDataOnly provider called
+// from a shared app (its terms show a person's data only to that person).
+const reasonOwnDataOnly = "provider_own_data_only"
+
+// extOwnDataOnly refuses a ShowOwnDataOnly provider (Strava, Jira ...) in
+// another person's app or in an app whose published DSL has a shared /
+// public entity: the data must stay with the person who connected.
+func (h *Handler) extOwnDataOnly(r *http.Request, appID, creator, uid string) error {
+	refused := apiErr(http.StatusForbidden, httpx.CodeForbidden, "このサービスのデータは、つないだ本人だけが自分のアプリで見られます。").
+		With("reason", reasonOwnDataOnly)
+	if creator != uid {
+		return refused
+	}
+	a, _, err := h.publishedDSL(r.Context(), appID)
+	if err != nil {
+		return err
+	}
+	if a != nil && hasSharedEntity(a) {
+		return refused
+	}
+	return nil
 }
 
 // extCreator returns whose `runs` the call is: the creator of a shared app
@@ -285,7 +314,7 @@ func connectable(enabled, features []string) []connectableProvider {
 	out := []connectableProvider{}
 	for _, p := range extapi.Providers() {
 		on := slices.Contains(enabled, p.ID)
-		if !p.NeedsOAuth || (p.Fake && !on) || (allow != nil && !allow[p.FeatureKey()]) {
+		if !p.NeedsOAuth || (p.Fake && !on) || (allow != nil && !allow[p.FeatureKey()]) || p.Sunset(time.Now()) {
 			continue
 		}
 		out = append(out, connectableProvider{ID: p.ID, NameJa: p.NameJa, NameEn: p.NameEn, Enabled: on})
@@ -293,7 +322,15 @@ func connectable(enabled, features []string) []connectableProvider {
 	return out
 }
 
-// startConnection: POST /v1/me/connections/{provider}/start {"scopes": [...]} → {"authUrl"}
+// extStartWith is a runner that takes connect args (Backlog's space;
+// extapi.Provider.ConnectArgs). *extapi.Client has it.
+type extStartWith interface {
+	StartWith(ctx context.Context, uid, provider string, scopes []string, args map[string]string) (string, error)
+}
+
+// startConnection: POST /v1/me/connections/{provider}/start
+// {"scopes": [...], "args": {"space": ...}} → {"authUrl"}. args are only for a
+// provider with ConnectArgs (a name it does not take is 400).
 func (h *Handler) startConnection(w http.ResponseWriter, r *http.Request) {
 	p, err := extProvider(r, true)
 	if err != nil {
@@ -301,7 +338,8 @@ func (h *Handler) startConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Scopes []string `json:"scopes"`
+		Scopes []string          `json:"scopes"`
+		Args   map[string]string `json:"args"`
 	}
 	if r.ContentLength != 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
@@ -313,11 +351,22 @@ func (h *Handler) startConnection(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "too many scopes").With("field", "scopes"))
 		return
 	}
+	for k, v := range in.Args {
+		if !slices.Contains(p.ConnectArgs, k) || len(v) > extapi.MaxArgLen {
+			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown connect argument").With("field", "args"))
+			return
+		}
+	}
 	if h.ext == nil {
 		fail(w, extOff())
 		return
 	}
-	u, err := h.ext.Start(r.Context(), uidOf(r), p.ID, in.Scopes)
+	var u string
+	if sw, ok := h.ext.(extStartWith); ok && len(in.Args) > 0 {
+		u, err = sw.StartWith(r.Context(), uidOf(r), p.ID, in.Scopes, in.Args)
+	} else {
+		u, err = h.ext.Start(r.Context(), uidOf(r), p.ID, in.Scopes)
+	}
 	if err != nil {
 		fail(w, extErr(err, p.ID))
 		return

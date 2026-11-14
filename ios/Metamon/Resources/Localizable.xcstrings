@@ -4258,19 +4258,19 @@
         }
       }
     },
-    "おかえりなさい。\n今日は何を作りますか?" : {
+    "おかえりなさい。\n今日は何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome back.\nWhat shall we make today?"
+            "value" : "Welcome back.\nWhat shall I turn into today?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "おかえりなさい。\n今日は何を作りますか?"
+            "value" : "おかえりなさい。\n今日は何に変身しましょうか?"
           }
         }
       }
@@ -4292,19 +4292,19 @@
         }
       }
     },
-    "おかえりなさい。\n次は何を作りますか?" : {
+    "おかえりなさい。\n次は何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome back.\nWhat shall we make next?"
+            "value" : "Welcome back.\nWhat shall I turn into next?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "おかえりなさい。\n次は何を作りますか?"
+            "value" : "おかえりなさい。\n次は何に変身しましょうか?"
           }
         }
       }
@@ -6519,36 +6519,19 @@
         }
       }
     },
-    "どんなアプリが欲しいですか?" : {
+    "どんなアプリに変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "What app do you want?"
+            "value" : "What shall I turn into?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "どんなアプリが欲しいですか?"
-          }
-        }
-      }
-    },
-    "どんなアプリにするか考えています…" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thinking about what kind of app to make…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "どんなアプリにするか考えています…"
+            "value" : "どんなアプリに変身しましょうか?"
           }
         }
       }
@@ -12424,6 +12407,23 @@
         }
       }
     },
+    "何に変身するか考えています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thinking about what to turn into…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何に変身するか考えています…"
+          }
+        }
+      }
+    },
     "何を記録したいですか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16375,19 +16375,19 @@
         }
       }
     },
-    "新しいアプリですね。\nどんなアプリにしますか?" : {
+    "新しいアプリですね。\n何に変身しましょうか?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A new app.\nWhat kind of app?"
+            "value" : "A new app.\nWhat shall I turn into?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新しいアプリですね。\nどんなアプリにしますか?"
+            "value" : "新しいアプリですね。\n何に変身しましょうか?"
           }
         }
       }
