@@ -1,3 +1,4 @@
+import AppIntents
 import WidgetKit
 import SwiftUI
 
@@ -9,6 +10,7 @@ import SwiftUI
 struct MetamonWidgetBundle: WidgetBundle {
     var body: some Widget {
         MetamonStatWidget()
+        MetamonActionWidget() // #2238
         TailorLiveActivity() // #423
         if #available(iOS 18, *) { // コントロール(#1993)。iOS 17 では出さない
             OpenAppControl()
@@ -60,6 +62,70 @@ struct MetamonStatWidget: Widget {
     }
 }
 
+// MARK: - ボタンのウィジェット(#2238)
+
+/// 設定: どの生成アプリのボタンを並べるか。一覧はコントロールと同じ `ControlCatalog`(本体が App Group に書く)
+struct SelectWidgetAppIntent: WidgetConfigurationIntent {
+    #if APP_STORE_REVIEW // 審査用の版は記録帳と言う(#247)
+    static var title: LocalizedStringResource = "記録帳を選ぶ"
+    @Parameter(title: "記録帳")
+    var app: ControlAppEntity?
+    #else
+    static var title: LocalizedStringResource = "アプリを選ぶ"
+    @Parameter(title: "アプリ")
+    var app: ControlAppEntity?
+    #endif
+}
+
+struct ActionProvider: AppIntentTimelineProvider {
+    /// 選んだアプリのボタンと、押して記録した後に変わる数字。どちらも本体が App Group に書いたものを読むだけ
+    private static func current(_ configuration: SelectWidgetAppIntent, family: WidgetFamily) -> ActionEntry {
+        let appId = configuration.app?.id
+        let catalog = ControlCatalog.load()
+        let snapshot = WidgetSnapshot.load()
+        let stat = appId != nil && snapshot?.appId == appId ? snapshot?.stats.first : nil
+        return ActionEntry(date: .now,
+                           appName: catalog.controlTitle(appId: appId),
+                           buttons: catalog.widgetButtons(appId: appId, limit: WidgetActionLayout.limit(for: family)),
+                           stat: stat)
+    }
+
+    func placeholder(in context: Context) -> ActionEntry {
+        ActionEntry.sample
+    }
+
+    func snapshot(for configuration: SelectWidgetAppIntent, in context: Context) async -> ActionEntry {
+        // ギャラリー(追加画面)ではサンプルを見せる。実配置時は実データ
+        context.isPreview ? .sample : Self.current(configuration, family: context.family)
+    }
+
+    func timeline(for configuration: SelectWidgetAppIntent, in context: Context) async -> Timeline<ActionEntry> {
+        let entry = Self.current(configuration, family: context.family)
+        let next = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? .now.addingTimeInterval(1800)
+        return Timeline(entries: [entry], policy: .after(next))
+    }
+}
+
+/// 押すと本体が開いて記録の入力画面が出る(コントロール #1993 と同じ扱い。ロック中は OS が解除を求める)。
+/// 記録すると本体の `WidgetSnapshotWriter` が数字を書き直し、タイムラインが読み直される
+struct MetamonActionWidget: Widget {
+    let kind = "MetamonActionWidget"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: kind, intent: SelectWidgetAppIntent.self, provider: ActionProvider()) { entry in
+            ActionButtonsView(entry: entry)
+                .containerBackground(for: .widget) { WidgetTheme.background }
+        }
+        .configurationDisplayName("Tailor It のボタン")
+        #if APP_STORE_REVIEW // 審査用の版は「アプリを作る」を避ける(#468・docs/store/wording.md)
+        .description("用意した記録帳の記録の入力画面を、ホーム画面とロック画面のボタンから開きます。")
+        #else
+        .description("作ったアプリの記録の入力画面を、ホーム画面とロック画面のボタンから開きます。")
+        #endif
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Small", as: .systemSmall) {
@@ -108,4 +174,17 @@ struct MetamonStatWidget: Widget {
     MetamonStatWidget()
 } timeline: {
     StatEntry(date: .now, snapshot: .sample)
+}
+
+#Preview("Action Small", as: .systemSmall) {
+    MetamonActionWidget()
+} timeline: {
+    ActionEntry.sample
+    ActionEntry(date: .now, appName: nil, buttons: [])
+}
+
+#Preview("Action Rectangular", as: .accessoryRectangular) {
+    MetamonActionWidget()
+} timeline: {
+    ActionEntry.sample
 }
