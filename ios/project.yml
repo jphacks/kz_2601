@@ -308,6 +308,11 @@ targets:
     platform: iOS
     sources:
       - path: MetamonShare
+        excludes:
+          - PrivacyInfo.xcprivacy
+      # 拡張のプライバシーマニフェスト(#3651)。集めるデータ・理由が要る API は無い
+      - path: MetamonShare/PrivacyInfo.xcprivacy
+        buildPhase: resources
     entitlements:
       path: MetamonShare/MetamonShare.entitlements
       properties:

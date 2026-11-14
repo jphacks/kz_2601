@@ -39,4 +39,17 @@ enum SampleAppCatalog {
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
+
+    /// サイドバーの「同梱の例」に出す例(展示向け)。Mac で動き、1 人ですぐ触れて見栄えのするものをこの順で並べる。
+    /// 開発用(gallery-*・画面遷移の確認・はじめてのアプリ)と Mac で使えない部品の例(ドラレコ・ヘルスケア・センサー・歩いた道)は出さない。
+    /// 出さない例もバンドルには残す(ショートカット・UI テストが id で開く)
+    static let showcaseIds = ["kakeibo", "shopping", "medicine", "water", "timetable", "vocab", "warikan", "tournament"]
+
+    /// `apps` から展示する例を `showcaseIds` の順で選ぶ。`keeping` の例(開いている例)は出さない例でも末尾に残す
+    static func showcase(_ apps: [SampleApp], keeping keep: String? = nil) -> [SampleApp] {
+        let byId = Dictionary(apps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var picked = showcaseIds.compactMap { byId[$0] }
+        if let keep, !showcaseIds.contains(keep), let app = byId[keep] { picked.append(app) }
+        return picked
+    }
 }
