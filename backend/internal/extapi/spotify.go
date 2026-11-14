@@ -78,6 +78,8 @@ var spotifySearchTypes = []string{"track", "artist", "album", "playlist"}
 
 func init() {
 	register(Provider{ID: Spotify, Billing: BillingFree, NeedsOAuth: true, NameJa: "Spotify", NameEn: "Spotify",
+		// Developer Policy IV.2 (no commercial use)・III.13/14 (no analysis, no AI)・II.4 (credit and link)
+		Terms: Terms{NoCharge: true, NoAI: true, ShowOwnDataOnly: true, Attribution: "Spotify のデータです(各行から Spotify で開けます)"},
 		Ops: []OpSpec{
 			{Name: "recentlyPlayed", Scopes: []string{spotifyScopeRecent}, Args: []string{"limit"}, Check: checkSpotifyRecent},
 			{Name: "nowPlaying", Scopes: []string{spotifyScopeNow}},

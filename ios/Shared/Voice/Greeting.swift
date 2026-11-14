@@ -28,16 +28,16 @@ enum Greeting {
         let hello = timeOfDay(date, calendar: calendar)
         switch context {
         case .firstVisit:
-            return Copy(title: L10n.pick(L10n.tr("どんなアプリが欲しいですか?"), review: L10n.tr("何を記録したいですか?")),
+            return Copy(title: L10n.pick(L10n.tr("どんなアプリに変身しましょうか?"), review: L10n.tr("何を記録したいですか?")),
                         subtitle: L10n.pick(L10n.tr("\(hello)。話しかけるだけで、アプリが生まれ変わります"), review: L10n.tr("\(hello)。話すだけで、記録帳の形が変わります")))
         case .returning:
-            return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n今日は何を作りますか?"), review: L10n.tr("おかえりなさい。\n今日は何を記録しますか?")),
+            return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n今日は何に変身しましょうか?"), review: L10n.tr("おかえりなさい。\n今日は何を記録しますか?")),
                         subtitle: L10n.pick(L10n.tr("\(hello)。「変身一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます"), review: L10n.tr("\(hello)。マイクを長押しすると、前に用意した記録帳を呼び出せます")))
         case .newApp:
-            return Copy(title: L10n.pick(L10n.tr("新しいアプリですね。\nどんなアプリにしますか?"), review: L10n.tr("新しい記録帳ですね。\n何を記録しますか?")),
+            return Copy(title: L10n.pick(L10n.tr("新しいアプリですね。\n何に変身しましょうか?"), review: L10n.tr("新しい記録帳ですね。\n何を記録しますか?")),
                         subtitle: L10n.pick(L10n.tr("前のアプリは、マイクの長押しからいつでも戻せます"), review: L10n.tr("前の記録帳は、マイクの長押しからいつでも戻せます")))
         case .home:
-            return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n次は何を作りますか?"), review: L10n.tr("おかえりなさい。\n次は何を記録しますか?")),
+            return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n次は何に変身しましょうか?"), review: L10n.tr("おかえりなさい。\n次は何を記録しますか?")),
                         subtitle: L10n.pick(L10n.tr("\(hello)。前のアプリは、マイクの長押しからいつでも戻せます"), review: L10n.tr("\(hello)。前の記録帳は、マイクの長押しからいつでも戻せます")))
         case .editing:
             return Copy(title: L10n.pick(L10n.tr("このアプリをどう変えますか?"), review: L10n.tr("この記録帳をどう直しますか?")),

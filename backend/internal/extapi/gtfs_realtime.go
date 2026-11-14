@@ -76,7 +76,7 @@ const GTFSAttribution = "事業者が公開しているデータです。正確�
 var gtfsIDRe = regexp.MustCompile(`^[A-Za-z0-9_.:\-]{1,64}$`)
 
 func init() {
-	register(Provider{ID: GTFSRealtime, Billing: BillingFree, Hosts: gtfsHosts(),
+	register(Provider{ID: GTFSRealtime, Billing: BillingFree, Hosts: gtfsHosts(), Terms: Terms{Attribution: GTFSAttribution},
 		Ops: []OpSpec{
 			{Name: "nextBuses", Args: []string{"feed", "stop", "route", "limit"}, Check: checkGTFSNext, CacheTTL: 30 * time.Second},
 			{Name: "busPositions", Args: []string{"feed", "route", "limit"}, Check: checkGTFSPositions, CacheTTL: 30 * time.Second},

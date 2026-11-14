@@ -146,7 +146,8 @@ func (q *qiita) items(ctx context.Context, path string, limit int) (Output, erro
 	case resp.StatusCode != http.StatusOK:
 		return Output{}, statusError(resp.StatusCode)
 	}
-	body, err := ReadBody(io.LimitReader(resp.Body, qiitaMaxBody+1))
+	// 本文入りの答えは MaxBody(1 MB)を超えうるので、上限は qiitaMaxBody で読む
+	body, err := io.ReadAll(io.LimitReader(resp.Body, qiitaMaxBody+1))
 	if err == nil && len(body) > qiitaMaxBody {
 		err = fmt.Errorf("body over %d bytes", qiitaMaxBody)
 	}
