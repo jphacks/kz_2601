@@ -150,6 +150,16 @@
 	<string>生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<!-- 交通系 IC カードの残高と履歴を読む(#2246・LiveFeliCaTransitReader)。Core NFC の FeliCa。読むだけで書き換えはしない。
+	     英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh)。
+	     entitlement com.apple.developer.nfc.readersession.formats = TAG(Metamon.entitlements)。
+	     App ID 側に NFC Tag Reading の capability と、ここに書いたシステムコード(0003)の登録が要る(人の作業) -->
+	<key>NFCReaderUsageDescription</key>
+	<string>生成したアプリで、交通系 IC カードの残高と最近の利用履歴を表示するために使用します。読み取った内容は端末の外に送りません。</string>
+	<key>com.apple.developer.nfc.readersession.felica.systemcodes</key>
+	<array>
+		<string>0003</string>
+	</array>
 	<!-- 端末のカレンダー・リマインダーを読む(#1987・DeviceCalendarSource)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。</string>
