@@ -101,6 +101,8 @@ final class MacComposeSession: Identifiable {
     @ObservationIgnored private let historyStore: ChatHistoryStore
     @ObservationIgnored private let reduceMotion: () -> Bool
     @ObservationIgnored private let isConsentGranted: @MainActor () -> Bool
+    /// Pro か(`RemainingTodayPlan.isPro`・iOS の `ProGate` と同じ権利)。Pro なら有料機能も全文で作る
+    @ObservationIgnored private let isPro: @MainActor () -> Bool
     @ObservationIgnored private var task: Task<Void, Never>?
     /// 閉じた後・サインアウトの後始末の後は履歴を書かない(走っていた返事が消した履歴を書き戻さないように)
     @ObservationIgnored private var closed = false
@@ -163,6 +165,7 @@ final class MacComposeSession: Identifiable {
     init(target: Target, draft: String = "", ai: any AIClient = MacComposeSession.gatedAI(),
          reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
          isConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
+         isPro: @escaping @MainActor () -> Bool = { RemainingTodayPlan.isPro },
          clarifyEnabled: Bool = ClarifySettings.enabled, clarifyAutoBuild: Bool = ClarifySettings.autoBuild,
          historyStore: ChatHistoryStore = .forRuntime()) {
         self.target = target
@@ -170,6 +173,7 @@ final class MacComposeSession: Identifiable {
         self.ai = ai
         self.reduceMotion = reduceMotion
         self.isConsentGranted = isConsentGranted
+        self.isPro = isPro
         self.clarifyEnabled = clarifyEnabled
         self.clarifyAutoBuild = clarifyAutoBuild
         self.historyStore = historyStore
@@ -308,14 +312,15 @@ final class MacComposeSession: Identifiable {
     /// 案の「これでいく」。複数選択なら選んだ案(並びは案の順)を 1 つにまとめる。
     func choose(_ options: [ChatOption]) {
         guard let option = MultiSelect.combined(options) else { return }
-        build(Self.instruction(requiresPro: option.requiresPro, full: option.instruction, free: option.freeInstruction))
+        build(Self.instruction(requiresPro: option.requiresPro, full: option.instruction, free: option.freeInstruction,
+                               isPro: isPro()))
     }
 
     /// 要約カードの「これでいく」
     func confirm() {
         guard case .confirm(let transcript) = offer, let turn = latest else { return }
         let full = transcript ?? bubbles.filter { $0.role == .user }.map(\.text).joined(separator: "。")
-        build(Self.instruction(requiresPro: turn.requiresPro, full: full, free: turn.freeTranscript))
+        build(Self.instruction(requiresPro: turn.requiresPro, full: full, free: turn.freeTranscript, isPro: isPro()))
     }
 
     /// 「このまま作る」(create: go-ahead を送って ready を受ける)・「このまま反映」(edit: これまでの指示で直す)
@@ -327,14 +332,14 @@ final class MacComposeSession: Identifiable {
         }
     }
 
-    /// 有料機能(#77)は Mac ではまだ買えない(課金は後の Issue)ので、無料版の指示があればそちらで作る。
-    static func instruction(requiresPro: Bool?, full: String, free: String?) -> String {
-        guard requiresPro == true, let free, !free.isEmpty else { return full }
+    /// 有料機能(#77)を Mac ではまだ使えないので、Pro でなければ無料版の指示があればそちらで作る。Pro なら全文
+    static func instruction(requiresPro: Bool?, full: String, free: String?, isPro: Bool) -> String {
+        guard !isPro, requiresPro == true, let free, !free.isEmpty else { return full }
         return free
     }
 
-    /// 有料機能を外して作ることになるか(要約カード・案に一言出す)
-    var dropsPaidFeatures: Bool { latest?.requiresPro == true && latest?.freeTranscript != nil }
+    /// 有料機能を外して作ることになるか(要約カード・案に一言出す)。Pro なら外さない
+    var dropsPaidFeatures: Bool { !isPro() && latest?.requiresPro == true && latest?.freeTranscript != nil }
 
     // MARK: - 生成
 
