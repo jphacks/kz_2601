@@ -212,7 +212,8 @@ public final class RecordSyncEngine {
         let (data, unsaved) = await seal(appId: appId, entity: entity, recordId: recordId, data: plain)
         let written: String
         let now = Self.timestamp.string(from: .now)
-        if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
+        // 仮 id(`local-…`)で開いたまま、作成の送信が済んでから直しても同じ行を書き換える(新規として 2 件目を作らない)
+        if let recordId, var row = await store.current(appId: appId, entity: entity, recordId: recordId) {
             let oldVideos = VideoValue.localIDs(in: row.data)
             let oldAudios = AudioValue.localIDs(in: row.data)
             row.data.merge(data) { _, new in new } // PATCH と同じくキー単位でマージ(DSL から消えた項目も保持)
@@ -221,8 +222,8 @@ public final class RecordSyncEngine {
             row.updatedAt = now
             if row.pendingOp != .create { row.pendingOp = .update }
             await store.upsert(row)
-            await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .update, data: data))
-            written = recordId
+            await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: row.recordId, kind: .update, data: data))
+            written = row.recordId
         } else {
             let clientId = UUID().uuidString.lowercased()
             let row = LocalRecord(appId: appId, entity: entity, recordId: LocalRecord.temporaryId(clientId: clientId), data: data,
