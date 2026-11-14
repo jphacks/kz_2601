@@ -78,13 +78,13 @@ class GreetingTest {
     fun textInBothLanguages() {
         Strings.withLang(Lang.JA) {
             val (title, sub) = Greeting.text(Context.FIRST_VISIT, hour = 8)
-            assertEquals("どんなアプリが欲しいですか?", title)
+            assertEquals("どんなアプリに変身しましょうか?", title)
             assertEquals("おはようございます。話しかけるだけで、アプリが生まれ変わります", sub)
             assertEquals("話しかけると、このアプリが育ちます", Greeting.text(Context.EDITING, hour = 8).second)
         }
         Strings.withLang(Lang.EN) {
             val (title, sub) = Greeting.text(Context.RETURNING, hour = 20)
-            assertEquals("Welcome back.\nWhat shall we make today?", title)
+            assertEquals("Welcome back.\nWhat shall I turn into today?", title)
             assertEquals("Good evening. Long-press the mic to bring back an app you made", sub)
             assertEquals("Hello. Just talk, and the app transforms", Greeting.text(Context.FIRST_VISIT, hour = 12).second)
         }
