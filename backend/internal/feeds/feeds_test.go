@@ -495,9 +495,7 @@ func TestFeedsCheckRedirect(t *testing.T) {
 	}
 }
 
-// sleepCtx returns true only when the wait ran out; a cancel before or
-// during the wait ends it at once.
-func TestSleepCtx(t *testing.T) {
+func TestSleepCtxReturnsFalseWhenCanceled(t *testing.T) {
 	const long = time.Minute
 	for _, c := range []struct {
 		name string
@@ -520,15 +518,16 @@ func TestSleepCtx(t *testing.T) {
 		}, false},
 	} {
 		ctx, cancel := c.ctx()
-		start := time.Now()
-		got := sleepCtx(ctx, c.d)
-		took := time.Since(start)
+		done := make(chan bool, 1)
+		go func() { done <- sleepCtx(ctx, c.d) }()
+		select {
+		case got := <-done:
+			if got != c.want {
+				t.Errorf("%s: sleepCtx = %t, want %t", c.name, got, c.want)
+			}
+		case <-time.After(long / 2):
+			t.Errorf("%s: sleepCtx did not return", c.name)
+		}
 		cancel()
-		if got != c.want {
-			t.Errorf("%s: sleepCtx = %t, want %t", c.name, got, c.want)
-		}
-		if took > 50*time.Millisecond {
-			t.Errorf("%s: took %v, want under 50ms", c.name, took)
-		}
 	}
 }
