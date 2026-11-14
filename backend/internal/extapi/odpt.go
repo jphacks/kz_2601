@@ -99,7 +99,7 @@ var odptOperators = []odptOperator{
 }
 
 func init() {
-	register(Provider{ID: ODPT, Billing: BillingFree,
+	register(Provider{ID: ODPT, Billing: BillingFree, Terms: Terms{Attribution: ODPTAttribution},
 		Ops: []OpSpec{
 			{Name: "trainStatus", Args: []string{"operator", "railway"}, Check: checkODPTStatus, CacheTTL: time.Minute},
 		},
@@ -273,9 +273,8 @@ func (o *odpt) trainStatus(ctx context.Context, in Input) (Output, error) {
 			out.ValidUntil = r.valid
 		}
 	}
-	// TODO(#1643): Output has no place for a notice yet, so ODPTAttribution
-	// (and ODPTToeiCredit for Toei rows) is not sent with the rows; the
-	// part that shows them adds it when the DSL's external-API parts land.
+	// ODPTAttribution goes with the answer (Terms.Attribution). TODO(#1643):
+	// ODPTToeiCredit for Toei rows is not sent yet.
 	return out, nil
 }
 
