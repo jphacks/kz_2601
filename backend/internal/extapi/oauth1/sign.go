@@ -1,8 +1,7 @@
-// Package oauth1 computes OAuth 1.0a HMAC-SHA1 signatures (RFC 5849 3.4).
-//
-// Nothing calls it yet and it is not in the extapi registry: it only shows the
-// signing is small and correct while #1953 decides whether the runner gets
-// OAuth 1.0a (Trello). No nonce, timestamp, header building or token flow here.
+// Package oauth1 computes OAuth 1.0a HMAC-SHA1 signatures (RFC 5849 3.4)
+// and the Authorization header of a signed request (3.5.1). The token flow
+// (request token → authorize → access token) is the provider's
+// (extapi.OAuth1Client: zaim.go); nonce and timestamp are the caller's.
 package oauth1
 
 import (
@@ -11,6 +10,7 @@ import (
 	"encoding/base64"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -105,4 +105,59 @@ func SignHMACSHA1(base, consumerSecret, tokenSecret string) string {
 	mac := hmac.New(sha1.New, []byte(Encode(consumerSecret)+"&"+Encode(tokenSecret)))
 	mac.Write([]byte(base))
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// Header is the Authorization header value of a signed request (3.5.1):
+// the protocol parameters (consumer key, the token when there is one,
+// nonce, timestamp, HMAC-SHA1, version 1.0 and extra ones such as
+// oauth_callback / oauth_verifier) signed together with u's query and a
+// form-encoded body. tokenSecret is "" before there is a token.
+func Header(method string, u *url.URL, formBody, consumerKey, consumerSecret, token, tokenSecret, nonce string, ts int64, extra ...Param) (string, error) {
+	protocol := []Param{
+		{"oauth_consumer_key", consumerKey},
+		{"oauth_nonce", nonce},
+		{"oauth_signature_method", "HMAC-SHA1"},
+		{"oauth_timestamp", strconv.FormatInt(ts, 10)},
+		{"oauth_version", "1.0"},
+	}
+	if token != "" {
+		protocol = append(protocol, Param{"oauth_token", token})
+	}
+	protocol = append(protocol, extra...)
+	params, err := Collect(u, formBody, protocol)
+	if err != nil {
+		return "", err
+	}
+	protocol = append(protocol, Param{"oauth_signature", SignHMACSHA1(BaseString(method, u, params), consumerSecret, tokenSecret)})
+	slices.SortFunc(protocol, func(a, b Param) int { return strings.Compare(a.Key, b.Key) })
+	parts := make([]string, len(protocol))
+	for i, p := range protocol {
+		parts[i] = Encode(p.Key) + `="` + Encode(p.Value) + `"`
+	}
+	return "OAuth " + strings.Join(parts, ", "), nil
+}
+
+// ParseHeader reads the protocol parameters of an Authorization header
+// made by Header (tests and fakes; realm is left out).
+func ParseHeader(h string) ([]Param, bool) {
+	rest, ok := strings.CutPrefix(h, "OAuth ")
+	if !ok {
+		return nil, false
+	}
+	var out []Param
+	for _, part := range strings.Split(rest, ",") {
+		k, v, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || len(v) < 2 || v[0] != '"' || v[len(v)-1] != '"' {
+			return nil, false
+		}
+		key, err1 := url.PathUnescape(k)
+		val, err2 := url.PathUnescape(v[1 : len(v)-1])
+		if err1 != nil || err2 != nil {
+			return nil, false
+		}
+		if key != "realm" {
+			out = append(out, Param{key, val})
+		}
+	}
+	return out, true
 }
