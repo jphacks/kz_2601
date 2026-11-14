@@ -4,5 +4,5 @@
 # stg / prod に向ける手順は docs/infra/stg-cleanup.md(人が実行する)。この target はエミュレータにしか向けない。
 STG_CLEANUP_FLAGS ?= -smoke -stg-ratelimits
 .PHONY: run-stg-cleanup
-run-stg-cleanup:
+run-stg-cleanup: ## 試験データの掃除をエミュレータに対して試す(既定はドライラン)
 	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/stg-cleanup $(STG_CLEANUP_FLAGS)

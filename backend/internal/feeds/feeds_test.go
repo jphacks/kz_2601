@@ -494,3 +494,40 @@ func TestFeedsCheckRedirect(t *testing.T) {
 		}
 	}
 }
+
+func TestSleepCtxReturnsFalseWhenCanceled(t *testing.T) {
+	const long = time.Minute
+	for _, c := range []struct {
+		name string
+		d    time.Duration
+		ctx  func() (context.Context, context.CancelFunc)
+		want bool
+	}{
+		{"no wait at all", 0, func() (context.Context, context.CancelFunc) {
+			return context.WithCancel(context.Background())
+		}, true},
+		{"cancelled before the wait", long, func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			return ctx, cancel
+		}, false},
+		{"cancelled during the wait", long, func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			time.AfterFunc(time.Millisecond, cancel)
+			return ctx, cancel
+		}, false},
+	} {
+		ctx, cancel := c.ctx()
+		done := make(chan bool, 1)
+		go func() { done <- sleepCtx(ctx, c.d) }()
+		select {
+		case got := <-done:
+			if got != c.want {
+				t.Errorf("%s: sleepCtx = %t, want %t", c.name, got, c.want)
+			}
+		case <-time.After(long / 2):
+			t.Errorf("%s: sleepCtx did not return", c.name)
+		}
+		cancel()
+	}
+}

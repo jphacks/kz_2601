@@ -49,6 +49,14 @@ struct ControlCatalog: Codable, Equatable {
     func controlTitle(appId: String?) -> String? { appId.flatMap { app(id: $0)?.name } }
     func controlTitle(recordTargetId: String?) -> String? { recordTargetId.flatMap { recordTarget(id: $0)?.title } }
 
+    /// ウィジェットに並べるボタン(#2238)。生成アプリのボタンの指定(`exposeAsControl`)は #1775 の決まり待ちなので、
+    /// 今は選んだアプリの記録先をそのままボタンにする。指定が決まったら読む所はここだけ直す。
+    /// 選んでいない・消したアプリなら空(ウィジェットは「アプリを選ぶ」と出す)。
+    func widgetButtons(appId: String?, limit: Int) -> [RecordTarget] {
+        guard let appId, app(id: appId) != nil, limit > 0 else { return [] }
+        return Array(recordTargets.filter { $0.appId == appId }.prefix(limit))
+    }
+
     /// 設定の検索欄。名前の一部(大文字小文字・全角半角を無視)で絞る
     static func matches(_ name: String, _ query: String) -> Bool {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)

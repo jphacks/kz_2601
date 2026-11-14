@@ -292,6 +292,9 @@ targets:
       - path: MetamonWidgetTests
       - path: MetamonWidget/Views
       - path: MetamonWidget/Shared
+      # ボタンのウィジェット(#2238)の View が押した時に呼ぶ Intent。ウィジェット側の Bridge は何もしない
+      - path: Metamon/Features/Intents/ControlIntents.swift
+      - path: MetamonWidget/Controls/ControlIntentBridge.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
