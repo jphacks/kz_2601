@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -162,4 +163,115 @@ func TestStoreWatchVisibleRecords(t *testing.T) {
 			t.Fatalf("hidden changes sent %d signal(s)", n)
 		}
 	})
+}
+
+// #2771: the fingerprint of the watch window (id, updatedAt, mark counts):
+// hidden records are out, a visible mark or update moves it, and the record
+// past the window does not count.
+func TestVisibleState(t *testing.T) {
+	m := NewMemory()
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	m.now = func() time.Time { at = at.Add(time.Minute); return at }
+	ctx := t.Context()
+	rs := PublicRecords("VISSTATE", "msg")
+	vis := func(r *Record) bool { return !strings.HasPrefix(r.ID, "h-") }
+	create := func(id string) {
+		t.Helper()
+		if _, _, err := m.CreateRecord(ctx, rs, Record{ID: id, Entity: rs.Entity, Data: map[string]any{"v": 1}}); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+	}
+	mark := func(id string, on bool) {
+		t.Helper()
+		if _, err := m.SetMark(ctx, rs, id, "like", "u-1", on); err != nil {
+			t.Fatalf("mark %s: %v", id, err)
+		}
+	}
+	update := func(id string) {
+		t.Helper()
+		if _, err := m.UpdateRecord(ctx, rs, id, map[string]any{"v": 2}); err != nil {
+			t.Fatalf("update %s: %v", id, err)
+		}
+	}
+
+	create("v-1")
+	create("h-1")
+	base := m.visibleState(rs, vis)
+	if !strings.Contains(base, "v-1@") || strings.Contains(base, "h-1@") {
+		t.Fatalf("only the visible record is in the print: %q", base)
+	}
+
+	// a hidden record's update and mark leave the print as it was
+	update("h-1")
+	mark("h-1", true)
+	if got := m.visibleState(rs, vis); got != base {
+		t.Errorf("hidden change moved the print:\n got %q\nwant %q", got, base)
+	}
+
+	// a mark on a visible record moves it, and its count is in the print
+	mark("v-1", true)
+	marked := m.visibleState(rs, vis)
+	if marked == base {
+		t.Errorf("a visible mark did not move the print: %q", marked)
+	}
+	if !strings.Contains(marked, "#like=1") {
+		t.Errorf("the mark count is in the print: %q", marked)
+	}
+	mark("v-1", false)
+	if got := m.visibleState(rs, vis); got == marked || !strings.Contains(got, "#like=0") {
+		t.Errorf("undoing the mark moves the print back to a count of 0: %q", got)
+	}
+
+	// an update moves it too (updatedAt), and a delete empties it
+	before := m.visibleState(rs, vis)
+	update("v-1")
+	if got := m.visibleState(rs, vis); got == before {
+		t.Errorf("an update of a visible record did not move the print: %q", got)
+	}
+	if err := m.DeleteRecord(ctx, rs, "v-1"); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.visibleState(rs, vis); got != "" {
+		t.Errorf("with only hidden records the print is empty: %q", got)
+	}
+
+	// a record set that is not there at all (no such app) has no print
+	if got := m.visibleState(PrivateRecords("no-user", "no-app", "msg"), vis); got != "" {
+		t.Errorf("an unreadable record set has no print: %q", got)
+	}
+}
+
+// #2771: only the newest watchRecordsWindow records are in the print.
+func TestVisibleStateWatchWindow(t *testing.T) {
+	m := NewMemory()
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	m.now = func() time.Time { at = at.Add(time.Minute); return at }
+	ctx := t.Context()
+	rs := PublicRecords("VISWINDOW", "msg")
+	vis := func(*Record) bool { return true }
+	for i := 0; i <= watchRecordsWindow; i++ { // one more than the window
+		id := fmt.Sprintf("v-%03d", i)
+		if _, _, err := m.CreateRecord(ctx, rs, Record{ID: id, Entity: rs.Entity, Data: map[string]any{"v": i}}); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+	}
+	state := m.visibleState(rs, vis)
+	if n := len(strings.Split(state, "|")); n != watchRecordsWindow {
+		t.Errorf("the print has %d records, want %d", n, watchRecordsWindow)
+	}
+	if strings.Contains(state, "v-000@") {
+		t.Error("the oldest record is past the window and out of the print")
+	}
+	if !strings.Contains(state, fmt.Sprintf("v-%03d@", watchRecordsWindow)) {
+		t.Error("the newest record is in the print")
+	}
+
+	// a mark on the record past the window does not move the print
+	// (SetMark keeps updatedAt, so it stays out)
+	if _, err := m.SetMark(ctx, rs, "v-000", "like", "u-1", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.visibleState(rs, vis); got != state {
+		t.Error("a change past the window moved the print")
+	}
 }
