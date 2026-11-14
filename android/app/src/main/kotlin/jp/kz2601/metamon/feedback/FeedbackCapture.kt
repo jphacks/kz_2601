@@ -34,19 +34,19 @@ import kotlin.math.roundToInt
 class FeedbackOpen(val context: FeedbackContext, val screenshot: Bitmap?)
 
 /**
- * フィードバックの画面の出し入れ(iOS の `FeedbackPresenter`)。設定の入口と端末を振った時の両方がここを通る。
+ * フィードバックの画面の出し入れ(iOS の `FeedbackPresenter`)。設定の入口と debug の自動で開く口(`METAMON_AUTO_FEEDBACK`)の両方がここを通る。
  * 二重には開かない。
  */
 class FeedbackComposerLauncher {
     private val _open = MutableStateFlow<FeedbackOpen?>(null)
     val open: StateFlow<FeedbackOpen?> = _open.asStateFlow()
 
-    /** 撮っている途中(振った直後にもう 1 回振っても 2 回撮らない) */
+    /** 撮っている途中(続けて開こうとしても 2 回撮らない) */
     private var capturing = false
 
     val isOpen: Boolean get() = _open.value != null || capturing
 
-    /** 今の画面を撮り([withOverlays] は振った時だけ true)、今のアプリと端末の情報を集めて開く。どれも送るかは本人が選ぶ(既定はすべて送らない)。 */
+    /** 今の画面を撮り([withOverlays] は自動で開く口だけ true)、今のアプリと端末の情報を集めて開く。どれも送るかは本人が選ぶ(既定はすべて送らない)。 */
     suspend fun capture(activity: Activity, container: AppContainer, withOverlays: Boolean = false) = show {
         val shot = FeedbackScreenshot.capture(activity, withOverlays)
         val doc = container.runtime.state.value.document
@@ -111,7 +111,7 @@ object FeedbackScreenshot {
 
     /**
      * Activity の窓を PixelCopy で撮る(他のアプリ・システムの画面は写らない)。
-     * [withOverlays] が true なら、上に出ているこのアプリのシート・ダイアログ(別の窓)も重ねる(振った時・iOS の `captureWindow()`)。
+     * [withOverlays] が true なら、上に出ているこのアプリのシート・ダイアログ(別の窓)も重ねる(自動で開く口・iOS の `captureWindow()`)。
      * false なら Activity の窓だけ(設定から開いた時・シートの下のアプリの画面)。
      */
     suspend fun capture(activity: Activity, withOverlays: Boolean = false): Bitmap? {
