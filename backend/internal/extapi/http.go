@@ -70,6 +70,8 @@ type ConnBody struct {
 	UID      string   `json:"uid"`
 	Provider string   `json:"provider"`
 	Scopes   []string `json:"scopes,omitempty"`
+	// Args are the provider's connect args (Provider.ConnectArgs; start only).
+	Args map[string]string `json:"args,omitempty"`
 }
 
 // FailBody is the internal answer of a failed call: the reason, and for
@@ -116,7 +118,7 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		if !httpx.DecodeBody(w, r, &b) {
 			return
 		}
-		u, err := s.Start(r.Context(), b.UID, b.Provider, b.Scopes)
+		u, err := s.StartWith(r.Context(), b.UID, b.Provider, b.Scopes, b.Args)
 		if err != nil {
 			s.fail(w, err)
 			return

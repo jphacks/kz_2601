@@ -64,7 +64,8 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 | `Billing` | `free`(API 自体は無料)/ `paid`(呼ぶたびに原価) |
 | `NeedsOAuth` | 利用者ごとのトークンが要るか。審査用の版の機能のキーに入れない(決定 6・`ReviewBuildFeatures`) |
 | `Ops` | op の名前・書く op か・要る scope・取る引数 |
-| `Hosts` | 出口の許可リスト(`https://<host>` だけ) |
+| `Hosts` | 出口の許可リスト(`https://<host>` だけ。利用者ごとにホストが変わる provider は `https://*.<domain>` で 1 ラベルだけ通す・「Backlog の注」) |
+| `ConnectArgs` / `ConnectHost` | つなぐ時に受け取る引数(Backlog の `space`)と、それを利用者のホスト(`Token.Host`)にする関数。無い provider は引数を取らない |
 | `New` / `NewOAuth` | 起動時に鍵(`EXT_<PROVIDER>_API_KEY` / `_CLIENT_ID` / `_CLIENT_SECRET`)から op と OAuth のクライアントを作る |
 
 機能のキーは `externalCall.<provider>`(`FeatureKey`)。provider は既定で off(`EXT_<PROVIDER>_ENABLED`)、`EXT_DISABLED=1` で全部止まる。
@@ -81,6 +82,9 @@ provider ごとの規約の条項の場所(課金・出典・保存・人が確�
 | `asana` の `projectTasks`(プロジェクトのタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read`) | `projectTasks(projectId, limit?)`。プロジェクトの未完了のタスク。`projectId` は数字の id(Asana の URL の `/0/<id>/`)。持っていない id(Asana の 400 / 404)は 400 `bad_request`。行は `myTasks` と同じ。規約・回数は同上 | 同上 | なし | 同上 |
 | `asana` の `complete`(タスクを完了にする・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write`。初めて使う時につなぎ直す。Asana の scope は足し算にならないので、つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `complete(taskId)`。`taskId` は数字の id。答えは `resultId`(= `taskId`)と 1 件(補足 = 「完了」)。完了済みをもう一度完了にしても変わらない。持っていないタスクは 400 `bad_request`。規約は同上。回数: 書き込みは同時 15 | 同上 | なし | 同上 |
 | `asana` の `addTask`(タスクを足す・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write` と `workspaces:read`。`tasks:write` は初めて使う時につなぎ直す。つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `addTask(name, notes?, dueOn?, workspaceId?, projectId?)`。自分に割り当てたタスクを 1 件足す(`assignee=me`)。`name` は 1〜500 文字(前後の空白は落とす)・`notes` は 1,000 文字まで(改行・タブは可、ほかの制御文字は 400)・`dueOn` は `YYYY-MM-DD`。`projectId` があればそのプロジェクトに足す(ワークスペースはプロジェクトのもの)。どちらも無い時は `myTasks` と同じく利用者のワークスペースが 1 つならそれを使い、0 か 2 つ以上なら 400 `bad_request`。答えは `resultId`(= 足したタスクの id)と 1 件(行は `myTasks` と同じ)。Asana に冪等キーは無く、書く op は再試行しない。持っていないワークスペース・プロジェクトは 400 `bad_request`。規約・回数は同上 | 同上 | なし | 同上 |
+| `backlog` の `myIssues`(自分が担当の課題・Nulab Backlog API v2) | 無料・OAuth(`runs` だけ・Backlog の OAuth に scope と PKCE は無い。**つなぐ時に `space` が要る**・下の「Backlog の注」) | `myIssues(limit?, statusId?)`。自分(`/users/myself`)が担当の課題を更新の新しい順(`assigneeId[]`・`sort=updated`)。`statusId` は状態の数字の id(無ければ全部)。`limit` 1〜100(既定 20)。行は課題(見出し = 件名・補足 = 「プロジェクトのキー · 期限 · 状態」・値 = 課題のキー(`APP-12`)・リンク = スペースの `/view/APP-12`)。規約: Backlog API の利用規約(Nulab の規約・利用者の権限の範囲)。回数: 利用者 1 人 1 分 150 回(API の種類ごと)。401 は接続のエラー・403 は権限不足(つなぎ直し)・404 / 400 は 400・429 は provider を 1 分止める。アクセストークンは 1 時間・リフレッシュトークンは入れ替わる。取り消しの口は無い(保存したトークンを消すだけ) | `https://*.backlog.com`・`https://*.backlog.jp`(スペースのホスト 1 ラベルだけ・下の「Backlog の注」) | なし | `EXT_BACKLOG_ENABLED=1`・`EXT_BACKLOG_CLIENT_ID` / `_CLIENT_SECRET` |
+| `backlog` の `projects`(参加しているプロジェクト) | 同上 | `projects(limit?)`。アーカイブでないプロジェクト(`/projects?archived=false`)。`limit` 1〜100(既定 20・こちらで切る)。行はプロジェクト(見出し = 名前・補足 = キー・値 = id(`addIssue` の `projectId`)・リンク = スペースの `/projects/KEY`) | 同上 | なし | 同上 |
+| `backlog` の `addIssue`(課題を足す) | 同上・書く(確認必須) | `addIssue(projectId, summary, issueTypeId, priorityId?, description?, dueDate?)`。`projectId` / `issueTypeId` / `priorityId` は数字の id・`summary` は 1 行 255 文字まで・`description` は 100,000 文字まで・`dueDate` は `YYYY-MM-DD`。Backlog では `priorityId` が必須なので、無い時はスペースの優先度(`/priorities`)から「中」(無ければ真ん中)を使う。Backlog が受けない入力(400)・無い id(404)は 400 `bad_request`。答えは `resultId`(課題のキー)と 1 件 | 同上 | なし | 同上 |
 | `anthropicUsage` の `usage` / `cost`(Claude の使用量と費用・Anthropic の Admin API・#2137)**`EXT_ANTHROPIC_USAGE_ENABLED=1` の時だけ登録(無ければまだ登録しない)** | 無料・**利用者の** Admin API キー(`runs` だけ・読むだけ。キーは組織の管理もできるので読む op しか作らない) | `usage(days?)`・`cost(days?)`。`days` 1〜31(既定 7・今日(UTC)から何日前まで)。`usage` は `usage_report/messages` を 1 日・モデルごとに読む(行 = 1 日・1 モデル。見出し = 日付・補足 = モデル・値 = トークンの合計。`Output.Cells` は 日付・モデル・入力(キャッシュ以外)・出力・キャッシュの読み・キャッシュの書き)。`cost` は `cost_report` を 1 日ごとに読む(行 = 1 日。見出し = 日付・補足 = 通貨・値 = 金額(小数 2 桁。Anthropic のセント単位を直す))。行の形は OpenAI の使用量と同じ(`usage_rows.go`)。ページ送りは 5 ページまで(超えたら 502 `upstream_unavailable`)。キーは `x-api-key` のヘッダーだけ。401 / 403 は 409 `ext_not_connected`(キーを預け直す)・429 / 5xx は 502 `upstream_unavailable`。キーを預かる土台(#1671)が入るまで `New` が断るので、登録しても呼べない | `https://api.anthropic.com` だけ | なし(答えは人ごと) | `EXT_ANTHROPIC_USAGE_ENABLED=1`。キーは利用者のもの(#1671) |
 | `cloudflare` の `pagesProjects`(Pages のプロジェクトと最新のデプロイ・#1676)**まだ登録しない** | 無料・利用者の API トークン(`runs` だけ。Cloudflare に他のアプリ向けの OAuth が無い)・読むだけ | `pagesProjects(accountId?, limit?)`。`accountId` は 32 桁の 16 進。無ければトークンが見られるアカウントが 1 つの時だけそれ(0 か 2 つ以上・アカウントを読めないトークンは 400 `bad_request`)。`limit` 1〜25(既定 10)。行はプロジェクト(見出し = 名前・値 = 最新のデプロイの状態(成功・失敗・ビルド中・待ち・取り消し。デプロイが無ければ値なし)・補足 = 「本番 / プレビュー · ブランチ · コミットの 1 行目 · 日時(日本時間)」・リンク = ダッシュボードのそのデプロイ)。キーを預かる土台(#1671)が入るまで provider は定義だけで登録しない(呼べない)。勧めるトークンの権限は Account の「Cloudflare Pages: Read」「Workers Scripts: Read」(`accountId` を省くなら「Account Settings: Read」も) | `https://api.cloudflare.com` だけ(`/client/v4/...`) | なし | (登録後)`EXT_CLOUDFLARE_ENABLED=1`。キーは利用者のもの(#1671) |
 | `cloudflare` の `pagesDeployments`(Pages のプロジェクトのデプロイ・#1676)**まだ登録しない** | 同上 | `pagesDeployments(project, accountId?, env?, limit?)`。`project` は Pages の名前(小文字・数字・`-` の 58 文字まで)・`env` は `production` か `preview`。新しい順。行は `pagesProjects` と同じ形。無いプロジェクト(404)は 400 `bad_request` | 同上 | なし | 同上 |
@@ -198,6 +202,13 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 - **GitHub の上限と決まり**: 利用者 1 人 1 時間 5,000 回(本人のほかのトークンと共有)・検索は 1 分 30 回・同時に 100 本まで。GitHub は 1 人ぶんを並べて呼ばないよう求めるので、同じトークンの呼び出しは台の中で 1 本ずつにする。上限の 403(`x-ratelimit-remaining: 0` か `retry-after` つき)と 429 と GraphQL の `RATE_LIMITED` は 429 として扱い、provider を 1 分止める(上限を超えて呼び続けると連携を止められることがある)。上限でない 403 は App の権限が足りない(つなぎ直し)。`User-Agent` を必ず付け、`X-GitHub-Api-Version: 2026-03-10`。検索は GitHub App のトークンでは `is:pr` / `is:issue` が要る(無いと 422)。
 - **Linear**: scope は `read`(既定)と `issues:create`(Issue を足すだけ。直す・消すはできない)。`write`・`admin` は頼まない。PKCE は S256・`actor=user`。アクセストークンは 24 時間・リフレッシュトークンは 30 日で入れ替わる。切る時は `POST /oauth/revoke` にリフレッシュトークン(無ければアクセストークン)。400(もう取り消し済み)・401 は済んだものとする。
 - **Linear の上限**: OAuth の App は利用者 1 人 1 時間 5,000 回・複雑さ 2,000,000 点(1 回 10,000 点を超える問い合わせは断られる)。上限は 429 と `RATELIMITED`。問い合わせは見せる項目だけ・50 件までにする。Linear はエラーを 200 / 400 と `extensions.code` で返すので、`AUTHENTICATION_ERROR` は接続のエラー、`FORBIDDEN` はつなぎ直し、`INVALID_INPUT` は 400 にする(エラーの code の一覧は公開の文書に無いので、知らない code は 502 `upstream_unavailable`)。
+
+### Backlog の注(スペースごとのホスト)
+
+- **ホストは利用者ごと**: Backlog の認可・トークン・API は全部スペースのホスト(`https://<space>.backlog.com` / `.backlog.jp`)にある。OAuth のクライアント(`EXT_BACKLOG_CLIENT_ID` / `_CLIENT_SECRET`)は Nulab のアプリ登録で 1 つ(どのスペースでも同じ)。
+- **つなぐ時に `space` を受け取る**: `POST /v1/me/connections/backlog/start` の本文 `{"args": {"space": "acme.backlog.jp"}}`(runner は `POST /internal/ext/connections/start` の `args`)。provider は `ConnectArgs`(取る引数の名前)と `ConnectHost`(引数 → `https://` のホスト。形が違えば 400)を持ち、`Service.StartWith` が state(`oauthStates/{state}.host`)に入れる。callback は `HostedOAuthClient` の `ExchangeOn(host, …)` で引き換え、トークンは `Token.Host` にホストを持つ(暗号化して保存・`sealed` の `h`)。`Refresh` と op はそのホストに話す(`Input.Token.Host`)。`ConnectArgs` の無い provider に `args` を渡すと 400。端末の「つないだサービス」には今はホストを出さない(`ConnectionView` にまだ無い)。
+- **出口の許可リスト**: `Hosts` の `https://*.backlog.jp` は「1 ラベル + そのドメイン」だけ通す(`AllowedURL`: `acme.backlog.jp` は通り、`backlog.jp`・`a.b.backlog.jp`・`acme.backlog.jp:8443`・`acme.backlog.jp.evil.example` は通らない)。`*` が使えるのはこの形だけで、ほかの provider は今までどおり `https://<host>` の完全一致。
+- **OAuth の形**: scope と PKCE は無い(認可の URL に `code_challenge` を付けず、state で守る)。アクセストークンは 1 時間・リフレッシュトークンは使うたびに入れ替わる。取り消しの口は無い(`ErrNoRevoke`: 保存したトークンを消すだけ。本人が Backlog の設定で切る)。上限は利用者 1 人 1 分 150 回(API の種類ごと・`X-RateLimit-*`)。
 
 ### Withings の注(#1669)
 
@@ -375,8 +386,8 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 
 | もの | 場所・中身 |
 |---|---|
-| トークン | `users/{uid}/connections/{provider}`: `status`(`active` / `revoked` / `error`)・`sealed`(暗号化したトークン)・`scopes`・`connectedAt`・`lastUsedAt`・`revokedAt`・`deleteAt` |
-| state / PKCE | `oauthStates/{state}`: uid・provider・`code_verifier`・scope・`expireAt`(10 分)・`createdAt`。1 回だけ使える(取り出しと削除を 1 つのトランザクションで) |
+| トークン | `users/{uid}/connections/{provider}`: `status`(`active` / `revoked` / `error`)・`sealed`(暗号化したトークン。利用者ごとのホストもこの中・`Token.Host`)・`scopes`・`connectedAt`・`lastUsedAt`・`revokedAt`・`deleteAt` |
+| state / PKCE | `oauthStates/{state}`: uid・provider・`code_verifier`・scope・`host`(Backlog のスペース)・`expireAt`(10 分)・`createdAt`。1 回だけ使える(取り出しと削除を 1 つのトランザクションで) |
 | OAuth 1.0a の state(`zaim`) | 同じ `oauthStates/{state}` に `requestToken`(リクエストトークン)と `verifier`(その secret)。下の「OAuth 1.0a」 |
 
 - **暗号化**: `Sealer` が暗号化する。本番は Cloud KMS の対称鍵(`KMSSealer`・`EXT_TOKEN_KMS_KEY`)で、鍵の encrypt / decrypt は runner の SA だけに渡す。uid と provider を追加の認証データにするので、別の人・別の provider の文書に写しても開けない。エミュレータでは起動ごとの使い捨ての鍵(`LocalSealer`)。鍵が無い時は OAuth の provider が動かない(暗号化しないで保存する道は無い)。
@@ -396,7 +407,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | 口 | 中身 |
 |---|---|
 | `POST /internal/ext/call` | `{provider, op, args, appId, creatorUid, creatorAnonymous, userUid, userAnonymous, requestId}` → `{result: {rows / item / resultId}, coinsCharged, coinsBalance}`(後の 2 つは `X-Coins-Charged` / `X-Coins-Balance` にする) |
-| `POST /internal/ext/connections/start` | `{uid, provider, scopes?}` → `{authUrl}`(scope を書かなければ読む op の分だけ。書く op の scope は使う時に足す) |
+| `POST /internal/ext/connections/start` | `{uid, provider, scopes?, args?}` → `{authUrl}`(`args` は provider の `ConnectArgs`・Backlog の `space`。scope を書かなければ読む op の分だけ。書く op の scope は使う時に足す) |
 | `POST /internal/ext/connections/revoke` / `revokeAll` / `list` | 切る / 全部切る(退会)/ 一覧(トークン無し。`list` は動かしている provider の id `enabled` も返す) |
 | `POST /internal/ext/expire` | 90 日を過ぎた接続を最大 500 件消す(Scheduler から 1 日 1 回の想定) |
 | `GET /oauth/callback/{provider}` | provider の同意から戻る唯一の認証なしの口。state を 1 回だけ確かめ、code をトークンに替えて保管し、`tailorit://connected?provider=…&status=ok\|error` に 302。URL にトークン・code は入らない |
@@ -418,7 +429,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 |---|---|
 | `POST /v1/apps/{appId}/ext/{provider}/{op}` | `{"args": {...}}` → `{rows / item / resultId}`。有料の provider は `X-Coins-Charged` / `X-Coins-Balance` |
 | `GET /v1/me/connections` | `connections`: つないだサービスの一覧(provider・状態・scope・日付。トークンは返さない)。`providers`: つなげるサービスの一覧(下) |
-| `POST /v1/me/connections/{provider}/start` | `{"scopes"?}` → `{authUrl}`(OAuth の要る provider だけ。ほかは 404) |
+| `POST /v1/me/connections/{provider}/start` | `{"scopes"?, "args"?}` → `{authUrl}`(`args` は Backlog の `{"space": "acme.backlog.jp"}`。provider が取らない名前は 400)(OAuth の要る provider だけ。ほかは 404) |
 | `DELETE /v1/me/connections/{provider}` | 切る(204) |
 
 `GET /v1/me/connections` の `providers` は、端末の「つないだサービス」の画面がつなぐボタンを出すための一覧(#1566)。端末に provider を書き込まずに済む。
