@@ -61,7 +61,7 @@ var (
 func init() {
 	register(Provider{ID: NHK, Billing: BillingFree, Hosts: []string{nhkHost}, GlobalDaily: nhkGlobalDaily,
 		Ops: []OpSpec{
-			{Name: "programs", Args: []string{"area", "service", "date", "limit"}, Check: checkNHKPrograms, CacheTTL: nhkCacheTTL},
+			{Name: "programs", Args: []string{"area", "service", "date", "limit"}, Check: checkNHKPrograms, CacheTTL: nhkCacheTTL, CacheTTLFor: nhkProgramsTTL},
 			{Name: "now", Args: []string{"area", "service"}, Check: checkNHKNow, CacheTTL: nhkCacheTTL},
 		},
 		New: func(sec Secrets) (map[string]Operation, error) {
@@ -112,6 +112,17 @@ func checkNHKPrograms(args map[string]string) error {
 	}
 	_, err := argInt(args, "limit", nhkListDefault, 1, nhkListMax)
 	return err
+}
+
+// nhkProgramsTTL keeps a call without date (today) no later than JST
+// midnight, when "today" becomes another day.
+func nhkProgramsTTL(args map[string]string, now time.Time) time.Duration {
+	if strings.TrimSpace(args["date"]) != "" {
+		return nhkCacheTTL
+	}
+	t := now.In(jst)
+	midnight := time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, jst)
+	return min(nhkCacheTTL, midnight.Sub(now))
 }
 
 func checkNHKNow(args map[string]string) error {
@@ -244,9 +255,15 @@ func (n *nhk) nowOnAir(ctx context.Context, in Input) (Output, error) {
 			if !ok {
 				continue
 			}
-			if it.label == "今" && out.Item == nil {
-				item := r
-				out.Item = &item
+			if it.label == "今" {
+				if out.Item == nil {
+					item := r
+					out.Item = &item
+				}
+				// the answer is kept no longer than the earliest present program
+				if end, err := time.Parse(time.RFC3339, it.p.EndTime); err == nil && (out.ValidUntil.IsZero() || end.Before(out.ValidUntil)) {
+					out.ValidUntil = end
+				}
 			}
 			out.Rows = append(out.Rows, r)
 		}

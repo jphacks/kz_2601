@@ -144,6 +144,9 @@ func TestNHKNow(t *testing.T) {
 			t.Fatalf("row %d = %+v, want %+v", i, out.Rows[i], want[i])
 		}
 	}
+	if want := time.Date(2026, 11, 14, 10, 45, 0, 0, jst); !out.ValidUntil.Equal(want) {
+		t.Fatalf("valid until %v, want the present program's end %v", out.ValidUntil, want)
+	}
 	if _, err := ops["now"].Do(t.Context(), Input{Args: map[string]string{"service": "r1"}}); Reason(err) != ReasonUpstream {
 		t.Fatalf("nothing on air: %s (%v)", Reason(err), err)
 	}
@@ -284,5 +287,23 @@ func TestNHKThroughService(t *testing.T) {
 	}
 	if strings.Contains(e.logs.String(), nhkTestKey) {
 		t.Fatal("the key is in the logs")
+	}
+}
+
+// today's programs (no date) are not kept past JST midnight; a fixed date
+// keeps the 10 minutes.
+func TestNHKProgramsTTL(t *testing.T) {
+	late := time.Date(2026, 11, 14, 23, 57, 0, 0, jst)
+	if got := nhkProgramsTTL(map[string]string{}, late); got != 3*time.Minute {
+		t.Fatalf("today at 23:57: %v", got)
+	}
+	if got := nhkProgramsTTL(map[string]string{}, late.UTC()); got != 3*time.Minute {
+		t.Fatalf("today at 23:57 (UTC clock): %v", got)
+	}
+	if got := nhkProgramsTTL(map[string]string{}, nhkNow); got != nhkCacheTTL {
+		t.Fatalf("today at 10:00: %v", got)
+	}
+	if got := nhkProgramsTTL(map[string]string{"date": "2026-11-15"}, late); got != nhkCacheTTL {
+		t.Fatalf("a fixed date: %v", got)
 	}
 }
