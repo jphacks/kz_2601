@@ -79,8 +79,10 @@ func init() {
 	})
 }
 
-// outlookCalendar is the provider's ops and OAuth client.
+// outlookCalendar is the provider's ops and OAuth client. microsoftTodo uses
+// the same OAuth client and do with its own wire.
 type outlookCalendar struct {
+	id   string // the provider, in errors
 	sec  Secrets
 	wire outlookWire
 	hc   *http.Client
@@ -88,18 +90,25 @@ type outlookCalendar struct {
 }
 
 func newOutlookCalendar(sec Secrets, w outlookWire) (*outlookCalendar, error) {
+	return newMicrosoftClient(OutlookCalendar, sec, w, outlookCalendarHosts)
+}
+
+// newMicrosoftClient is the OAuth client and Graph caller of one Microsoft
+// provider (Outlook calendar, To Do): the same token endpoints, its own
+// wire and hosts.
+func newMicrosoftClient(id string, sec Secrets, w outlookWire, hosts []string) (*outlookCalendar, error) {
 	if sec.ClientID == "" || sec.ClientSecret == "" {
-		return nil, errors.New("EXT_OUTLOOK_CALENDAR_CLIENT_ID / _CLIENT_SECRET not set")
+		return nil, fmt.Errorf("EXT_%s_CLIENT_ID / _CLIENT_SECRET not set", envName(id))
 	}
 	hc := w.Client
 	if hc == nil {
-		hc = NewHTTPClient(outlookCalendarHosts, DefaultTimeout)
+		hc = NewHTTPClient(hosts, DefaultTimeout)
 	}
 	now := w.Now
 	if now == nil {
 		now = time.Now
 	}
-	return &outlookCalendar{sec: sec, wire: w, hc: hc, now: now}, nil
+	return &outlookCalendar{id: id, sec: sec, wire: w, hc: hc, now: now}, nil
 }
 
 // --- OAuth ---
@@ -188,7 +197,7 @@ func (o *outlookCalendar) token(ctx context.Context, form url.Values, prev Token
 		Scope        string `json:"scope"`
 	}
 	if err := json.Unmarshal(body, &r); err != nil || r.AccessToken == "" {
-		return Token{}, errors.New("outlookCalendar: bad token answer")
+		return Token{}, fmt.Errorf("%s: bad token answer", o.id)
 	}
 	t := Token{AccessToken: r.AccessToken, RefreshToken: r.RefreshToken, Scopes: outlookScopes(r.Scope)}
 	if r.ExpiresIn > 0 {
@@ -488,7 +497,7 @@ func (o *outlookCalendar) do(ctx context.Context, t *Token, method, path string,
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		if err := json.Unmarshal(b, out); err != nil {
-			return fmt.Errorf("outlookCalendar: bad answer: %w", err)
+			return fmt.Errorf("%s: bad answer: %w", o.id, err)
 		}
 		return nil
 	}
@@ -505,5 +514,5 @@ func (o *outlookCalendar) do(ctx context.Context, t *Token, method, path string,
 		return ErrNotConnected
 	}
 	return &ProviderError{Status: resp.StatusCode, Retryable: resp.StatusCode == 429 || resp.StatusCode >= 500,
-		Err: fmt.Errorf("outlookCalendar %s", e.Error.Code)}
+		Err: fmt.Errorf("%s %s", o.id, e.Error.Code)}
 }
