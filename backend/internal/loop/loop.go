@@ -49,6 +49,11 @@ const (
 // SourceGooglePlayReview is Google Play reviews (#2147).
 const SourceGooglePlayReview Source = "google_play_review"
 
+// SourceUnsupported is 「無い機能を頼まれた」: a day's ai.unsupported log
+// lines (the generation declared it replaced or could not do a requested
+// part) for one phrase, recorded as one feature-request item (#1769).
+const SourceUnsupported Source = "unsupported"
+
 // Item statuses.
 const (
 	// ItemNew: ingested, waiting for triage.

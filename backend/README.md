@@ -221,7 +221,7 @@ Firestore に繋ぐ cmd は、どれも `internal/fsenv` で同じ読み方を�
 ### cmd/appstore-reconcile・cmd/feedback-loop・cmd/purge(Cloud Run Job)
 
 - `cmd/appstore-reconcile`: `APPSTORE_API_*`(App Store Server API のキー)と appconfig と同じ `APPSTORE_*`。[app-store-notifications.md](../docs/infra/app-store-notifications.md#照合ジョブ)
-- `cmd/feedback-loop`: `LOOP_*`。段のスイッチ `LOOP_<段>=on`(`INTAKE` / `TRIAGE` / `DRAFT` / `PUBLISH` / `ISSUE_AUTO` / `NOTIFY`)、Issue の自動の起票は `LOOP_ISSUE_AUTO=on` + `LOOP_PUBLISH=on` + `LOOP_ISSUE_REPO`、上限 `LOOP_ISSUE_AUTO_MAX_PER_RUN`(10)/ `LOOP_ISSUE_AUTO_MAX_PER_DAY`(30)。全部の表は [feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)
+- `cmd/feedback-loop`: `LOOP_*`。段のスイッチ `LOOP_<段>=on`(`INTAKE` / `TRIAGE` / `DRAFT` / `PUBLISH` / `ISSUE_AUTO` / `NOTIFY`)、Issue の自動の起票は `LOOP_ISSUE_AUTO=on` + `LOOP_PUBLISH=on` + `LOOP_ISSUE_REPO`、上限 `LOOP_ISSUE_AUTO_MAX_PER_RUN`(10)/ `LOOP_ISSUE_AUTO_MAX_PER_DAY`(30)。「無い機能を頼まれた」の取り込みは `LOOP_SOURCE_UNSUPPORTED=on`。全部の表は [feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)
 - `cmd/purge`: 共通の物と `FIREBASE_AUTH_EMULATOR_HOST`(ローカルだけ)。消す期間はフラグ。[account-purge.md](../docs/infra/account-purge.md)
 
 ### 人が回す道具
