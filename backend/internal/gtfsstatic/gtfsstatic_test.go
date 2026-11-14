@@ -116,6 +116,29 @@ func TestNilTable(t *testing.T) {
 	}
 }
 
+func TestRouteOf(t *testing.T) {
+	tb, err := read(zipDir(t, "basic", ""), Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		tb   *Table
+		trip string
+		want string
+	}{
+		{"a trip that is there", tb, "T1", "R1"},
+		{"another route", tb, "T3", "R2"},
+		{"a trip that is not there", tb, "T9", ""},
+		{"an empty id", tb, "", ""},
+		{"a nil table", nil, "T1", ""},
+	} {
+		if got := c.tb.RouteOf(c.trip); got != c.want {
+			t.Errorf("%s: RouteOf(%q) = %q, want %q", c.name, c.trip, got, c.want)
+		}
+	}
+}
+
 func TestReadRefusesBadZips(t *testing.T) {
 	good := map[string]string{
 		"stops.txt":      "stop_id,stop_name\nS1,a\n",

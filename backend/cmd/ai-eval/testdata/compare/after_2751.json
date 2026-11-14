@@ -1,0 +1,4 @@
+{"date":"2026-11-02","model":"m1","effort":"low","cases":[
+ {"id":"both","kind":"create","ok":true,"attempts":1,"regenerations":0,"areaFallback":false,"claudeMs":500,"firstEventMs":120,"totalMs":600,"usage":{"inputTokens":10,"outputTokens":100}},
+ {"id":"only-after","kind":"edit","ok":true,"attempts":1,"regenerations":0,"areaFallback":false,"claudeMs":300,"totalMs":350,"usage":{"inputTokens":10,"outputTokens":30}}
+]}

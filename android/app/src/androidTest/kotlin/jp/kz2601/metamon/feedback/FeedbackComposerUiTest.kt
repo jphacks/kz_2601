@@ -34,7 +34,7 @@ import org.junit.runner.RunWith
 
 /**
  * フィードバックの画面(#906)の画面のテスト(#1314)。モックの構成(`METAMON_MOCK=1`)で起動し、
- * `METAMON_AUTO_FEEDBACK=<秒>`(振った時と同じく開く口・debug だけ)で画面を開く。送り先はモック([MockFeedbackClient])。
+ * `METAMON_AUTO_FEEDBACK=<秒>`(自動で開く口・debug だけ)で画面を開く。送り先はモック([MockFeedbackClient])。
  * - 既定ではどの添付もオフ
  * - 同意を入れるまで「送信」を押せない
  * - 送れたら「送信しました」が出る

@@ -258,8 +258,11 @@ struct RouteGuideLeaf: View {
                 Text(message).foregroundStyle(RenderTheme.Colors.negative)
             case .guiding, .arrived:
                 if let cue = session.lastCue, voiceOn {
+                    // スピーカーの印は飾り: 要素を 1 つにまとめ、読み上げと識別子を文だけに付ける
                     Label(cue, systemImage: "speaker.wave.2")
                         .lineLimit(2)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(cue)
                         .accessibilityIdentifier("routeGuide.cue")
                 }
             case .idle:

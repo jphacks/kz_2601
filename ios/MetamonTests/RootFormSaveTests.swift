@@ -94,12 +94,8 @@ final class RootFormSaveTests: XCTestCase {
         let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
         draft.values["body"] = .string("買い物")
 
-        let saving = Task { await save(rt, draft, at: tabRoot) }
-        // 書き込み(recordSync の actor)を待っている間に次の入力が入る。main actor で見えた時は必ず await の途中
-        for _ in 0..<1000 where !rt.isSaving(draft) { await Task.yield() }
-        XCTAssertTrue(rt.isSaving(draft), "保存の途中に入れる")
-        draft.values["body"] = .string("次のメモ")
-        await saving.value
+        // 書き込み(recordSync の actor)を待っている間に次の入力が入る
+        await typeDuringSave(rt, draft, "次のメモ")
 
         let saved = await rt.recordSync.cached(appId: appId, entity: "memo")
         XCTAssertEqual(saved.count, 1)
@@ -167,12 +163,16 @@ final class RootFormSaveTests: XCTestCase {
         XCTAssertNil(draft.lastSaveResult)
     }
 
-    /// 書き込み(recordSync の actor)を待っている間に `text` を入れる
+    /// 書き込み(recordSync の actor)を待っている間に `text` を入れる。書き込みの入口を `WriteGate` で止めて入れる
     private func typeDuringSave(_ rt: AppRuntime, _ draft: FormDraft, _ text: String) async {
+        let gate = WriteGate()
+        rt.recordSync.beforeWrite = { await gate.hold() }
+        defer { rt.recordSync.beforeWrite = nil }
         let saving = Task { await save(rt, draft, at: tabRoot) }
-        for _ in 0..<1000 where !rt.isSaving(draft) { await Task.yield() }
+        await gate.waitUntilEntered()
         XCTAssertTrue(rt.isSaving(draft), "保存の途中に入れる")
         draft.values["body"] = .string(text)
+        gate.open()
         await saving.value
     }
 
@@ -230,5 +230,37 @@ final class RootFormSaveTests: XCTestCase {
 
         XCTAssertEqual(rt.paths[stack], [], "積まれたフォームは閉じる")
         XCTAssertNil(rt.toast, "閉じる時は toast を出さない(今までどおり)")
+    }
+}
+
+/// 書き込み(`RecordSyncEngine.write`)の入口で止め、「保存の途中」(書き込みの await の間)をテストが決定的に作る。
+/// `Task.yield` を数えて待つと、速い machine では書き込みが yield の間に終わり、遅い machine では始まる前に数え切る(CI で 1 回落ちた)
+@MainActor
+private final class WriteGate {
+    private var entered: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, Never>?
+    private var hasEntered = false
+    private var isOpen = false
+
+    /// `recordSync.beforeWrite` に入れる: 入ったことを知らせ、`open` まで待つ
+    func hold() async {
+        hasEntered = true
+        entered?.resume()
+        entered = nil
+        guard !isOpen else { return }
+        await withCheckedContinuation { release = $0 }
+    }
+
+    /// 書き込みに入るまで待つ
+    func waitUntilEntered() async {
+        guard !hasEntered else { return }
+        await withCheckedContinuation { entered = $0 }
+    }
+
+    /// 書き込みを進める
+    func open() {
+        isOpen = true
+        release?.resume()
+        release = nil
     }
 }
