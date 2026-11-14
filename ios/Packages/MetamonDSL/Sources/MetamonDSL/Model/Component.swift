@@ -208,6 +208,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     // healthStat(#167)。label / target は共用
     public var metric: String?         // steps|weight
     public var period: String?         // today(既定)|week
+    public var live: Bool?             // steps: 開いている間も歩数が増え続ける(#3694・既定 false)
     // gridTable(#234)。entity / titleField / subtitleField / onItemTap は共用
     public var columnField: String?    // 横軸(例: 曜日 enum)
     public var rowField: String?       // 縦軸(例: 時限 integer)
@@ -284,7 +285,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case nameField, balanceField
         case task, input, output, options, shape, count, items, length, inputPhoto, saveTo, inputFeeds, outputs
         case tone
-        case metric, period
+        case metric, period, live
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField, roleField, persona, speak, inputEntity
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, illustrate, fields, distance, allowRequests, autoAccept
@@ -390,6 +391,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         subtitleField = try? c.decodeIfPresent(String.self, forKey: .subtitleField)
         metric = try? c.decodeIfPresent(String.self, forKey: .metric)
         period = try? c.decodeIfPresent(String.self, forKey: .period)
+        live = try? c.decodeIfPresent(Bool.self, forKey: .live)
         columnField = try? c.decodeIfPresent(String.self, forKey: .columnField)
         rowField = try? c.decodeIfPresent(String.self, forKey: .rowField)
         columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
