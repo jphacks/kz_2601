@@ -20,11 +20,15 @@ const (
 	StageTriage  = "triage"  // LLM classification
 	StageDraft   = "draft"   // build issue drafts
 	StagePublish = "publish" // post an approved draft to GitHub
-	StageNotify  = "notify"  // 「あなたの声で直りました」
+	// StageIssueAuto files checked drafts as issues without a person
+	// (auto-issue; owner decision 2026-11-14 in #365). It needs StagePublish
+	// on as well, so the publish switch stops it too.
+	StageIssueAuto = "issue_auto"
+	StageNotify    = "notify" // 「あなたの声で直りました」
 )
 
 // Stages lists every stage.
-var Stages = []string{StageIntake, StageTriage, StageDraft, StagePublish, StageNotify}
+var Stages = []string{StageIntake, StageTriage, StageDraft, StagePublish, StageIssueAuto, StageNotify}
 
 // SwitchAll is the Firestore switch that stops every stage at once.
 const SwitchAll = "all"
