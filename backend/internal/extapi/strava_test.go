@@ -393,3 +393,29 @@ func TestStravaEgress(t *testing.T) {
 		t.Fatalf("local server reached: %v", err)
 	}
 }
+
+// A transport failure (API and token endpoint) is the shared upstream error:
+// retryable, 502, no token or secret in it.
+func TestStravaTransportError(t *testing.T) {
+	f, srv := newFakeStrava(t)
+	c, err := newStrava(Secrets{ClientID: stravaTestID, ClientSecret: stravaTestSecret}, f.wire(srv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Close()
+	_, err = c.stats(context.Background(), Input{Token: &Token{AccessToken: "st-access-0"}})
+	var pe *ProviderError
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream || StatusOf(Reason(err)) != http.StatusBadGateway {
+		t.Fatalf("api transport: %v", err)
+	}
+	if strings.Contains(err.Error(), "st-access-0") {
+		t.Fatalf("token in the error: %v", err)
+	}
+	_, err = c.Refresh(context.Background(), Token{AccessToken: "st-access-0", RefreshToken: "st-refresh-0"})
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream {
+		t.Fatalf("token transport: %v", err)
+	}
+	if strings.Contains(err.Error(), stravaTestSecret) || strings.Contains(err.Error(), "st-refresh-0") {
+		t.Fatalf("secret in the error: %v", err)
+	}
+}

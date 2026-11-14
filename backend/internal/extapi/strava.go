@@ -170,7 +170,7 @@ func (c *strava) Revoke(ctx context.Context, t Token) error {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return err
+		return transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	_, _ = ReadBody(resp.Body)
@@ -194,12 +194,15 @@ func (c *strava) token(ctx context.Context, form url.Values, prev Token) (Token,
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return Token{}, err
+		return Token{}, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ReadBody(resp.Body)
 	if err != nil {
-		return Token{}, err
+		if ctx.Err() != nil {
+			return Token{}, ctx.Err()
+		}
+		return Token{}, &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	if resp.StatusCode != http.StatusOK {
 		// Strava answers 400 {"message":"Bad Request","errors":[{"code":"invalid",...}]} to a code or refresh token it does not know
@@ -441,12 +444,15 @@ func (c *strava) get(ctx context.Context, in Input, path string, q url.Values, o
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return err
+		return transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, err := ReadBody(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
