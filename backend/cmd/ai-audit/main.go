@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"regexp"
@@ -703,9 +704,15 @@ func main() {
 		cmp, _ = evaluate(cases, *cmpPath)
 	}
 
-	fmt.Printf("## 機械判定(%s %s)\n\n", rf.Model, rf.Tag)
-	fmt.Println("| id | 生成 | needs ○/△/× | 欠落した needs | lint 件数 |" + map[bool]string{true: " 比較 run ○/△/× |", false: ""}[cmp != nil])
-	fmt.Println("|---|---|---|---|---|" + map[bool]string{true: "---|", false: ""}[cmp != nil])
+	report(os.Stdout, cases, res, rf, cmp)
+}
+
+// report writes the Markdown tables for one run (and the optional compare
+// column) so the same output can be checked in a test.
+func report(w io.Writer, cases []auditCase, res map[string]result, rf runFile, cmp map[string]result) {
+	_, _ = fmt.Fprintf(w, "## 機械判定(%s %s)\n\n", rf.Model, rf.Tag)
+	_, _ = fmt.Fprintln(w, "| id | 生成 | needs ○/△/× | 欠落した needs | lint 件数 |"+map[bool]string{true: " 比較 run ○/△/× |", false: ""}[cmp != nil])
+	_, _ = fmt.Fprintln(w, "|---|---|---|---|---|"+map[bool]string{true: "---|", false: ""}[cmp != nil])
 	needTotals := map[string][3]int{}
 	lintKinds := map[string]int{}
 	for _, c := range cases {
@@ -739,12 +746,12 @@ func main() {
 			o2, p2, n2 := score(cmp[c.ID])
 			line += fmt.Sprintf(" %d/%d/%d |", o2, p2, n2)
 		}
-		fmt.Println(line)
+		_, _ = fmt.Fprintln(w, line)
 	}
 
-	fmt.Println("\n## needs 別の充足(○/△/×)")
-	fmt.Println("\n| need | ○ | △ | × |")
-	fmt.Println("|---|---|---|---|")
+	_, _ = fmt.Fprintln(w, "\n## needs 別の充足(○/△/×)")
+	_, _ = fmt.Fprintln(w, "\n| need | ○ | △ | × |")
+	_, _ = fmt.Fprintln(w, "|---|---|---|---|")
 	keys := make([]string, 0, len(needTotals))
 	for k := range needTotals {
 		keys = append(keys, k)
@@ -757,12 +764,12 @@ func main() {
 	})
 	for _, k := range keys {
 		t := needTotals[k]
-		fmt.Printf("| %s | %d | %d | %d |\n", k, t[0], t[1], t[2])
+		_, _ = fmt.Fprintf(w, "| %s | %d | %d | %d |\n", k, t[0], t[1], t[2])
 	}
 
-	fmt.Println("\n## lint 種別の件数")
-	fmt.Println("\n| 種別 | 件数 |")
-	fmt.Println("|---|---|")
+	_, _ = fmt.Fprintln(w, "\n## lint 種別の件数")
+	_, _ = fmt.Fprintln(w, "\n| 種別 | 件数 |")
+	_, _ = fmt.Fprintln(w, "|---|---|")
 	lk := make([]string, 0, len(lintKinds))
 	for k := range lintKinds {
 		lk = append(lk, k)
@@ -771,23 +778,23 @@ func main() {
 		return lintKinds[lk[i]] > lintKinds[lk[j]] || lintKinds[lk[i]] == lintKinds[lk[j]] && lk[i] < lk[j]
 	})
 	for _, k := range lk {
-		fmt.Printf("| %s | %d |\n", k, lintKinds[k])
+		_, _ = fmt.Fprintf(w, "| %s | %d |\n", k, lintKinds[k])
 	}
 
-	fmt.Println("\n## ケース別の詳細")
+	_, _ = fmt.Fprintln(w, "\n## ケース別の詳細")
 	for _, c := range cases {
 		r := res[c.ID]
-		fmt.Printf("\n### %s\n\n「%s」\n\n", c.ID, c.Transcript)
+		_, _ = fmt.Fprintf(w, "\n### %s\n\n「%s」\n\n", c.ID, c.Transcript)
 		if !r.ok {
-			fmt.Printf("- 生成失敗: %s\n", r.err)
+			_, _ = fmt.Fprintf(w, "- 生成失敗: %s\n", r.err)
 			continue
 		}
 		for _, n := range c.Needs {
 			m := r.marks[n]
-			fmt.Printf("- %s %s — %s\n", m[0], n, m[1])
+			_, _ = fmt.Fprintf(w, "- %s %s — %s\n", m[0], n, m[1])
 		}
 		for _, l := range r.lint {
-			fmt.Printf("- lint %s\n", l)
+			_, _ = fmt.Fprintf(w, "- lint %s\n", l)
 		}
 	}
 }

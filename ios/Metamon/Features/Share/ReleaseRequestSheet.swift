@@ -24,26 +24,7 @@ final class ReleaseUI {
         byApp = ReleaseRequest.latestByApp(items)
     }
 }
-
-extension ReleaseStatus {
-    var label: String {
-        switch self {
-        case .received: return L10n.tr("受付")
-        case .reviewing: return L10n.tr("検討中")
-        case .planned: return L10n.tr("リリース予定")
-        case .declined: return L10n.tr("見送り")
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .received: return "tray.and.arrow.down"
-        case .reviewing: return "magnifyingglass"
-        case .planned: return "shippingbox"
-        case .declined: return "xmark.circle"
-        }
-    }
-}
+// 状況の文言・記号と入力の決まりは Mac と共有(Shared/Release/ReleaseRequestForm.swift・#2249)
 #endif
 
 /// 変身一覧のカード右上: 「…」メニュー(シェア・公開 / リリース申請)+ 申請済みなら status の小さなバッジ。
@@ -138,7 +119,7 @@ struct ReleaseStatusBadge: View {
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, 4)
             .background(.black.opacity(status == .declined ? 0.35 : 0.55), in: Capsule())
-            .accessibilityLabel(L10n.tr("リリース申請: \(status.label)"))
+            .accessibilityLabel(status.accessibilityLabel)
     }
 }
 
@@ -156,16 +137,15 @@ struct ReleaseRequestSheet: View {
     /// 今回送って受け付けられた(「受け付けました」表示)
     @State private var justSent = false
 
-    private static let maxPurpose = 200
-    private static let maxContact = 100
+    private static let maxPurpose = ReleaseRequestForm.maxPurpose
+    private static let maxContact = ReleaseRequestForm.maxContact
 
     /// 申請中(見送り以外)があればフォームの代わりに状況を出す
     private var open: ReleaseRequest? {
-        guard let r = ui.byApp[app.id], r.kind != .declined else { return nil }
-        return r
+        ReleaseRequestForm.open(ui.byApp[app.id])
     }
 
-    private var canSend: Bool { !purpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy }
+    private var canSend: Bool { ReleaseRequestForm.canSend(purpose: purpose, busy: busy) }
 
     var body: some View {
         ScrollView {

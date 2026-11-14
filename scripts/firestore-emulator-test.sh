@@ -122,4 +122,34 @@ hasline "::error::no Firestore emulator test ran"
 
 # 12. 入力が無ければ使い方で 2
 expect 2
+
+# --- summary: パッケージごとの回った・Skip の数(#3267)。落とさない ---
+SCRIPT="$HERE/firestore-emulator.sh"
+M=github.com/jphacks/kz_2601/backend/internal
+ev() { printf '{"Action":"%s","Package":"%s/%s","Test":"%s"}\n' "$1" "$M" "$2" "$3"; }
+{
+  ev pass store TestFirestoreA
+  ev pass store TestFirestoreB
+  ev pass calls TestFirestoreCalls
+  ev skip coins TestFirestoreCoins
+  ev pass coins TestOther
+  ev skip loop TestFirestoreLoop
+  ev skip loop TestFirestoreLoop2
+  # パッケージ単位の行(Test なし)は数えない
+  printf '{"Action":"pass","Package":"%s/store"}\n' "$M"
+  printf '{"Action":"output","Package":"%s/store","Output":"ok\\n"}\n' "$M"
+} >"$TMP/fake.json"
+
+OUT="$("$SCRIPT" summary "$TMP/fake.json" 2>&1)" || fail "summary は exit 0 のはず(Skip があっても落とさない)"
+# 列: パッケージ pass skip 状態
+grep -Eq '^internal/store +2 +0 +ran$' <<<"$OUT" || fail "store が ran・pass 2 でない"
+grep -Eq '^internal/calls +1 +0 +ran$' <<<"$OUT" || fail "calls が ran でない"
+grep -Eq '^internal/coins +1 +1 +SKIP$' <<<"$OUT" || fail "coins が SKIP・pass 1・skip 1 でない"
+grep -Eq '^internal/loop +0 +2 +SKIP$' <<<"$OUT" || fail "loop が SKIP・skip 2 でない"
+has "packages: 4 / ran: 2 / skipped: 2"
+
+# 存在しないファイルは使い方を出して 2
+set +e; OUT="$("$SCRIPT" summary "$TMP/none-summary.json" 2>&1)"; code=$?; set -e
+[ "$code" = 2 ] || fail "ファイルが無い時は exit 2 のはずが $code"
+has "usage:"
 echo "ok"

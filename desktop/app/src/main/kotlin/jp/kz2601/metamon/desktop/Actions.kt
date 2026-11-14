@@ -10,6 +10,8 @@ import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
 import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.desktop.notify.DesktopNotice
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
 import jp.kz2601.metamon.desktop.notify.TrayNotifier
 import jp.kz2601.metamon.desktop.settings.UpcomingNotification
 import jp.kz2601.metamon.desktop.notify.Notifier as DisplayNotifier
@@ -96,6 +98,8 @@ class DesktopActionHost(
     private val system: SystemOpener = SystemOpener.Awt,
     /** 予約した通知の一覧に出すアプリの名前。 */
     private val appName: String? = null,
+    /** 本の検索を画面のスレッドの外で。テストではその場で走らせて「すぐ終わる」を作る。 */
+    private val lookupThread: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "lookupBook") { it() } },
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
@@ -149,7 +153,10 @@ class DesktopActionHost(
         val raw = form.values[spec.isbnField]?.stringValue?.takeIf { it.isNotBlank() } ?: return Strings["host_book_isbn_empty"]
         val isbn = BookLookupPlan.normalizeISBN(raw) ?: return Strings["host_book_isbn_invalid"]
         val fields = BookLookupFields(spec.isbnField, spec.titleField, spec.authorsField, spec.publisherField, spec.publishedDateField)
-        thread(isDaemon = true, name = "lookupBook") {
+        // 「探しています」を先に出してから検索を始める(返り値にすると、すぐ終わった答えを dispatch が上書きする)
+        val id = synchronized(lookupIds) { (lookupIds[session] ?: 0L).plus(1).also { lookupIds[session] = it } }
+        session.message = Strings["desktop_book_searching"]
+        lookupThread {
             val msg = try {
                 val book = books.lookup(isbn)
                 if (book == null) {
@@ -162,10 +169,14 @@ class DesktopActionHost(
             } catch (e: Exception) {
                 Strings["host_book_unavailable"]
             }
-            Snapshot.withMutableSnapshot { session.message = msg }
+            // 後から頼んだ検索があれば、古い答えで上書きしない
+            if (synchronized(lookupIds) { lookupIds[session] == id }) Snapshot.withMutableSnapshot { session.message = msg }
         }
-        return Strings["desktop_book_searching"]
+        return null
     }
+
+    /** 画面ごとの最新の検索の番号。 */
+    private val lookupIds = java.util.WeakHashMap<DesktopSession, Long>()
 
     /**
      * 表は io/RecordIo(ref は名前・古い順)、PDF は io/PdfIo(#1856)。format が pdf なら PDF、他は CSV(iOS と同じ形)。
@@ -393,6 +404,24 @@ interface Notifier {
         /** すぐ出す(予約しない)。出せなければ何もしない。 */
         fun notify(title: String, body: String) {
             display.show(DesktopNotice(title, body))
+        }
+
+        /**
+         * ボタン(開く・あとで)付きですぐ出す(#3210)。出す口がボタンを出せなければボタン無しで出す。
+         * 押された印は [jp.kz2601.metamon.desktop.notify.NoticeActions] に届き、[onAction] にもどのボタンかを渡す。
+         */
+        fun notifyWithActions(
+            id: String,
+            title: String,
+            body: String,
+            actions: List<NoticeAction> = listOf(NoticeAction.OPEN, NoticeAction.LATER),
+            onAction: ((NoticeAction) -> Unit)? = null,
+        ): Boolean {
+            val d = display
+            if (!d.supportsActions) return d.show(DesktopNotice(title, body))
+            val notice = DesktopNotice(title, body, id = id, actions = actions, onAction = onAction)
+            NoticeActions.remember(notice)
+            return d.show(notice)
         }
 
         override fun schedule(n: Notification): String = schedule(n, null)

@@ -52,6 +52,23 @@
         }
       }
     },
+    "Tailor It のボタン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It Buttons"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It のボタン"
+          }
+        }
+      }
+    },
     "Tailor It の数字" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -188,6 +205,23 @@
         }
       }
     },
+    "作ったアプリの記録の入力画面を、ホーム画面とロック画面のボタンから開きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the entry form of your app from a button on the Home Screen and Lock Screen."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリの記録の入力画面を、ホーム画面とロック画面のボタンから開きます。"
+          }
+        }
+      }
+    },
     "作ったアプリの集計(今月の支出など)をデスクトップと通知センターに表示します。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -235,6 +269,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近の記録"
+          }
+        }
+      }
+    },
+    "用意した記録帳の記録の入力画面を、ホーム画面とロック画面のボタンから開きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the entry form of your tracker from a button on the Home Screen and Lock Screen."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用意した記録帳の記録の入力画面を、ホーム画面とロック画面のボタンから開きます。"
           }
         }
       }

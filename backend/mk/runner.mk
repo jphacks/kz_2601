@@ -5,6 +5,6 @@
 # 本番は未デプロイ(サービスの追加は人の承認の後)。ローカルから stg/prod に向けない。
 RUNNER_TICK_INTERVAL ?= 10s
 .PHONY: run-runner
-run-runner:
+run-runner: ## 自動の動きの runner をエミュレータ向けに :8082 で動かす
 	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 \
 	PORT=8082 RUNNER_TICK_INTERVAL=$(RUNNER_TICK_INTERVAL) go run ./cmd/runner

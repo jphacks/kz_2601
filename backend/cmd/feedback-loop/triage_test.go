@@ -94,6 +94,18 @@ func TestTriageEvalCommand(t *testing.T) {
 	if items, _ := ta.ls.ListItems(context.Background(), loop.ItemQuery{}); len(items) != 0 {
 		t.Fatalf("items written: %d", len(items))
 	}
+	if strings.Contains(out, "embedding merge") {
+		t.Fatalf("-embed is off by default: %s", out)
+	}
+	out = ta.must(t, "triage-eval", "-set", labelledSet, "-embed", "fake", "-embed-threshold", "0.9")
+	if !strings.Contains(out, "embedding merge (cosine >= 0.90)") || !strings.Contains(out, "before ") || !strings.Contains(out, "after ") {
+		t.Fatalf("-embed fake: %s", out)
+	}
+	for _, bad := range [][]string{{"-embed", "openai"}, {"-embed", "fake", "-embed-threshold", "0"}} {
+		if err := ta.run(context.Background(), append([]string{"triage-eval", "-set", labelledSet}, bad...)); err == nil {
+			t.Fatalf("%v accepted", bad)
+		}
+	}
 
 	// -model ai uses the (fake) triage model and counts its tokens
 	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}

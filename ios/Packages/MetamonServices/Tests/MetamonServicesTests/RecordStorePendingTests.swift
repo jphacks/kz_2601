@@ -58,6 +58,29 @@ final class RecordStorePendingTests: XCTestCase {
         XCTAssertNil(byRow, "row は今の id だけで引く")
     }
 
+    /// 送っている間にもう一度書いた行(#3667): 作成の応答で端末の内容を戻さず、update 待ちで残す
+    func testMarkSyncedKeepsLocalChangesWrittenWhileSending() async {
+        let temp = LocalRecord.temporaryId(clientId: "abc")
+        var edited = row(temp, .create, clientId: "abc")
+        edited.data = ["title": .string("昼")]
+        edited.updatedAt = "2026-11-01T00:00:02Z"
+        await store.upsert(edited)
+        let server = Record(id: "srv-1", data: ["title": .string("朝"), "author": .string("me")], updatedAt: "2026-11-01T00:00:01Z")
+
+        await store.markSynced(appId: app, entity: entity, localId: temp, server: server, keepingLocalChanges: true)
+        let kept = await store.row(appId: app, entity: entity, recordId: "srv-1")
+        XCTAssertEqual(kept?.data["title"], .string("昼"), "端末で直した値を残す")
+        XCTAssertEqual(kept?.data["author"], .string("me"), "サーバーが足した項目は取り込む")
+        XCTAssertEqual(kept?.updatedAt, "2026-11-01T00:00:02Z")
+        XCTAssertEqual(kept?.pendingOp, .update, "次の update を送るまで未送信")
+        XCTAssertEqual(kept?.clientId, "abc")
+
+        await store.markSynced(appId: app, entity: entity, localId: "srv-1", server: server)
+        let settled = await store.row(appId: app, entity: entity, recordId: "srv-1")
+        XCTAssertEqual(settled?.data["title"], .string("朝"), "後ろに書き込みが無ければサーバーの内容")
+        XCTAssertEqual(settled?.pendingOp, PendingOp.none)
+    }
+
     // MARK: - markDeleting
 
     func testMarkDeletingHidesRowAndCountsAsPending() async {

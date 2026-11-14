@@ -79,6 +79,7 @@ struct RootView: View {
     /// 上の層 + 常駐の確認・バー・変身後のサムネ撮影。
     private var promptLayers: some View {
         aiButtonLayers
+            .modifier(ShareInboxHost()) // #2224 共有シートで受け取った物の一覧
             .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
             .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
             .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
