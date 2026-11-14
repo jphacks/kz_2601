@@ -163,12 +163,15 @@ func (c *spotify) token(ctx context.Context, form url.Values, prev Token) (Token
 	}
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return Token{}, err
+		return Token{}, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ReadBody(resp.Body)
 	if err != nil {
-		return Token{}, err
+		if ctx.Err() != nil {
+			return Token{}, ctx.Err()
+		}
+		return Token{}, &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	if resp.StatusCode != http.StatusOK {
 		var e struct {
@@ -450,12 +453,15 @@ func (c *spotify) get(ctx context.Context, in Input, path string, q url.Values, 
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return 0, err
+		return 0, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, err := ReadBody(resp.Body)
 	if err != nil {
-		return 0, err
+		if ctx.Err() != nil {
+			return 0, ctx.Err()
+		}
+		return 0, &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	switch {
 	case resp.StatusCode == http.StatusNoContent:

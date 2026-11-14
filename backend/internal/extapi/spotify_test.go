@@ -392,3 +392,29 @@ func TestSpotifyEgress(t *testing.T) {
 		t.Fatalf("local server reached: %v", err)
 	}
 }
+
+// A transport failure (API and token endpoint) is the shared upstream error:
+// retryable, 502, no token or secret in it.
+func TestSpotifyTransportError(t *testing.T) {
+	f, srv := newFakeSpotify(t)
+	c, err := newSpotify(Secrets{ClientID: spotifyTestID, ClientSecret: spotifyTestSecret}, f.wire(srv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Close()
+	_, err = c.nowPlaying(context.Background(), Input{Token: &Token{AccessToken: "sp-access-0"}})
+	var pe *ProviderError
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream || StatusOf(Reason(err)) != http.StatusBadGateway {
+		t.Fatalf("api transport: %v", err)
+	}
+	if strings.Contains(err.Error(), "sp-access-0") {
+		t.Fatalf("token in the error: %v", err)
+	}
+	_, err = c.Refresh(context.Background(), Token{AccessToken: "sp-access-0", RefreshToken: "sp-refresh-0"})
+	if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream {
+		t.Fatalf("token transport: %v", err)
+	}
+	if strings.Contains(err.Error(), spotifyTestSecret) || strings.Contains(err.Error(), "sp-refresh-0") {
+		t.Fatalf("secret in the error: %v", err)
+	}
+}
