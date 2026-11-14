@@ -48,7 +48,7 @@ Inspector の警告の種類(書く時の名前):
 | 作る | VoiceOver で読む順 | — | 未点検 | 実機の点検がまだ |
 | 記録を入れる | 画面全体の Audit | — | 未点検 | 実機の点検がまだ |
 | 記録を入れる | 透明度を下げる・コントラストを上げる | — | 未点検 | 実機の点検がまだ |
-| 記録を入れる | 文字の拡大(上限) | — | 未点検 | ⌘+ でフォームのシートの文字も上がる(`AppCanvas` の `dynamicTypeSize`) |
+| 記録を入れる | 文字の拡大(上限) | — | 未点検 | ⌘+ でフォームのシートも拡大する(`AppCanvas` の `macGeneratedAppZoom`) |
 | 記録を入れる | VoiceOver で読む順 | — | 未点検 | 実機の点検がまだ |
 | 一覧 | 画面全体の Audit | — | 未点検 | 実機の点検がまだ |
 | 一覧 | 透明度を下げる・コントラストを上げる | — | 未点検 | 実機の点検がまだ |
@@ -74,7 +74,7 @@ Inspector の警告の種類(書く時の名前):
 | 対応 | 場所 | テスト |
 | --- | --- | --- |
 | 透明度を下げる時は不透明な面・コントラストを上げる時は濃く太い枠と本文の色の補足 | `ios/MetamonMac/App/Theme/MacAccessibility.swift`(`MacSurfaceStyle`) | `MacAccessibilityStyleTests` |
-| 中央のアプリの文字の拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(上限 accessibility3) | `MacTextZoom`・`ios/MetamonMac/App/Shell/MacCommands.swift`・`AppCanvas.swift` | `MacAccessibilityStyleTests` |
+| 中央のアプリの拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(既定は xLarge = 112%・上限 accessibility3。Mac は dynamicTypeSize で文字が変わらないので段の割合で拡大して描く) | `MacTextZoom`・`ios/MetamonMac/App/Shell/MacCommands.swift`・`AppCanvas.swift` | `MacAccessibilityStyleTests` |
 | 視差効果を減らす時は動かさずに変える | `MacMotion` | `MacVoiceOverTests` |
 | フルキーボードアクセスの時だけ広い面のフォーカスの輪 | `MacFocusRing` | `MacVoiceOverTests` |
 | 一言を出すのと同時に VoiceOver で読む | `ios/MetamonMac/App/Shell/MacVoiceOver.swift` | `MacVoiceOverTests` |

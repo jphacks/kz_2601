@@ -52,7 +52,7 @@ struct CalendarLeaf: View {
     private var header: some View {
         HStack {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(.secondary)
+                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(RenderTheme.Colors.secondaryText)
             }
             Spacer()
             Button { shift(-1) } label: { Image(systemName: "chevron.left").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }

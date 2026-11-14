@@ -56,20 +56,24 @@ public struct GridMetrics: Equatable, Sendable {
 
     // MARK: - Mac(#938)
 
-    /// Mac のグリッドの外枠の幅の下限・上限。下限は Web の共有ページの最大幅(480px)と同じ、上限は iPad 縦向きの幅の手前
+    /// Mac のグリッドの外枠の幅の下限・上限。下限は Web の共有ページの最大幅(480px)と同じ。
+    /// 上限は横長の窓で左右が空きすぎない幅(1 列 ≒ 150pt。これより広いと 1 行の文字が長くなりすぎる)
     public static let minDesktopWidth: CGFloat = 480
-    public static let maxDesktopWidth: CGFloat = 720
-    /// Mac で外枠の幅を高さから決める比率(幅 = 高さ × 3/4)。iPad の縦向き(3:4)と同じ縦長に保つ
-    public static let desktopAspect: CGFloat = 3.0 / 4.0
+    public static let maxDesktopWidth: CGFloat = 900
+    /// Mac で外枠の幅を高さから決める比率(幅 = 高さ × 4/3)。Mac の窓は横長なので、iPad を横に置いた比率(4:3)に合わせる
+    public static let desktopAspect: CGFloat = 4.0 / 3.0
 
     /// Mac のウィンドウ(横長で大きさが自由に変わる)の寸法。列は 6 のまま(DSL の area をそのまま読む)。
-    /// - 幅は「高さ × 3/4」を 480〜720 に収め、領域より広ければ中央に寄せる(横に引き伸ばさない)
+    /// - 幅は「高さ × 4/3」を 480〜900 に収め、領域より広ければ中央に寄せる(横に引き伸ばしすぎない)
     /// - 行の高さは縦向きと同じく高さ ÷ 12。低いウィンドウで iOS の横向きの行の高さ(52)を下回る時はそれで止め、はみ出す分は縦スクロール
     /// - マイク FAB は中央の列の外(ツールバー)にあるので、既定では余白に FAB を収める計算はしない。
-    ///   `fabInGutter` の試作(#2327・既定 off)の時だけ、左右の余白が `fabGutter` 以上あるかを返す
+    ///   `fabInGutter` の試作(#2327・既定 off)の時だけ、左右に `fabGutter` の余白を取れるなら列を細くして空け、取れたかを返す
     public static func resolveDesktop(width: CGFloat, height: CGFloat, inset: CGFloat, fabInGutter: Bool = false) -> GridMetrics {
         let preferred = min(max(height * desktopAspect, minDesktopWidth), maxDesktopWidth)
-        let frameWidth = min(width, preferred)
+        var frameWidth = min(width, preferred)
+        if fabInGutter, width - fabGutter * 2 >= minDesktopWidth {
+            frameWidth = min(frameWidth, width - fabGutter * 2)
+        }
         let fitted = max(0, height - inset * 2) / CGFloat(GridArea.visibleRows)
         return GridMetrics(
             frameWidth: frameWidth,
