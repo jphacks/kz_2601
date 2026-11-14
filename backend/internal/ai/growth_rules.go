@@ -15,4 +15,17 @@ var growthRules = strings.TrimSpace(`
 - 育つ見た目を頼まれていない「歩数を見たい」「達成率を見たい」は growth にしない(歩数のカード・進捗バーのまま)。
 `)
 
-func init() { systemPrompt += "\n\n" + growthRules }
+// growthChatRule: the same for the chat (plain words, no part names: #258).
+// The demo phrasings build at once with the usual goal instead of a question.
+var growthChatRule = strings.TrimSpace(`
+## 数で育つ絵
+- 数が増えるほど**木に実がなる・花が咲く・芽が木に育つ**絵のカードを**作れる**。育てる数は、今日の歩数(画面を開いている間も歩くたびにその場で増える)・記録の合計や回数(貯金・勉強時間)・押した回数のどれか。
+- 「歩数で木に実がなる」「歩くほど花が咲く」「歩いて木を育てる」は**聞き返さずに ready**。目標を言われなければ 1 日 8000 歩・1000 歩ごとに実(花)が 1 つ・8000 歩で収穫(満開)として、brief と transcript に「今日の歩数で木に実がなる(1000 歩ごとに 1 つ・8000 歩で収穫・歩くとその場で増える)」のように書く。
+`)
+
+func init() {
+	systemPrompt += "\n\n" + growthRules
+	chatEditSystemPrompt += "\n\n" + growthChatRule
+	// the create prompt keeps ending with the capability index (restrict.go swaps it)
+	chatCreateSystemPrompt = strings.TrimSuffix(chatCreateSystemPrompt, chatCapabilityIndex) + growthChatRule + "\n\n" + chatCapabilityIndex
+}

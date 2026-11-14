@@ -79,6 +79,9 @@ var expectKeys = map[string]expectKind{
 	"activityButtons": expectBool,
 	// checkHealthLive (#3694): health_live.go
 	"healthLive": expectBool,
+	// checkGrowth: growth.go
+	"growth":      expectString,
+	"growthSteps": expectBool,
 	// checkCalendarAdd: calendar_add.go
 	"addToCalendar": expectBool,
 	"calendarAlert": expectBool,

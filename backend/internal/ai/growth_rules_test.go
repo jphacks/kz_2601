@@ -28,6 +28,21 @@ func TestGrowthRulesReachPrompts(t *testing.T) {
 	}
 }
 
+// The chat builds the demo phrasings without a question and names no part.
+func TestGrowthChatRule(t *testing.T) {
+	for name, p := range map[string]string{"chatCreate": chatCreateSystemPrompt, "chatEdit": chatEditSystemPrompt} {
+		if !strings.Contains(p, "## 数で育つ絵") || !strings.Contains(p, "聞き返さずに ready") {
+			t.Errorf("%s lacks the growth chat rule", name)
+		}
+	}
+	if !strings.HasSuffix(chatCreateSystemPrompt, chatCapabilityIndex) {
+		t.Error("chat create prompt must keep ending with the capability index")
+	}
+	if strings.Contains(growthChatRule, "growth") || strings.Contains(growthChatRule, "metric") {
+		t.Error("chat rule names a part (#258)")
+	}
+}
+
 func TestGrowthRulesDroppedWithoutPart(t *testing.T) {
 	all := make([]string, 0, len(knownComponentTypes))
 	for k := range knownComponentTypes {
