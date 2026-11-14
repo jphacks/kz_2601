@@ -223,7 +223,7 @@ func TestStravaFlow(t *testing.T) {
 		t.Fatalf("token after connect: %+v %v", tok, err)
 	}
 
-	res, err := e.call(e.req(Strava, "activities", map[string]string{"limit": "10", "after": "2026-11-01"}))
+	res, err := e.call(e.req(Strava, "activities", map[string]string{"limit": "10"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,8 +235,7 @@ func TestStravaFlow(t *testing.T) {
 	if !slices.Equal(res.Output.Rows, want) {
 		t.Fatalf("rows %+v", res.Output.Rows)
 	}
-	// after is the JST day's start as unix seconds
-	if f.lastPath != "/api/v3/athlete/activities" || f.lastQuery.Get("per_page") != "10" || f.lastQuery.Get("after") != strconv.FormatInt(time.Date(2026, 11, 1, 0, 0, 0, 0, jst).Unix(), 10) {
+	if f.lastPath != "/api/v3/athlete/activities" || f.lastQuery.Get("per_page") != "10" {
 		t.Fatalf("request %s %v", f.lastPath, f.lastQuery)
 	}
 	if e.runs() != 1 || res.Charge.Coins != 0 {
@@ -244,6 +243,12 @@ func TestStravaFlow(t *testing.T) {
 	}
 	if _, err := e.call(e.req(Strava, "activities", nil)); err != nil || f.lastQuery.Has("after") || f.lastQuery.Get("per_page") != "20" {
 		t.Fatalf("defaults: %v %v", err, f.lastQuery)
+	}
+	// after (JST day) is applied to the newest ones here, not sent (Strava
+	// answers oldest first with it): only 朝ラン (11/11 07:30 JST) is on or after 11/11
+	res, err = e.call(e.req(Strava, "activities", map[string]string{"after": "2026-11-11"}))
+	if err != nil || f.lastQuery.Has("after") || len(res.Output.Rows) != 1 || res.Output.Rows[0] != want[0] {
+		t.Fatalf("after: %v %v %+v", err, f.lastQuery, res.Output.Rows)
 	}
 
 	f.paths = nil

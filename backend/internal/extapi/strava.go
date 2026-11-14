@@ -359,10 +359,10 @@ func (c *strava) activities(ctx context.Context, in Input) (Output, error) {
 	if err != nil {
 		return Output{}, err
 	}
+	// Strava answers oldest first when `after` is sent, so it is not sent:
+	// the newest `limit` are read and the ones before after are dropped
+	// (the newest of those on or after it, newest first).
 	q := url.Values{"per_page": {strconv.Itoa(limit)}, "page": {"1"}}
-	if hasAfter {
-		q.Set("after", strconv.FormatInt(after.Unix(), 10))
-	}
 	var list []stravaActivity
 	if err := c.get(ctx, in, "/athlete/activities", q, &list); err != nil {
 		return Output{}, err
@@ -371,6 +371,11 @@ func (c *strava) activities(ctx context.Context, in Input) (Output, error) {
 	for _, a := range list {
 		if a.Name == "" || len(out.Rows) == limit {
 			continue
+		}
+		if hasAfter {
+			if st, err := time.Parse(time.RFC3339, a.StartDate); err != nil || st.Before(after) {
+				continue
+			}
 		}
 		out.Rows = append(out.Rows, a.row(c.wire.ActivityLinks))
 	}
