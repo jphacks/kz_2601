@@ -129,13 +129,17 @@ final class MacRootFormSaveTests: XCTestCase {
         XCTAssertFalse(edit.hasUnsavedChanges)
     }
 
-    /// 書き込み(recordSync の actor)を待っている間に `text` を入れる
+    /// 書き込み(recordSync の actor)を待っている間に `text` を入れる。書き込みの入口を `WriteGate` で止めて入れる
     private func typeDuringSave(_ rt: MacAppRuntime, _ form: FormDraft, _ text: String, recordId: String? = nil) async throws {
         let action = try saveAction()
+        let gate = WriteGate()
+        rt.recordSync.beforeWrite = { await gate.hold() }
+        defer { rt.recordSync.beforeWrite = nil }
         let saving = Task { await rt.run(action, ActionContext(route: tabRoot, form: form, recordId: recordId)) }
-        for _ in 0..<1000 where !rt.book.isSaving(form) { await Task.yield() }
+        await gate.waitUntilEntered()
         XCTAssertTrue(rt.book.isSaving(form), "保存の途中に入れる")
         form.values["memo"] = .string(text)
+        gate.open()
         await saving.value
     }
 
@@ -188,5 +192,37 @@ final class MacRootFormSaveTests: XCTestCase {
         await rt.run(try saveAction(), ActionContext(route: pushed, form: try form(rt, memo: "a")))
         XCTAssertEqual(rt.paths[tabRoot.stack] ?? [], [], "積まれた画面からの保存は今までどおり閉じる")
         XCTAssertNil(rt.toast)
+    }
+}
+
+/// 書き込み(`RecordSyncEngine.write`)の入口で止め、「保存の途中」(書き込みの await の間)をテストが決定的に作る。
+/// `Task.yield` を数えて待つと、速い machine では書き込みが yield の間に終わり、遅い machine では始まる前に数え切る(CI で 1 回落ちた)
+@MainActor
+private final class WriteGate {
+    private var entered: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, Never>?
+    private var hasEntered = false
+    private var isOpen = false
+
+    /// `recordSync.beforeWrite` に入れる: 入ったことを知らせ、`open` まで待つ
+    func hold() async {
+        hasEntered = true
+        entered?.resume()
+        entered = nil
+        guard !isOpen else { return }
+        await withCheckedContinuation { release = $0 }
+    }
+
+    /// 書き込みに入るまで待つ
+    func waitUntilEntered() async {
+        guard !hasEntered else { return }
+        await withCheckedContinuation { entered = $0 }
+    }
+
+    /// 書き込みを進める
+    func open() {
+        isOpen = true
+        release?.resume()
+        release = nil
     }
 }
