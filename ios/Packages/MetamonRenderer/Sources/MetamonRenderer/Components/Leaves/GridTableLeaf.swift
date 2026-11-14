@@ -23,7 +23,7 @@ struct GridTableLeaf: View {
         let today = GridTableLayout.todayColumn(labels: layout.columns.map(\.label))
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(.secondary)
+                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(RenderTheme.Colors.secondaryText)
                     .accessibilityAddTraits(.isHeader)
             }
             if usesMacTable {

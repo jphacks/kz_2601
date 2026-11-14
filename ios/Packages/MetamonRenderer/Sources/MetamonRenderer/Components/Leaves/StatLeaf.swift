@@ -66,7 +66,7 @@ struct StatLeaf: View {
             iconView
             Text(c.label ?? "")
                 .font(RenderTheme.Fonts.statLabel)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(RenderTheme.Colors.secondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: RenderTheme.Spacing.sm)
@@ -92,7 +92,7 @@ struct StatLeaf: View {
                 iconView
                 Text(c.label ?? "")
                     .font(RenderTheme.Fonts.statLabel)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(RenderTheme.Colors.secondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(compact ? 0.6 : 0.8)
             }
