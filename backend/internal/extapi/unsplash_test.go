@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-const unsplashTestKey = "abcDEF0123456789_-xyzABC0123"
+// 偽の鍵(gitleaks に掛からない値)。
+var unsplashTestKey = strings.Repeat("u", 32)
 
 const unsplashPhotoJSON = `{"id":"p1","description":"  富士山と\n湖 ","alt_description":"mountain","width":4000,"height":3000,
 "urls":{"regular":"https://images.unsplash.com/photo-1?ixid=x&w=1080"},
