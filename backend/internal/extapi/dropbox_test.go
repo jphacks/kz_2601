@@ -397,11 +397,15 @@ func TestDropboxCheck(t *testing.T) {
 // never in the review build; nothing writes; only the metadata scope.
 func TestDropboxDefinition(t *testing.T) {
 	p, ok := Lookup(Dropbox)
-	if !ok || !p.NeedsOAuth || p.Billing != BillingFree || p.Fake || p.EnvName() != "DROPBOX" || len(p.Hosts) != 2 {
+	if !ok || !p.NeedsOAuth || p.Billing != BillingFree || p.Fake || p.EnvName() != "DROPBOX" || len(p.Hosts) != 1 {
 		t.Fatalf("%+v", p)
 	}
 	w := dropboxWireDefault
-	for _, raw := range []string{w.AuthURL, w.TokenURL, w.RevokeURL, w.APIBase + "/files/list_folder"} {
+	// the consent page is the browser's: the runner never reaches it
+	if u, _ := url.Parse(w.AuthURL); AllowedURL(p.Hosts, u) {
+		t.Errorf("%s is on the allowlist", w.AuthURL)
+	}
+	for _, raw := range []string{w.TokenURL, w.RevokeURL, w.APIBase + "/files/list_folder"} {
 		u, _ := url.Parse(raw)
 		if !AllowedURL(p.Hosts, u) {
 			t.Errorf("%s not on the allowlist", raw)
@@ -430,5 +434,28 @@ func TestDropboxDefinition(t *testing.T) {
 		if f == p.FeatureKey() {
 			t.Fatal("in the review build")
 		}
+	}
+}
+
+// An expired access token is renewed before the revoke (the grant really
+// ends); a refused refresh is ErrInvalidGrant; a client error at the token
+// endpoint is not ErrInvalidGrant (the connection is not marked error).
+func TestDropboxRevokeRenewsExpired(t *testing.T) {
+	c, f := dropboxTestClient(t)
+	ctx := context.Background()
+	past := c.now().Add(-time.Hour)
+	if err := c.Revoke(ctx, Token{AccessToken: "dead", RefreshToken: "db-refresh", Expiry: past}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.revoked) != 1 || f.revoked[0] != "db-access-1" {
+		t.Fatalf("revoked %v", f.revoked)
+	}
+	if err := c.Revoke(ctx, Token{AccessToken: "dead", RefreshToken: "gone", Expiry: past}); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("refused refresh: %v", err)
+	}
+	bad := *c
+	bad.sec.ClientSecret = "wrong"
+	if _, err := bad.Refresh(ctx, Token{RefreshToken: "db-refresh"}); err == nil || errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("client error: %v", err)
 	}
 }

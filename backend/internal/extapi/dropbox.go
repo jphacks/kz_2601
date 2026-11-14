@@ -55,7 +55,9 @@ var dropboxWireDefault = dropboxWire{
 	APIBase:   "https://api.dropboxapi.com/2",
 }
 
-var dropboxHosts = []string{"https://api.dropboxapi.com", "https://www.dropbox.com"}
+// dropboxHosts: the token, revoke and API endpoints share one host; the
+// consent page (www.dropbox.com) is the browser's only.
+var dropboxHosts = []string{"https://api.dropboxapi.com"}
 
 func init() {
 	register(Provider{ID: Dropbox, Billing: BillingFree, NeedsOAuth: true, NameJa: "Dropbox", NameEn: "Dropbox",
@@ -127,9 +129,18 @@ func (c *dropbox) Refresh(ctx context.Context, t Token) (Token, error) {
 	return c.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {t.RefreshToken}}, t)
 }
 
-// Revoke ends the grant (access and refresh token) with the access token;
-// 401 is a token already gone.
+// Revoke ends the grant (access and refresh token) with the access token.
+// An expired access token is renewed first (revoking with it would end
+// nothing); a refused refresh is ErrInvalidGrant. 401 with a fresh token
+// is a grant already gone.
 func (c *dropbox) Revoke(ctx context.Context, t Token) error {
+	if t.expired(c.now()) && t.RefreshToken != "" {
+		nt, err := c.Refresh(ctx, t)
+		if err != nil {
+			return err
+		}
+		t = nt
+	}
 	if t.AccessToken == "" {
 		return ErrNoRevoke
 	}
@@ -173,7 +184,9 @@ func (c *dropbox) token(ctx context.Context, form url.Values, prev Token) (Token
 			Error string `json:"error"`
 		}
 		_ = json.Unmarshal(b, &e)
-		if e.Error == "invalid_grant" || resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusUnauthorized {
+		// only a refused code / refresh token is the person's to fix; another
+		// 4xx (a bad client id or secret) is ours and keeps the connection
+		if e.Error == "invalid_grant" {
 			return Token{}, ErrInvalidGrant
 		}
 		return Token{}, statusError(resp.StatusCode)
