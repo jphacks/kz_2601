@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -41,18 +42,50 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
-func main() {
-	var opts options
-	flag.BoolVar(&opts.dryRun, "dry-run", false, "only list the accounts that would be purged")
-	flag.IntVar(&opts.limit, "limit", 50, "max accounts per run")
-	flag.DurationVar(&opts.olderThan, "older-than", store.PurgeAfter, "purge accounts deleted longer ago than this")
-	flag.BoolVar(&opts.deleteAuth, "delete-auth", true, "also delete the Firebase Auth user")
-	flag.DurationVar(&opts.feedbackOlderThan, "feedback-older-than", store.FeedbackRetention, "erase feedback created longer ago than this")
-	flag.IntVar(&opts.feedbackLimit, "feedback-limit", 500, "max feedback documents erased per run")
-	flag.Parse()
+// minRetention is the floor both -older-than and -feedback-older-than must
+// clear: erasing something a person deleted minutes ago is never what a
+// scheduled job is for.
+const minRetention = 24 * time.Hour
 
+func parseFlags(fs *flag.FlagSet, args []string) (options, error) {
+	var o options
+	fs.BoolVar(&o.dryRun, "dry-run", false, "only list the accounts that would be purged")
+	fs.IntVar(&o.limit, "limit", 50, "max accounts per run")
+	fs.DurationVar(&o.olderThan, "older-than", store.PurgeAfter, "purge accounts deleted longer ago than this")
+	fs.BoolVar(&o.deleteAuth, "delete-auth", true, "also delete the Firebase Auth user")
+	fs.DurationVar(&o.feedbackOlderThan, "feedback-older-than", store.FeedbackRetention, "erase feedback created longer ago than this")
+	fs.IntVar(&o.feedbackLimit, "feedback-limit", 500, "max feedback documents erased per run")
+	if err := fs.Parse(args); err != nil {
+		return o, err
+	}
+	return o, o.validate()
+}
+
+func (o options) validate() error {
+	if o.olderThan < minRetention {
+		return fmt.Errorf("-older-than=%s is below %s", o.olderThan, minRetention)
+	}
+	if o.feedbackOlderThan < minRetention {
+		return fmt.Errorf("-feedback-older-than=%s is below %s", o.feedbackOlderThan, minRetention)
+	}
+	if o.limit < 1 {
+		return fmt.Errorf("-limit=%d must be at least 1", o.limit)
+	}
+	if o.feedbackLimit < 1 {
+		return fmt.Errorf("-feedback-limit=%d must be at least 1", o.feedbackLimit)
+	}
+	return nil
+}
+
+func main() {
 	logger := httpx.NewLogger()
 	slog.SetDefault(logger)
+	opts, err := parseFlags(flag.CommandLine, os.Args[1:]) // flag.CommandLine exits on a bad flag
+	if err != nil {
+		logger.Error("purge: bad flags", slog.Any("error", err))
+		os.Exit(2)
+	}
+
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if project == "" {
 		logger.Error("purge: GOOGLE_CLOUD_PROJECT is required")
@@ -127,7 +160,7 @@ type authDeleter interface {
 // may be nil (Auth deletion off). Logs carry a hash of the uid, never the uid
 // or anything the user wrote.
 func run(ctx context.Context, st purgeStore, users authDeleter, opts options, logger *slog.Logger, now time.Time) int {
-	if opts.olderThan < 24*time.Hour {
+	if opts.olderThan < minRetention {
 		logger.Error("purge: -older-than below 24h refused", slog.Duration("olderThan", opts.olderThan))
 		return 1
 	}
@@ -192,7 +225,7 @@ func uidHash(uid string) string {
 
 // purgeFeedback erases feedback past its retention (#319). Returns 1 on failure.
 func purgeFeedback(ctx context.Context, st store.FeedbackPurger, opts options, logger *slog.Logger, now time.Time) int {
-	if opts.feedbackOlderThan < 24*time.Hour {
+	if opts.feedbackOlderThan < minRetention {
 		logger.Error("purge: -feedback-older-than below 24h refused", slog.Duration("feedbackOlderThan", opts.feedbackOlderThan))
 		return 1
 	}
