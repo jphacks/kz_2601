@@ -96,7 +96,7 @@
 
 - 条項: 5.1.1(i)(ii)・5.1.2(i)(スクショ・診断を送る)。
 - 前提: ラベルに「カスタマーサポート」「その他の診断データ」「写真(スクショ)」。ポリシーへの追記(`docs/legal/feedback-privacy-draft.md` を元に人が決める)。`PrivacyInfo.xcprivacy` の `NSPrivacyCollectedDataTypes`。
-- メモの案: `NEW IN THIS VERSION: Settings > Send Feedback (or shake the device) lets the user send a message to us. A screenshot and device information (model, OS, app version) are attached only if the user leaves them selected before sending.`
+- メモの案: `NEW IN THIS VERSION: Settings > Send Feedback lets the user send a message to us. A screenshot and device information (model, OS, app version) are attached only if the user leaves them selected before sending.`
 
 ### F2 aiButton の集計
 
