@@ -26,6 +26,7 @@
 | Firestore `feedback/{id}` | 種類・本文・`appId`(添付の画像・DSL は読まない) | — |
 | Cloud Logging `ai.generate` | 依頼ごとの結果(validated / regenerated / unchanged / restored / refused / failed)・作り直しの回数と理由(`retry_reasons`)・検証で落ちた問題のコードと数(`validation_codes`。例 `bad_ref:2,missing_field:1`・#1772)・lint の再試行・全体で作り直し・待ち時間・`uid_hash`・`app_hash` | 中身(依頼の文・DSL)は書かない約束 |
 | Cloud Logging `ai.usage` | Claude の呼び出しごとの `operation`(chat / chat_first / generate / patch ...)・待ち時間・トークン・`uid_hash` | `app_hash` が無いので、聞き返しは「同じ人の次の依頼(30 分以内)」に割り当てる |
+| Cloud Logging `ai.unsupported`(まだレポートは読まない) | 生成が summary に「○○は△△で代替しました」「○○は今はできません」と申告するたびに 1 行(`requested` = ○○・`substitute` = △△。どちらも伏せ字して 160 文字まで・`note` = その 1 文・`mode`・`locale`・`platform`・`app_hash`)。「できない機能を頼まれた数」(#1769)の印で、自己改善ループが `LOOP_SOURCE_UNSUPPORTED=on` で取り込んで要望の Issue にする([feedback-loop.md](../backend/features/feedback-loop.md#環境変数))。レポートに節を足すのはこれから | 依頼の文・summary の残り・DSL・アプリの id・uid |
 | Cloud Logging `ai.chat` | `/v1/chat` の往復ごとの返答の種類(`reply_kind`: question / ready / answer / proposal / other)・会話の中の何往復目(`turn`)・聞き返しの後に ready に至ったか(`clarify_ended_in_build`)・`mode`・`source`・待ち時間・トークン・`model`・`uid_hash`・`app_hash` → レポートの「会話の結果」 | 会話の文・返答の文・候補・transcript・brief。「できない・代わりに〜」の印はまだ無い |
 | Cloud Logging `http.request` | パス・ステータス(402・429・5xx)・`uid_hash` | 本文 |
 | Cloud Logging `app.opened` | アプリを開いた(`app_hash`) | — |
@@ -108,7 +109,7 @@ GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/ai-session-report \
 | 会話の往復数(`1` / `2` / `3` / `4` / `5+`) | `chat.turnsPerConversation` | 作る前の往復の分布。会話が何往復で終わったかごとの会話の数 | 山の位置を前の期間と比べる。`5+` が増えたら、聞き返しが多い・伝わっていない会話が増えた。`1` だけが多いなら、聞き返さずに作ったか、1 往復で止めた |
 
 - 決まった目安の値は置かない。同じ人たちの前の期間や、OS ごと(`-by-platform`)と見比べて、動いた所を上の点の高いセッションと合わせて読む。
-- 「できない・代わりに〜」の返答は印が無いので数えていない(節の最後にも書いてある)。
+- 「できない・代わりに〜」の返答は、`ai.chat` には印が無いので数えていない。作る側(`/v1/generate`)の申告は `ai.unsupported` の行になった(上の表)。レポートにはまだ出ない。
 - 「作った・直した直後に版を戻した数」は、レポートにまだ無い(#2792)。入ったら同じ PR でこの表に 1 行足す。
 
 ## 読み終わったら

@@ -452,7 +452,7 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 	sort.Strings(oses)
 	d.Count, d.AppVersions = count, versions
 	d.Sources = d.Sources[:0]
-	for _, s := range []loop.Source{loop.SourceInApp, loop.SourceStoreReview, loop.SourceGooglePlayReview, loop.SourceTestFlight, loop.SourceCrash, loop.SourceGenFailure} {
+	for _, s := range []loop.Source{loop.SourceInApp, loop.SourceStoreReview, loop.SourceGooglePlayReview, loop.SourceTestFlight, loop.SourceCrash, loop.SourceGenFailure, loop.SourceUnsupported} {
 		if bySource[s] > 0 {
 			d.Sources = append(d.Sources, string(s))
 		}
@@ -564,7 +564,7 @@ func sourceLine(by map[loop.Source]int) string {
 	names := []struct {
 		s    loop.Source
 		name string
-	}{{loop.SourceInApp, "アプリ内"}, {loop.SourceStoreReview, "ストアのレビュー"}, {loop.SourceGooglePlayReview, "Google Play のレビュー"}, {loop.SourceTestFlight, "TestFlight"}, {loop.SourceCrash, "クラッシュ"}, {loop.SourceGenFailure, "生成の失敗"}}
+	}{{loop.SourceInApp, "アプリ内"}, {loop.SourceStoreReview, "ストアのレビュー"}, {loop.SourceGooglePlayReview, "Google Play のレビュー"}, {loop.SourceTestFlight, "TestFlight"}, {loop.SourceCrash, "クラッシュ"}, {loop.SourceGenFailure, "生成の失敗"}, {loop.SourceUnsupported, "無い機能の申告"}}
 	parts := []string{}
 	for _, n := range names {
 		if by[n.s] > 0 {
