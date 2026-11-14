@@ -36,9 +36,9 @@ final class MacTextZoomTests: XCTestCase {
         XCTAssertEqual(MacTextZoom.zoomedOut(MacTextZoom.zoomedOut(up)), start)
     }
 
-    /// ⌘0 は既定の段(.large・100%)に戻す。既定の段では押せない
-    func testActualSizeIsLargeAt100Percent() {
-        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.defaultStep), .large)
+    /// ⌘0 は既定の段(.xLarge・100%)に戻す。既定の段では押せない。Mac の文字は小さいので system の既定(.large)より 1 段上
+    func testActualSizeIsXLargeAt100Percent() {
+        XCTAssertEqual(MacTextZoom.size(at: MacTextZoom.defaultStep), .xLarge)
         XCTAssertEqual(MacTextZoom.percent(at: MacTextZoom.defaultStep), 100)
         for step in MacTextZoom.steps.indices {
             XCTAssertEqual(MacTextZoom.isActualSize(step), step == MacTextZoom.defaultStep)
@@ -50,6 +50,15 @@ final class MacTextZoomTests: XCTestCase {
         let percents = MacTextZoom.steps.indices.map(MacTextZoom.percent(at:))
         XCTAssertEqual(percents, percents.sorted())
         XCTAssertEqual(Set(percents).count, percents.count)
+    }
+
+    /// Mac の SwiftUI は dynamicTypeSize で文字が変わらないので、段の割合で拡大して描く。.large が等倍・既定はそれより大きい
+    func testScaleFollowsBodyPoints() {
+        let large = try! XCTUnwrap(MacTextZoom.steps.firstIndex(of: .large))
+        XCTAssertEqual(MacTextZoom.scale(at: large), 1, accuracy: 0.0001)
+        XCTAssertEqual(MacTextZoom.scale(at: MacTextZoom.defaultStep), 19.0 / 17.0, accuracy: 0.0001)
+        let scales = MacTextZoom.steps.indices.map(MacTextZoom.scale(at:))
+        XCTAssertEqual(scales, scales.sorted())
     }
 
     /// 上限は accessibility3・下限は xSmall(Mac のウインドウ幅で崩れない所まで)
