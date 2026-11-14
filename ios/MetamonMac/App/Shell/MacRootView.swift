@@ -118,7 +118,7 @@ struct MacRootView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             AppSidebar(created: sidebarSections.own.filter { $0.matches(searchText) },
                        shared: sidebarSections.shared.filter { $0.matches(searchText) },
-                       examples: exampleApps.filter { $0.matches(searchText) },
+                       examples: SampleAppCatalog.showcase(exampleApps, keeping: selectedAppId).filter { $0.matches(searchText) },
                        newItems: { badges.count($0) },
                        releaseBadge: releaseBadge(for:),
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
