@@ -7919,6 +7919,23 @@
         }
       }
     },
+    "星 %lld、全部で %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld stars, out of %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "星 %1$lld、全部で %2$lld"
+          }
+        }
+      }
+    },
     "曲を入れられませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
