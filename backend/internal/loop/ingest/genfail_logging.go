@@ -97,24 +97,62 @@ func (l *LoggingLister) ListEntries(ctx context.Context, req LogListRequest) (Lo
 // [since, until]. All lines are read, not only failures: the detector needs
 // every line as the denominator of a rate.
 func GenLogFilter(services []string, since, until time.Time) string {
+	return logEventFilter(genEvent, services, since, until)
+}
+
+// logEventFilter is the entries.list filter of one jsonPayload.event of
+// services in [since, until].
+func logEventFilter(event string, services []string, since, until time.Time) string {
 	q := make([]string, len(services))
 	for i, s := range services {
 		q[i] = strconv.Quote(s)
 	}
 	return fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name=(%s) AND jsonPayload.event=%q AND timestamp>=%q AND timestamp<=%q`,
-		strings.Join(q, " OR "), genEvent, since.UTC().Format(time.RFC3339Nano), until.UTC().Format(time.RFC3339Nano))
+		strings.Join(q, " OR "), event, since.UTC().Format(time.RFC3339Nano), until.UTC().Format(time.RFC3339Nano))
 }
 
 // GenerateEvents implements GenLogSource.
 func (g GenLogAPI) GenerateEvents(ctx context.Context, since, until time.Time) ([]GenEvent, error) {
+	out := []GenEvent{}
+	err := g.each(ctx, genEvent, since, until, func(raw json.RawMessage) {
+		if ev, ok := decodeGenEntry(raw); ok {
+			out = append(out, ev)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	return genInRange(out, since, until), nil
+}
+
+// UnsupportedEvents implements UnsupportedLogSource over the same reader
+// (ai.unsupported lines, #1769).
+func (g GenLogAPI) UnsupportedEvents(ctx context.Context, since, until time.Time) ([]UnsupportedEvent, error) {
+	out := []UnsupportedEvent{}
+	err := g.each(ctx, unsupportedEvent, since, until, func(raw json.RawMessage) {
+		if ev, ok := decodeUnsupportedEntry(raw); ok {
+			out = append(out, ev)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	return unsupportedInRange(out, since, until), nil
+}
+
+// each reads the entries of event in [since, until], newest first, up to
+// MaxEntries, and hands each raw entry to fn.
+func (g GenLogAPI) each(ctx context.Context, event string, since, until time.Time, fn func(json.RawMessage)) error {
 	if g.Project == "" || len(g.Services) == 0 {
-		return nil, errors.New("cloud logging: no project or services")
+		return errors.New("cloud logging: no project or services")
 	}
 	lister := g.Lister
 	if lister == nil {
 		l, err := NewLoggingLister(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		lister = l
 	}
@@ -128,36 +166,32 @@ func (g GenLogAPI) GenerateEvents(ctx context.Context, since, until time.Time) (
 	}
 	req := LogListRequest{
 		ResourceNames: []string{"projects/" + g.Project},
-		Filter:        GenLogFilter(g.Services, since, until),
+		Filter:        logEventFilter(event, g.Services, since, until),
 		OrderBy:       "timestamp desc", // newest first: a cut keeps the window
 	}
-	out := []GenEvent{}
 	read := 0
 	for pages := 0; ; pages++ {
 		if pages >= maxGenLogPages {
-			slog.Warn("loop ingest: generation-failure log read hit the page cap", "pages", pages)
+			slog.Warn("loop ingest: log read hit the page cap", "event", event, "pages", pages)
 			break
 		}
 		req.PageSize = min(size, limit-read)
 		page, err := lister.ListEntries(ctx, req)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, raw := range page.Entries {
 			read++
-			if ev, ok := decodeGenEntry(raw); ok {
-				out = append(out, ev)
-			}
+			fn(raw)
 		}
 		if page.Next == "" {
 			break
 		}
 		if read >= limit {
-			slog.Warn("loop ingest: generation-failure log read hit the cap; the oldest baseline lines are skipped", "limit", limit)
+			slog.Warn("loop ingest: log read hit the cap; the oldest lines are skipped", "event", event, "limit", limit)
 			break
 		}
 		req.PageToken = page.Next
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
-	return genInRange(out, since, until), nil
+	return nil
 }

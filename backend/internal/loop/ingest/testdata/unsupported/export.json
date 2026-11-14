@@ -1,0 +1,14 @@
+[
+ {"timestamp": "2026-11-12T01:00:00Z", "jsonPayload": {"event": "ai.unsupported", "mode": "create", "locale": "ja", "platform": "ios",
+   "requested": "カレンダー表示", "substitute": "日付順の一覧", "note": "カレンダー表示は日付順の一覧で代替しました。", "app_hash": "a_1", "uid_hash": "u_secret", "message": "ai.unsupported"}},
+ {"timestamp": "2026-11-12T02:00:00Z", "jsonPayload": {"event": "ai.unsupported", "mode": "edit", "locale": "ja", "platform": "android",
+   "requested": "カレンダー 表示", "substitute": "日付順のリスト", "app_hash": "a_2", "uid_hash": "u_secret"}},
+ {"timestamp": "2026-11-12T03:00:00Z", "jsonPayload": {"event": "ai.unsupported", "mode": "create", "locale": "ja", "platform": "ios",
+   "requested": "田中さんへの送金 090-1234-5678", "substitute": "", "app_hash": "a_1"}},
+ {"timestamp": "2026-11-12T04:00:00Z", "jsonPayload": {"event": "ai.generate", "mode": "create", "outcome": "validated", "uid_hash": "u_secret"}},
+ {"timestamp": "2026-11-12T05:00:00Z", "jsonPayload": {"event": "ai.unsupported", "mode": "create", "requested": "", "substitute": "x"}},
+ {"timestamp": "2026-11-13T01:00:00Z", "jsonPayload": {"event": "ai.unsupported", "mode": "create", "locale": "en", "platform": "macos",
+   "requested": "Calendar view", "substitute": "a date-sorted list", "app_hash": "a_3"}},
+ {"timestamp": "2026-11-13T23:30:00Z", "jsonPayload": {"event": "ai.unsupported", "mode": "create", "locale": "ja", "platform": "ios",
+   "requested": "今日の分だけ", "substitute": "", "app_hash": "a_3"}}
+]

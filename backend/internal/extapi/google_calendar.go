@@ -151,7 +151,7 @@ func (g *googleCalendar) Revoke(ctx context.Context, t Token) error {
 	}
 	resp, err := g.postForm(ctx, g.wire.RevokeURL, url.Values{"token": {tok}})
 	if err != nil {
-		return err
+		return transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := ReadBody(resp.Body)
@@ -171,12 +171,15 @@ func (g *googleCalendar) token(ctx context.Context, form url.Values, prev Token)
 	form.Set("client_secret", g.sec.ClientSecret)
 	resp, err := g.postForm(ctx, g.wire.TokenURL, form)
 	if err != nil {
-		return Token{}, err
+		return Token{}, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ReadBody(resp.Body)
 	if err != nil {
-		return Token{}, err
+		if ctx.Err() != nil {
+			return Token{}, ctx.Err()
+		}
+		return Token{}, &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	if resp.StatusCode != http.StatusOK {
 		if code := gcalOAuthErrorCode(body); code == "invalid_grant" {
@@ -476,12 +479,15 @@ func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, 
 	}
 	resp, err := g.hc.Do(req)
 	if err != nil {
-		return err
+		return transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, err := ReadBody(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		if err := json.Unmarshal(b, out); err != nil {
