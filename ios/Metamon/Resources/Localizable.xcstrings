@@ -12458,6 +12458,23 @@
         }
       }
     },
+    "何を送るかは送る前に選べます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You choose what to send before sending."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何を送るかは送る前に選べます。"
+          }
+        }
+      }
+    },
     "何度か試しましたがうまくいきませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14969,19 +14986,19 @@
         }
       }
     },
-    "困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。" : {
+    "困ったこと・欲しい機能を、ここからそのまま送れます。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Send problems or ideas straight from here. You can also shake your device to open it."
+            "value" : "Send problems or ideas straight from here."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。"
+            "value" : "困ったこと・欲しい機能を、ここからそのまま送れます。"
           }
         }
       }
@@ -18627,23 +18644,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "端に隠す"
-          }
-        }
-      }
-    },
-    "端末を振っても開けます。何を送るかは送る前に選べます。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You can also open this by shaking the device. You choose what to send before sending."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末を振っても開けます。何を送るかは送る前に選べます。"
           }
         }
       }
