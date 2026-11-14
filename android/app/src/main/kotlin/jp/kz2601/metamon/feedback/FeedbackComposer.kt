@@ -1,10 +1,5 @@
 package jp.kz2601.metamon.feedback
 
-import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -33,13 +28,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,9 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.R
@@ -76,19 +66,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * フィードバックの画面と、端末を振って開く仕組みをまとめて置く(iOS の `FeedbackShakeHost` + `FeedbackPresenter`)。
+ * フィードバックの画面を置く(iOS の `FeedbackPresenter`)。端末を振って開く口は歩行中の誤発火のため外した(2026-11-14 の決定)。
  * 設定のシートより後に置く(設定から開いた時に上に重ねる)。
  */
 @Composable
 fun FeedbackComposerHost(container: AppContainer) {
     val launcher = container.feedbackComposer
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    ShakeEffect {
-        val activity = context.findActivity() ?: return@ShakeEffect
-        scope.launch { launcher.capture(activity, container, withOverlays = true) }
-    }
-    // ヘッドレス E2E・画面のテスト(#1314・iOS の METAMON_AUTO_FEEDBACK): 指定の秒数後に、振った時と同じく開く。debug だけ値が入る
+    // ヘッドレス E2E・画面のテスト(#1314・iOS の METAMON_AUTO_FEEDBACK): 指定の秒数後に開く。debug だけ値が入る
     container.knobs.autoFeedbackSeconds?.let { seconds ->
         LaunchedEffect(launcher) {
             if (!launcher.claimAutoOpen()) return@LaunchedEffect
@@ -118,51 +103,6 @@ fun FeedbackSettingsSection(container: AppContainer) {
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     HorizontalDivider(Modifier.padding(vertical = 8.dp))
-}
-
-/** 画面に出ている間(RESUMED)だけ加速度を見る。振ったら [onShake]。 */
-@Composable
-private fun ShakeEffect(onShake: () -> Unit) {
-    val context = LocalContext.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val latest by rememberUpdatedState(onShake)
-    DisposableEffect(lifecycle, context) {
-        val sensors = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-        val accel = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        val detector = ShakeDetector()
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                val v = event.values
-                if (detector.onSample(v[0], v[1], v[2], event.timestamp / 1_000_000)) latest()
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-        }
-        var registered = false
-        fun register() {
-            if (registered || sensors == null || accel == null) return
-            registered = sensors.registerListener(listener, accel, SensorManager.SENSOR_DELAY_UI)
-        }
-        fun unregister() {
-            if (!registered) return
-            sensors?.unregisterListener(listener)
-            registered = false
-            detector.reset()
-        }
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> register()
-                Lifecycle.Event.ON_PAUSE -> unregister()
-                else -> Unit
-            }
-        }
-        lifecycle.addObserver(observer)
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) register()
-        onDispose {
-            lifecycle.removeObserver(observer)
-            unregister()
-        }
-    }
 }
 
 /**
