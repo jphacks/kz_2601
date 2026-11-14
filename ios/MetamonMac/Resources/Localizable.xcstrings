@@ -16103,6 +16103,22 @@
         }
       }
     },
+    "画面マップ・共有・設定を開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the screen map, sharing, and settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面マップ・共有・設定を開く"
+          }
+        }
+      }
+    },
     "直してと頼む" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -1054,26 +1054,31 @@ struct ShellToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
+            // 作る入口は名前付きの目立つ 1 ボタン(展示で迷わない)
             Button(action: newApp) { Label("新しいアプリ", systemImage: "plus") }
+                .labelStyle(.titleAndIcon)
+                .buttonStyle(.borderedProminent)
                 .help("新しいアプリを作る")
             Button(action: speak) { Label("声で頼む", systemImage: "mic") }
                 .help(hasApp ? "声でこのアプリを直す" : "声でアプリを作る")
                 .disabled(!canCompose)
             Button(action: ask) { Label("文字で頼む", systemImage: "text.cursor") }
                 .help(hasApp ? "文字でこのアプリを直す" : "文字でアプリを作る")
-        }
-        ToolbarItemGroup(placement: .secondaryAction) {
-            Button(action: showScreenMap) { Label("画面マップ", systemImage: "map") }
-                .help("画面のつながりを見る")
-                .disabled(!canShowScreenMap)
-            Button(action: share) { Label("共有", systemImage: "square.and.arrow.up") }
-                .help(shareHelp)
-                .disabled(!canShare)
-            Button(action: showAppSettings) { Label("このアプリの設定", systemImage: "slider.horizontal.3") }
-                .help("記録の自動削除・自動の動きなど、このアプリの設定を開く")
-                .disabled(!canShowAppSettings)
-            SettingsLink { Label("設定", systemImage: "gearshape") }
-                .help("設定を開く")
+            // 画面マップ・共有・設定はメニューにまとめる(ショートカットはメニューバーのまま)
+            Menu {
+                Button(action: showScreenMap) { Label("画面マップ", systemImage: "map") }
+                    .disabled(!canShowScreenMap)
+                Button(action: share) { Label("共有", systemImage: "square.and.arrow.up") }
+                    .help(shareHelp)
+                    .disabled(!canShare)
+                Button(action: showAppSettings) { Label("このアプリの設定", systemImage: "slider.horizontal.3") }
+                    .disabled(!canShowAppSettings)
+                Divider()
+                SettingsLink { Label("設定", systemImage: "gearshape") }
+            } label: {
+                Label("その他", systemImage: "ellipsis.circle")
+            }
+            .help("画面マップ・共有・設定を開く")
         }
     }
 }
