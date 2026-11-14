@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Tailor It ポスター v7</title>
+<style>
+@page { size: 594mm 841mm; margin: 0; }
+:root {
+  --navy: #335267;
+  --navy-deep: #0F1A22;
+  --ai: #2E6A93;
+  --teal: #3E9A9C;
+  --fill: #245E86;
+  --text-brand: #1F5A82;
+  --canvas: #F6F3EC;
+  --surface: #FFFDF8;
+  --kinari: #F4F1E8;
+  --gold: #F0D060;
+  --amber: #9A6A12;
+  --ink: #16232D;
+  --sub: #4A5A66;
+  --line: rgba(51,82,103,.18);
+  --zebra: rgba(51,82,103,.05);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 594mm; height: 841mm; background: var(--canvas); }
+body {
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  overflow: hidden;
+}
+.poster { width: 594mm; height: 841mm; display: flex; flex-direction: column; }
+
+/* header */
+header { background: var(--navy); color: var(--kinari); padding: 7mm 26mm 9.5mm; position: relative; }
+header::after { content: ""; position: absolute; left: 12mm; right: 12mm; bottom: 4mm; border-bottom: 1.4mm dashed rgba(244,241,232,.55); }
+.team-tag { position: absolute; top: 13mm; right: 26mm; font-size: 10mm; font-weight: 700; letter-spacing: .05em; border: .8mm solid rgba(244,241,232,.7); border-radius: 4mm; padding: 1.5mm 6mm; }
+.brand { display: flex; align-items: center; gap: 12mm; }
+.brand img { width: 48mm; height: 48mm; border-radius: 12mm; box-shadow: 0 2mm 6mm rgba(0,0,0,.25); }
+.brand h1 { font-size: 32mm; line-height: 1; font-weight: 800; letter-spacing: -.01em; }
+.brand .catch { font-size: 13mm; font-weight: 700; margin-top: 3.5mm; color: var(--gold); }
+.brand .lead { font-size: 10mm; font-weight: 600; margin-top: 3mm; line-height: 1.3; }
+
+main { flex: 1; padding: 4mm 26mm 0; display: flex; flex-direction: column; gap: 4.5mm; }
+h2 { font-size: 12mm; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 3.5mm; margin-bottom: 2.2mm; line-height: 1.2; }
+h2::before { content: ""; flex: none; width: 2.8mm; height: 11mm; border-radius: 1.4mm; background: linear-gradient(var(--ai), var(--teal)); }
+h2 small { font-size: 8mm; font-weight: 600; color: var(--sub); margin-left: 2mm; }
+p, li, td, th { font-size: 7mm; line-height: 1.4; }
+
+/* hero: integrated figure (1 svg unit = 1 mm) */
+.hero { background: var(--surface); border: .5mm solid var(--line); border-radius: 7mm; padding: 4mm 6mm 3mm; }
+.hero svg { display: block; width: 515mm; height: 330mm; margin: 0 auto; font-family: inherit; }
+.hero svg text { fill: var(--ink); }
+.hero svg .zone { fill: rgba(46,106,147,.045); stroke: var(--navy); stroke-width: .5; stroke-dasharray: 3 2.2; }
+.hero svg .zone.cloud { fill: rgba(62,154,156,.07); }
+.hero svg .zone.other { fill: rgba(154,106,18,.05); }
+.hero svg .group { fill: rgba(51,82,103,.05); stroke: none; }
+.hero svg .zl { font-size: 11.5px; font-weight: 800; fill: var(--navy); }
+.hero svg .box { fill: #fff; stroke: var(--navy); stroke-width: .6; }
+.hero svg .box.ai { fill: #E8F0F6; stroke: var(--ai); stroke-width: .9; }
+.hero svg .box.ext { fill: var(--kinari); stroke: var(--sub); stroke-dasharray: 1.6 1.2; }
+.hero svg .bt { font-size: 11.5px; font-weight: 800; fill: var(--navy); }
+.hero svg .bs { font-size: 8px; font-weight: 600; fill: var(--sub); }
+.hero svg .tag { font-size: 7px; font-weight: 800; fill: #fff; }
+.hero svg .al { font-size: 7.5px; font-weight: 700; fill: var(--navy); paint-order: stroke; stroke: #FFFDF8; stroke-width: 2.4; stroke-linejoin: round; }
+.hero svg .al.t { fill: #2E7D7F; }
+.hero svg .al.g { fill: var(--sub); font-weight: 600; }
+.hero svg .data { fill: none; stroke: var(--navy); stroke-width: 1.4; stroke-linejoin: round; }
+.hero svg .dsl { fill: none; stroke: var(--teal); stroke-width: 1.4; stroke-dasharray: 3.2 2.2; stroke-linejoin: round; }
+.hero svg .aux { fill: none; stroke: #7E8C96; stroke-width: .8; stroke-linejoin: round; }
+.hero svg .bn { font-size: 8px; font-weight: 800; fill: #fff; text-anchor: middle; }
+.hero svg .pill { fill: var(--navy); }
+.hero svg .pt { font-size: 7.5px; font-weight: 800; fill: #fff; }
+.hero svg .shot { stroke: var(--line); stroke-width: .4; fill: none; }
+.hero svg .lg { font-size: 8px; fill: var(--ink); }
+.hero svg .callout { fill: var(--navy); }
+.hero svg .ct { font-size: 8.5px; font-weight: 800; fill: var(--gold); }
+.hero svg .cb { font-size: 8.5px; font-weight: 700; fill: var(--kinari); }
+.hero svg .icon { fill: none; stroke: var(--ai); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 作れるもの: 8 light tiles */
+.tiles { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3mm; }
+.tile { background: var(--surface); border: .5mm solid var(--line); border-radius: 5mm; padding: 2.5mm 2.5mm 2.5mm; text-align: center; }
+.tile .ic { width: 15mm; height: 15mm; margin: 0 auto; border-radius: 50%; background: rgba(46,106,147,.09); color: var(--ai); display: grid; place-items: center; }
+.tile .ic svg { width: 9.5mm; height: 9.5mm; }
+.tile h3 { font-size: 8.3mm; font-weight: 800; color: var(--navy); margin-top: 2mm; line-height: 1.2; white-space: nowrap; }
+.tile p { font-size: 6.4mm; font-weight: 600; color: var(--sub); line-height: 1.35; margin-top: 1.2mm; }
+.tile.soon { background: #FBF6EA; border-color: rgba(154,106,18,.35); }
+.tile.soon .ic { background: rgba(154,106,18,.1); color: var(--amber); }
+.tile.soon h3 { color: var(--amber); }
+
+/* いろんな使い方: screenshot gallery */
+.gallery { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3mm; }
+.shotc { min-width: 0; }
+.shotc { text-align: center; }
+.shotc img { display: block; width: 100%; aspect-ratio: 560 / 940; object-fit: cover; border-radius: 5mm; border: 1.6mm solid #1F2A33; background: #1F2A33; }
+.shotc h4 { font-size: 6.2mm; font-weight: 800; color: var(--navy); line-height: 1.2; margin-top: 1.8mm; white-space: nowrap; overflow: hidden; }
+.shotc h4 small { display: block; font-size: 5.4mm; font-weight: 600; color: var(--sub); margin-top: .4mm; }
+.gal-note { font-size: 6.5mm; color: var(--sub); margin-top: 2mm; }
+
+/* こんな人に (inside the appeal column) */
+.bubbles { display: flex; gap: 2.5mm; margin-top: 3mm; flex-wrap: wrap; }
+.bub { display: flex; align-items: center; gap: 2.5mm; }
+.bub .face { flex: none; width: 12mm; height: 12mm; border-radius: 50%; background: var(--navy); color: var(--kinari); display: grid; place-items: center; }
+.bub .face svg { width: 7mm; height: 7mm; }
+.bub .say { background: var(--surface); border: .5mm solid var(--line); border-radius: 5mm; padding: 1.6mm 3.5mm; font-size: 6.4mm; font-weight: 700; line-height: 1.3; white-space: nowrap; }
+
+/* stat band */
+.cols-32 { display: grid; grid-template-columns: minmax(0,1fr) 200mm; gap: 12mm; align-items: start; }
+.band { background: var(--navy); color: var(--kinari); border-radius: 6mm; padding: 3.5mm 6mm 3mm; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+.stat { text-align: center; border-left: .4mm solid rgba(244,241,232,.3); }
+.stat:first-child { border-left: none; }
+.stat .n { font-size: 16mm; font-weight: 800; line-height: 1; color: var(--gold); letter-spacing: -.02em; }
+.stat .n small { font-size: 9mm; font-weight: 700; margin-left: 1mm; }
+.stat .c { font-size: 6.8mm; font-weight: 600; margin-top: 1.5mm; line-height: 1.25; }
+.band-src { grid-column: 1 / -1; font-size: 6mm; opacity: .8; text-align: right; margin-top: .5mm; }
+.claims { display: flex; gap: 8mm; margin-top: 3mm; }
+.claim { font-size: 8.5mm; font-weight: 800; color: var(--navy); line-height: 1.3; white-space: nowrap; display: flex; align-items: center; gap: 3mm; }
+.claim::before { content: ""; flex: none; width: 4mm; height: 4mm; border-radius: 50%; background: var(--teal); }
+
+/* tables */
+table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: .5mm solid var(--line); border-radius: 5mm; overflow: hidden; }
+th, td { padding: .9mm 3mm; text-align: left; vertical-align: middle; border-bottom: .35mm solid var(--line); line-height: 1.25; }
+tr:last-child td { border-bottom: none; }
+thead th { background: var(--navy); color: var(--kinari); font-weight: 800; line-height: 1.25; }
+tbody tr:nth-child(even) td { background: var(--zebra); }
+td.k { font-weight: 800; color: var(--navy); white-space: nowrap; }
+.os-t th.c, .os-t td.c { text-align: center; padding-left: 1mm; padding-right: 1mm; }
+.os-t th.c { font-size: 7.5mm; }
+.os-t td.c { font-size: 7.5mm; font-weight: 800; line-height: 1.05; }
+.os-t td.c small { display: block; font-size: 5.8mm; font-weight: 600; color: var(--sub); margin-top: .3mm; line-height: 1.15; }
+.y { color: var(--teal); }
+.ck { display:inline-block; width:8mm; height:8mm; vertical-align:-1mm; background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12.5l5 5L20 6.5' fill='none' stroke='%233E9A9C' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.legend .ck { width:6mm; height:6mm; vertical-align:-.8mm; }
+.p { color: var(--amber); }
+.n { color: #8A96A0; }
+.legend { font-size: 6.5mm; margin-top: 1.5mm; color: var(--sub); line-height: 1.4; }
+.legend b { font-weight: 800; }
+
+/* footer */
+footer { margin-top: 3mm; background: var(--navy); color: var(--kinari); padding: 3mm 26mm 4mm; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10mm; align-items: center; }
+footer h3 { font-size: 8.5mm; font-weight: 800; color: var(--gold); margin-bottom: 1.5mm; }
+footer p { font-size: 6.8mm; line-height: 1.4; }
+.qr { display: flex; align-items: center; gap: 7mm; }
+.qr .box { background: #fff; padding: 4mm; border-radius: 4mm; }
+.qr .box img { width: 52mm; height: 52mm; display: block; image-rendering: pixelated; }
+.qr .url { font-size: 10.5mm; font-weight: 800; text-align: right; }
+.qr .url small { display: block; font-size: 7.5mm; font-weight: 500; opacity: .9; margin-top: 1.5mm; }
+</style>
+</head>
+<body>
+<div class="poster">
+
+<header>
+  <div class="team-tag">kz_2601</div>
+  <div class="brand">
+    <img src="icon.png" alt="Tailor It のアイコン">
+    <div>
+      <h1>Tailor It</h1>
+      <div class="catch">ひと声で、あなた仕立て。</div>
+      <p class="lead">話すだけで自分専用のアプリができ、話して直せる</p>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- hero: demo x architecture -->
+<section>
+  <h2>デモ × しくみ <small>① 話す → ② 作る → ③ 使う → ④ 直す</small></h2>
+  <div class="hero">
+  <svg viewBox="0 0 530 340" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs>
+      <marker id="mD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#335267"/></marker>
+      <marker id="mT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3E9A9C"/></marker>
+      <marker id="mA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#7E8C96"/></marker>
+      <clipPath id="shotClip"><rect x="0" y="0" width="24" height="52" rx="3"/></clipPath>
+    </defs>
+
+    <!-- ===== Zone A: あなたの端末 ===== -->
+    <rect class="zone" x="0" y="0" width="176" height="304" rx="6"/>
+    <g transform="translate(7,4)"><rect x="0" y="0" width="7" height="12" rx="1.6" class="icon"/><path d="M2.5 10h2" class="icon"/></g>
+    <text class="zl" x="19" y="14">あなたの端末(iPhone)</text>
+
+    <!-- screenshots with step pills -->
+    <g transform="translate(6,24)">
+      <rect class="pill" x="-1" y="0" width="26" height="9" rx="2.6"/><text class="pt" x="12" y="6.6" text-anchor="middle">① 話す</text>
+      <g transform="translate(0,11)"><image href="greeting.jpg" width="24" height="52" clip-path="url(#shotClip)"/><rect class="shot" x="0" y="0" width="24" height="52" rx="3"/></g>
+    </g>
+    <g transform="translate(6,92)">
+      <rect class="pill" x="-1" y="0" width="26" height="9" rx="2.6"/><text class="pt" x="12" y="6.6" text-anchor="middle">② 作る</text>
+      <g transform="translate(0,11)"><image href="generating.jpg" width="24" height="52" clip-path="url(#shotClip)"/><rect class="shot" x="0" y="0" width="24" height="52" rx="3"/></g>
+    </g>
+    <g transform="translate(6,160)">
+      <rect class="pill" x="-1" y="0" width="26" height="9" rx="2.6"/><text class="pt" x="12" y="6.6" text-anchor="middle">③ 使う</text>
+      <g transform="translate(0,11)"><image href="completed.jpg" width="24" height="52" clip-path="url(#shotClip)"/><rect class="shot" x="0" y="0" width="24" height="52" rx="3"/></g>
+    </g>
+    <g transform="translate(6,228)">
+      <rect class="pill" x="-1" y="0" width="26" height="9" rx="2.6"/><text class="pt" x="12" y="6.6" text-anchor="middle">④ 直す</text>
+      <g transform="translate(0,11)"><image href="proposal.jpg" width="24" height="52" clip-path="url(#shotClip)"/><rect class="shot" x="0" y="0" width="24" height="52" rx="3"/></g>
+    </g>
+
+    <!-- device boxes (x 40..166) -->
+    <rect class="box" x="40" y="24" width="130" height="24" rx="3"/>
+    <g transform="translate(46,29)"><rect x="4.5" y="0" width="5" height="8.5" rx="2.5" class="icon"/><path d="M1.5 6.5a5.5 5.5 0 0 0 11 0M7 11v2.2" class="icon"/></g>
+    <text class="bt" x="64" y="40">マイク</text>
+
+    <rect class="box" x="40" y="56" width="130" height="32" rx="3"/>
+    <text class="bt" x="48" y="70">端末内の音声認識</text>
+    <text class="bs" x="48" y="82">音声は外に出さない</text>
+
+    <rect class="box" x="40" y="108" width="130" height="32" rx="3"/>
+    <text class="bt" x="48" y="122">アプリ本体(SwiftUI)</text>
+    <text class="bs" x="48" y="134">設計図を画面に描く</text>
+
+    <rect class="box" x="40" y="200" width="130" height="32" rx="3"/>
+    <text class="bt" x="48" y="214">端末内のキャッシュ</text>
+    <text class="bs" x="48" y="226">圏外でも入力できる</text>
+
+    <rect class="box" x="40" y="262" width="130" height="32" rx="3"/>
+    <text class="bt" x="48" y="276">もう一度話す</text>
+    <text class="bs" x="48" y="288">「ここをこうして」</text>
+
+    <!-- in-device arrows -->
+    <path class="data" d="M105 48 V56" marker-end="url(#mD)"/>
+    <path class="data" d="M105 88 V108" marker-end="url(#mD)"/>
+    <text class="al" x="110" y="101">文字</text>
+    <path class="data" d="M105 140 V200" marker-start="url(#mD)" marker-end="url(#mD)"/>
+    <text class="al" x="110" y="173">設計図・記録</text>
+    <!-- edit loop back to mic -->
+    <path class="dsl" d="M40 278 H35 V36 H40" marker-end="url(#mT)"/>
+
+    <!-- ===== Zone B: クラウド ===== -->
+    <rect class="zone cloud" x="186" y="0" width="240" height="304" rx="6"/>
+    <g transform="translate(192,5)"><path d="M3.5 10.5h8.5a3.5 3.5 0 0 0 .5-7 5 5 0 0 0-9.5-1.5A4.2 4.2 0 0 0 3.5 10.5z" class="icon"/></g>
+    <text class="zl" x="208" y="14">クラウド(Google Cloud)</text>
+
+    <!-- Auth strip -->
+    <rect class="box" x="194" y="22" width="226" height="28" rx="3"/>
+    <g transform="translate(200,27)"><rect x="1" y="6" width="10" height="7.5" rx="1.5" class="icon"/><path d="M3.5 6V4.2a2.5 2.5 0 0 1 5 0V6" class="icon"/></g>
+    <text class="bt" x="216" y="36">Firebase Auth / App Check</text>
+    <text class="bs" x="216" y="46.5">本人と端末の確認</text>
+
+    <!-- left column: pipeline (x 190..290) -->
+    <rect class="box ext" x="194" y="58" width="100" height="32" rx="3"/>
+    <text class="bt" x="202" y="72">Claude API</text>
+    <text class="bs" x="202" y="84">外部(Anthropic)</text>
+
+    <rect class="box ai" x="194" y="108" width="100" height="32" rx="3"/>
+    <text class="bt" x="202" y="122">ai</text>
+    <text class="bs" x="202" y="134">設計図を書く</text>
+
+    <rect class="box" x="194" y="154" width="100" height="32" rx="3"/>
+    <g transform="translate(200,158)"><path d="M6 0 1 2.2v3.6c0 3.1 2.1 5.5 5 6.2 2.9-.7 5-3.1 5-6.2V2.2z" class="icon"/><path d="M4 6l1.6 1.6 2.9-3.2" class="icon"/></g>
+    <text class="bt" x="216" y="168">検査</text>
+    <text class="bs" x="202" y="180">決まりに合うか</text>
+
+    <rect class="box ai" x="194" y="200" width="100" height="32" rx="3"/>
+    <text class="bt" x="202" y="214">appconfig</text>
+    <text class="bs" x="202" y="226">設計図と記録の API</text>
+
+    <!-- right column (x 306..416) -->
+    <rect class="box" x="310" y="58" width="110" height="24" rx="3"/>
+    <g transform="translate(316,63)"><path d="M6 1.5a3.8 3.8 0 0 0-3.8 3.8v2.6L1 9.6h10L9.8 7.9V5.3A3.8 3.8 0 0 0 6 1.5zM4.6 11.2a1.5 1.5 0 0 0 2.8 0" class="icon"/></g>
+    <text class="bt" x="332" y="74">push 通知</text>
+
+    <rect class="box" x="310" y="108" width="110" height="32" rx="3"/>
+    <text class="bt" x="318" y="122">runner</text>
+    <rect x="382" y="112" width="32" height="10" rx="2" fill="#9A6A12"/><text class="tag" x="398" y="119.3" text-anchor="middle">準備中</text>
+    <text class="bs" x="318" y="134">自動の動き・通知</text>
+
+    <g>
+      <path class="box" d="M310 200 a55 4.5 0 0 1 110 0 V236 a55 4.5 0 0 1 -110 0 Z"/>
+      <path d="M310 200 a55 4.5 0 0 0 110 0" fill="none" stroke="#335267" stroke-width=".6"/>
+      <text class="bt" x="365" y="219" text-anchor="middle">Firestore</text>
+      <text class="bs" x="365" y="231" text-anchor="middle">設計図・記録</text>
+    </g>
+
+    <!-- cloud internal arrows -->
+    <path class="dsl" d="M244 108 V90" marker-start="url(#mT)" marker-end="url(#mT)"/>
+    <text class="al t" x="249" y="102">JSON</text>
+    <path class="dsl" d="M244 140 V154" marker-end="url(#mT)"/>
+    <text class="al t" x="249" y="150">設計図</text>
+    <path class="dsl" d="M244 186 V200" marker-end="url(#mT)"/>
+    <path class="data" d="M294 216 H310" marker-start="url(#mD)" marker-end="url(#mD)"/>
+    <path class="aux" d="M365 196 V140" marker-end="url(#mA)"/>
+    <text class="al g" x="370" y="171">用事</text>
+    <path class="aux" d="M365 108 V82" marker-end="url(#mA)"/>
+
+    <!-- ===== Zone C: ほかの端末 ===== -->
+    <rect class="zone other" x="436" y="0" width="94" height="304" rx="6"/>
+    <g transform="translate(442,5)"><rect x="0" y="0" width="11" height="7.5" rx="1" class="icon"/><path d="M3 10.5h5" class="icon"/></g>
+    <text class="zl" x="458" y="14">ほかの端末</text>
+
+    <rect class="box" x="442" y="58" width="82" height="24" rx="3"/>
+    <text class="bt" x="450" y="74">通知が届く</text>
+
+    <rect class="group" x="439" y="92" width="88" height="164" rx="4"/>
+    <rect class="box" x="442" y="98" width="82" height="32" rx="3"/>
+    <text class="bt" x="450" y="112">Mac</text>
+    <text class="bs" x="450" y="124">SwiftUI で描く</text>
+    <rect class="box" x="442" y="138" width="82" height="32" rx="3"/>
+    <text class="bt" x="450" y="152">Android</text>
+    <text class="bs" x="450" y="164">Compose で描く</text>
+    <rect class="box" x="442" y="178" width="82" height="32" rx="3"/>
+    <text class="bt" x="450" y="192">Windows</text>
+    <text class="bs" x="448" y="204">Compose・開発中</text>
+    <rect class="box" x="442" y="218" width="82" height="32" rx="3"/>
+    <text class="bt" x="450" y="232">Linux</text>
+    <text class="bs" x="448" y="244">Compose・開発中</text>
+
+    <rect class="box" x="442" y="264" width="82" height="32" rx="3"/>
+    <g transform="translate(448,268)"><rect x="0" y="0" width="4" height="4" class="icon"/><rect x="6" y="0" width="4" height="4" class="icon"/><rect x="0" y="6" width="4" height="4" class="icon"/><path d="M6 6h2v2M9 9h1" class="icon"/></g>
+    <text class="bt" x="464" y="278">共有</text>
+    <text class="bs" x="450" y="290">QR・リンクで渡す</text>
+
+    <!-- ===== Cross-zone flows ===== -->
+    <!-- ② text -> ai -->
+    <path class="data" d="M170 118 H194" marker-end="url(#mD)"/>
+    <circle cx="182" cy="118" r="6" fill="#335267"/><text class="bn" x="182" y="121">②</text>
+    <text class="al" x="182" y="109" text-anchor="middle">文字</text>
+    <!-- dsl back -> device -->
+    <path class="dsl" d="M194 134 H170" marker-end="url(#mT)"/>
+    <text class="al t" x="182" y="148" text-anchor="middle">設計図・差分</text>
+    <!-- ③ records sync -->
+    <path class="data" d="M170 216 H194" marker-start="url(#mD)" marker-end="url(#mD)"/>
+    <circle cx="182" cy="216" r="6" fill="#335267"/><text class="bn" x="182" y="219">③</text>
+    <text class="al" x="182" y="207" text-anchor="middle">記録</text>
+    <!-- same dsl -> other devices (one corridor) -->
+    <path class="dsl" d="M244 232 V288 H431 V174 H439" marker-end="url(#mT)"/>
+    <text class="al t" x="300" y="284">同じ設計図</text>
+    <!-- push -> other devices -->
+    <path class="aux" d="M420 70 H442" marker-end="url(#mA)"/>
+
+    <!-- ===== bottom strip: legend / callout ===== -->
+    <g transform="translate(2,312)">
+      <path class="data" d="M0 13 H16" marker-end="url(#mD)"/><text class="lg" x="20" y="16">実線 = データ</text>
+      <path class="dsl" d="M92 13 H108" marker-end="url(#mT)"/><text class="lg" x="112" y="16">破線 = 設計図</text>
+      <path class="aux" d="M184 13 H200" marker-end="url(#mA)"/><text class="lg" x="204" y="16">細線 = 通知・自動</text>
+    </g>
+    <g transform="translate(282,312)">
+      <rect class="callout" x="0" y="0" width="248" height="26" rx="4"/>
+      <text class="ct" x="8" y="17">ポイント</text>
+      <text class="cb" x="46" y="17.5">AI はコードを書かず、設計図(JSON)だけを書く</text>
+    </g>
+  </svg>
+  </div>
+</section>
+
+<!-- what you can make: light tiles -->
+<section>
+  <h2>作れるもの <small>部品 77 種・動き 16 種</small></h2>
+  <div class="tiles">
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></div><h3>端末の機能</h3><p>カメラ・位置情報・センサー・ヘルスケア・QR</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></div><h3>通知・常駐</h3><p>通知・アラーム・タイマー・ウィジェット・Siri</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></div><h3>地図</h3><p>地図・道案内・近くの場所・到着通知</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/></svg></div><h3>ほかのアプリと</h3><p>LINE・Slack・PayPay に送る/開く・カレンダー</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16"/><rect x="8" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/><rect x="18" y="13" width="2" height="4"/></svg></div><h3>データ</h3><p>表・グラフ・集計・計算式・CSV / PDF</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg></div><h3>AI</h3><p>要約・分類・提案・レシート読み取り・チャット</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.2"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M2.5 20a5.5 5.5 0 0 1 11 0M13.5 19.5a4.5 4.5 0 0 1 8 0"/></svg></div><h3>みんなで</h3><p>共有・チャット・日程調整・仲間探し</p></div>
+    <div class="tile soon"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4.5"/></svg></div><h3>つなぐ(準備中)</h3><p>Google カレンダー・Notion・Hue・SwitchBot・天気</p></div>
+  </div>
+</section>
+
+<!-- example uses: screenshot gallery -->
+<section>
+  <h2>いろんな使い方 <small>話した言葉から、こんなアプリに(実際の iPhone 画面)</small></h2>
+  <div class="gallery">
+    <div class="shotc"><img src="shots/kakeibo.jpg" alt=""><h4>家計簿<small>「家計簿が欲しい」</small></h4></div>
+    <div class="shotc"><img src="shots/warikan.jpg" alt=""><h4>旅行の割り勘<small>精算まで自動</small></h4></div>
+    <div class="shotc"><img src="shots/drive.jpg" alt=""><h4>ドライブ<small>地図・道案内</small></h4></div>
+    <div class="shotc"><img src="shots/ramen_timer.jpg" alt=""><h4>ラーメン計時<small>ロック画面にも</small></h4></div>
+    <div class="shotc"><img src="shots/chat.jpg" alt=""><h4>チャット<small>サークルで話す</small></h4></div>
+    <div class="shotc"><img src="shots/medicine.jpg" alt=""><h4>今日の薬<small>飲み忘れ通知</small></h4></div>
+    <div class="shotc"><img src="shots/shopping.jpg" alt=""><h4>買い物リスト<small>家族と共有</small></h4></div>
+    <div class="shotc"><img src="shots/training.jpg" alt=""><h4>筋トレ記録<small>グラフ・集計</small></h4></div>
+    <div class="shotc"><img src="shots/timetable.jpg" alt=""><h4>時間割<small>週の表</small></h4></div>
+    <div class="shotc"><img src="shots/vocab.jpg" alt=""><h4>英単語カード<small>覚えた / まだ</small></h4></div>
+    <div class="shotc"><img src="shots/ranking.jpg" alt=""><h4>ラーメン評価<small>ランキング</small></h4></div>
+    <div class="shotc"><img src="shots/recipes.jpg" alt=""><h4>みんなのレシピ<small>投稿・保存</small></h4></div>
+  </div>
+</section>
+
+<!-- appeal: stat band / OS table -->
+<div class="cols-32">
+<section>
+  <h2>アピールポイント <small>と、こんな人に</small></h2>
+  <div class="band">
+    <div class="stat"><div class="n">6.6<small>秒</small></div><div class="c">新しく作る<br>(中央値)</div></div>
+    <div class="stat"><div class="n">1.7<small>秒</small></div><div class="c">話して直す<br>(中央値)</div></div>
+    <div class="stat"><div class="n">77</div><div class="c">部品の種類<br>(動き 16 種)</div></div>
+    <div class="stat"><div class="n">4<small>OS</small></div><div class="c">対応する OS<br>(右の表)</div></div>
+    <div class="band-src">2026-10-24 計測・発話 16 本</div>
+  </div>
+  <div class="claims">
+    <div class="claim">AI が書くのは設計図だけ</div>
+    <div class="claim">直しても記録は消えない</div>
+  </div>
+  <div class="bubbles">
+    <div class="bub"><div class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><div class="say">「Mac も開発者登録も無くて諦めた」</div></div>
+    <div class="bub"><div class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.2"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M2.5 20a5.5 5.5 0 0 1 11 0M13.5 19.5a4.5 4.5 0 0 1 8 0"/></svg></div><div class="say">「部活や家族のちょっとした困りごと」</div></div>
+    <div class="bub"><div class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6 2.5 12 8 18M16 6l5.5 6L16 18M13.5 4l-3 16"/></svg></div><div class="say">「まず動く試作で検証したい(PoC)」</div></div>
+  </div>
+</section>
+<section>
+  <h2>OS ごとの対応</h2>
+  <table class="os-t">
+    <thead><tr><th>機能</th><th class="c">iPhone</th><th class="c">Mac</th><th class="c">Android</th><th class="c">Windows<br>Linux</th></tr></thead>
+    <tbody>
+      <tr><td class="k">話して作る・直す</td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c n">—</td></tr>
+      <tr><td class="k">部品(77 種)</td><td class="c y"><i class="ck"></i><small>77</small></td><td class="c p">△<small>73</small></td><td class="c y"><i class="ck"></i><small>77</small></td><td class="c p">△<small>59</small></td></tr>
+      <tr><td class="k">記録の保存・同期</td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c p">△</td></tr>
+      <tr><td class="k">圏外での入力</td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td></tr>
+      <tr><td class="k">みんなで記録</td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c n">—</td></tr>
+      <tr><td class="k">通知</td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c y"><i class="ck"></i></td><td class="c p">△</td></tr>
+    </tbody>
+  </table>
+  <p class="legend"><b class="y"><i class="ck"></i></b> 使える　<b class="p">△</b> 一部・準備中　<b class="n">—</b> まだ無い</p>
+</section>
+</div>
+
+</main>
+
+<footer>
+  <div>
+    <h3>対応環境</h3>
+    <p>iPhone(iOS 17 以降)<br>App Store での公開に向けて準備中<br>Mac・Android・Windows・Linux 版は開発中</p>
+  </div>
+  <div>
+    <h3>チーム</h3>
+    <p>君の心にズッキーニ<br>チーム番号 kz_2601<br>ko-tarou(iOS)・2410as(バックエンド)</p>
+  </div>
+  <div class="qr">
+    <div class="url">tailor-it.app<small>公式サイト</small></div>
+    <div class="box"><img src="qr.svg" alt="https://tailor-it.app の QR コード"></div>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>
