@@ -25,6 +25,7 @@ import (
 
 // The scopes of LimitError (the answer's "scope" and the ext.call log's "limit").
 const (
+	LimitUserMinute     = "user_minute"
 	LimitUserHourly     = "user_hourly"
 	LimitUserDaily      = "user_daily"
 	LimitAppHourly      = "app_hourly"
@@ -38,6 +39,8 @@ const UpstreamPause = time.Minute
 
 // Limits are the calls of one provider per window. 0 = no counter.
 type Limits struct {
+	// UserMinute is off unless the provider (Provider.UserMinute) or env sets it.
+	UserMinute  int
 	UserHourly  int
 	UserDaily   int
 	AppHourly   int
@@ -57,6 +60,7 @@ var limitEnv = []struct {
 	name string
 	of   func(*Limits) *int
 }{
+	{"USER_MINUTE", func(l *Limits) *int { return &l.UserMinute }},
 	{"USER_HOURLY", func(l *Limits) *int { return &l.UserHourly }},
 	{"USER_DAILY", func(l *Limits) *int { return &l.UserDaily }},
 	{"APP_HOURLY", func(l *Limits) *int { return &l.AppHourly }},
@@ -65,7 +69,7 @@ var limitEnv = []struct {
 
 // limitsFromEnv is every provider's Limits:
 //
-//	EXT_LIMIT_<SCOPE>               every provider (SCOPE = USER_HOURLY / USER_DAILY / APP_HOURLY / APP_DAILY)
+//	EXT_LIMIT_<SCOPE>               every provider (SCOPE = USER_MINUTE / USER_HOURLY / USER_DAILY / APP_HOURLY / APP_DAILY)
 //	EXT_LIMIT_<PROVIDER>_<SCOPE>    one provider (wins over the above)
 //	EXT_GLOBAL_DAILY                every provider's environment-wide day (not NeedsOAuth ones)
 //	EXT_GLOBAL_DAILY_<PROVIDER>     one provider's (wins over the above)
@@ -91,6 +95,9 @@ func limitsFromEnv(getenv func(string) string) (map[string]Limits, error) {
 			l.GlobalDaily = 0
 		case p.GlobalDaily > 0 && !globalSet:
 			l.GlobalDaily = p.GlobalDaily
+		}
+		if p.UserMinute > 0 && l.UserMinute == 0 {
+			l.UserMinute = p.UserMinute
 		}
 		for _, s := range limitEnv {
 			if err := envCount(getenv, "EXT_LIMIT_"+n+"_"+s.name, s.of(&l)); err != nil {
@@ -272,11 +279,12 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 	y, m, d := now.Date()
 	dayEnd := time.Date(y, m, d+1, 0, 0, 0, 0, ratelimit.JST)
 	hourEnd := now.Truncate(time.Hour).Add(time.Hour)
+	minuteEnd := now.Truncate(time.Minute).Add(time.Minute)
 	env := s.cfg.Env
 	if env == "" {
 		env = "local"
 	}
-	day, hour := now.Format("2006-01-02"), now.Format("2006-01-02T15")
+	day, hour, minute := now.Format("2006-01-02"), now.Format("2006-01-02T15"), now.Format("2006-01-02T15:04")
 	type ctr struct {
 		c     ratelimit.Counter
 		reset time.Time
@@ -289,6 +297,7 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 	}
 	if uid != "" {
 		k := "uid_" + docSafe(uid)
+		add(LimitUserMinute, minute, k, lim.UserMinute, minuteEnd)
 		add(LimitUserHourly, hour, k, lim.UserHourly, hourEnd)
 		add(LimitUserDaily, day, k, lim.UserDaily, dayEnd)
 	}

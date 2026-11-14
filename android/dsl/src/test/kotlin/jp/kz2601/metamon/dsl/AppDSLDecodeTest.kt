@@ -27,7 +27,7 @@ class AppDSLDecodeTest {
         assertEquals(ComponentType.VOICE_INPUT, mic.type)
         assertEquals("mic", mic.id)
         assertEquals("A1:F12", mic.area)
-        assertEquals("どんなアプリが欲しい？", mic.prompt)
+        assertEquals("どんなアプリに変身しましょうか？", mic.prompt)
         assertEquals(Size.LARGE, mic.size)
     }
 
