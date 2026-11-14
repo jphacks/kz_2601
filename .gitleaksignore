@@ -16,3 +16,5 @@ b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:68
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:105
 7e023e9c1fb0bdf1393ac993268d4dcaa53609a3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:132
+# OAuth 1.0a のテスト値(RFC 5849 の公開サンプル)。同じ行の別コミット。秘密情報ではない。
+cf0c4e2868c4163533f1789d60329d7a9ab0d5e3:backend/internal/extapi/oauth1/sign_test.go:generic-api-key:101
