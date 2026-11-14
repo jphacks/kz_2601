@@ -47,6 +47,8 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 
 部品ごとの Mac での見た目・操作の違い(代わりのやり方)は [`../mac/interactions.md`](../mac/interactions.md) と [`../mac/system-integration.md`](../mac/system-integration.md) にあります。
 
+`healthStat` の `live`(#3694・「リアルタイム」と言われた時だけ true)は iOS(CoreMotion + HealthKit の変化通知)と Android(`TYPE_STEP_COUNTER`)で、カードが画面に出ていて前面にいる間だけ歩数計を購読する。Mac はヘルスケアが無いので対象外(部品ごと「使えない(枠)」)。
+
 ## 表
 
 <!-- platform-table:begin -->
@@ -79,9 +81,9 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 | `speakButton` | 使える | 使える |  | 使えない |  |
 | `drawingField` | 使える | 使える |  | 使える |  |
 | `card` | 使える | 使える |  | 使える |  |
-| `disclosure` | 使える | 使える |  | 代わりの表示 |  |
-| `carousel` | 使える | 使える |  | 代わりの表示 |  |
-| `grid` | 使える | 使える |  | 代わりの表示 |  |
+| `disclosure` | 使える | 使える |  | 使える |  |
+| `carousel` | 使える | 使える |  | 使える |  |
+| `grid` | 使える | 使える |  | 使える |  |
 | `searchBar` | 使える | 使える |  | 使える |  |
 | `calendar` | 使える | 使える |  | 使える |  |
 | `shareButton` | 使える | 使える |  | 未定 |  |
@@ -115,7 +117,7 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 | `aiButton` | 使える | 使える |  | 使えない |  |
 | `nearbyShare` | 使える | 使える |  | 使えない | 外す |
 | `locationTracker` | 使える | 使えない(枠) |  | 使えない | 外す |
-| `chatThread` | 使える | 使える |  | 使えない | 外す |
+| `chatThread` | 使える | 使える |  | 代わりの表示 | 外す |
 | `aiChat` | 使える | 使える |  | 使えない | 外す |
 | `healthStat` | 使える | 使えない(枠) |  | 使えない | 外す |
 | `gridTable` | 使える | 使える |  | 使える |  |
@@ -148,8 +150,8 @@ python3 ios/scripts/platform-table.py --print   # 表だけを出す
 | `follow` | 使える | 代わりの表示(一言「フォローは Mac では使えません」) |  | 使えない |
 | `unfollow` | 使える | 代わりの表示(一言「フォローは Mac では使えません」) |  | 使えない |
 | `export` | 使える | 使える |  | 使える |
-| `startActivity` | 使える | 代わりの表示(一言「ライブアクティビティは iPhone だけで表示されます」) |  | 使えない |
-| `endActivity` | 使える | 使える(何もしない) |  | 使えない |
+| `startActivity` | 使える | 使える |  | 使えない |
+| `endActivity` | 使える | 使える |  | 使えない |
 | `addToCalendar` | 使える | 使える |  | 代わりの表示 |
 | `lookupBook` | 使える | 使える |  | 使える |
 

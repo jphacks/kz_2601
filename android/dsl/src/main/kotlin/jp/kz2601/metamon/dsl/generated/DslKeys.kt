@@ -74,7 +74,7 @@ object DslKeys {
         ComponentType.LOCATION_TRACKER to setOf("type", "id", "area", "entity", "locationField", "dateField", "label", "seconds"),
         ComponentType.CHAT_THREAD to setOf("type", "id", "area", "entity", "textField", "photoField", "placeholder", "emptyText"),
         ComponentType.AI_CHAT to setOf("type", "id", "area", "entity", "textField", "roleField", "persona", "length", "placeholder", "emptyText", "speak", "saveTo", "inputEntity", "limit"),
-        ComponentType.HEALTH_STAT to setOf("type", "id", "area", "metric", "period", "label", "target"),
+        ComponentType.HEALTH_STAT to setOf("type", "id", "area", "metric", "period", "label", "target", "live"),
         ComponentType.DASHCAM to setOf("type", "id", "area", "title", "keepMinutes", "maxStorageMB", "impactG", "autoStart", "audio"),
         ComponentType.FILE_IMPORT to setOf("type", "id", "area", "entity", "accept", "label", "field", "map"),
         ComponentType.SENSOR_VALUE to setOf("type", "id", "area", "sensor", "label", "style", "min", "max", "entity", "field", "dateField", "seconds", "limit", "threshold"),
