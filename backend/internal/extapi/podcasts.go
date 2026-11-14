@@ -63,7 +63,7 @@ const (
 var podcastsHosts = []string{"https://itunes.apple.com"}
 
 func init() {
-	register(Provider{ID: Podcasts, Billing: BillingFree, Hosts: podcastsHosts,
+	register(Provider{ID: Podcasts, Billing: BillingFree, Hosts: podcastsHosts, Terms: Terms{Attribution: PodcastsAttribution},
 		Ops: []OpSpec{
 			{Name: "searchPodcasts", Args: []string{"term", "limit"}, Check: checkPodcastSearch, CacheTTL: 6 * time.Hour},
 			{Name: "newEpisodes", Args: []string{"collectionId", "limit"}, Check: checkPodcastEpisodes, CacheTTL: 6 * time.Hour},

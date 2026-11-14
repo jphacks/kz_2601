@@ -151,8 +151,12 @@ func (s *Service) now() time.Time {
 }
 
 // Enabled reports whether provider can be called now.
+// A provider whose API has ended (SunsetAt) is off.
 func (s *Service) Enabled(provider string) bool {
 	_, ok := s.ops[provider]
+	if p, known := Lookup(provider); known && p.Sunset(s.now()) {
+		return false
+	}
 	return ok && !s.cfg.Disabled
 }
 
@@ -241,7 +245,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	if spec.CacheTTL > 0 {
 		cacheKeyOf = cacheKey(p.ID, spec.Name, r.Args)
 		if out, ok := s.cache.get(cacheKeyOf, s.now()); ok {
-			if s.Runs != nil && !s.Runs.ExtPro(ctx, run, r.Run) {
+			if s.Runs != nil && !p.Terms.NoCharge && !s.Runs.ExtPro(ctx, run, r.Run) {
 				return res, ErrProRequired
 			}
 			billing = "cache"
@@ -268,9 +272,13 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		return res, err
 	}
 
-	// 2. one `runs` of the creator's month (Pro only)
+	// 2. one `runs` of the creator's month (Pro only). A NoCharge provider
+	// counts nothing and is not Pro only: its terms forbid charging for it.
 	var runs quota.Charge
-	if s.Runs != nil {
+	if p.Terms.NoCharge {
+		billing = "none"
+	}
+	if s.Runs != nil && !p.Terms.NoCharge {
 		ch, blk, err := s.Runs.ExtRun(ctx, run, r.Run)
 		if err != nil {
 			s.refundLimits(ctx, p.ID, lc)
@@ -427,6 +435,10 @@ func (s *Service) check(r CallRequest) (Provider, OpSpec, error) {
 	}
 	if p.NeedsOAuth && (s.oauth[p.ID] == nil || s.Conns == nil) {
 		return p, spec, ErrUnavailable
+	}
+	if p.Terms.ShowOwnDataOnly && r.UserUID == "" {
+		// a server rule acts with the creator's token for everyone
+		return p, spec, ErrOwnDataOnly
 	}
 	return p, spec, nil
 }
