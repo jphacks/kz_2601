@@ -9086,6 +9086,23 @@
         }
       }
     },
+    "目標を決めると育ちます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a goal to make it grow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目標を決めると育ちます"
+          }
+        }
+      }
+    },
     "目的地" : {
       "extractionState" : "manual",
       "localizations" : {

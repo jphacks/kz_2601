@@ -66,6 +66,38 @@ final class GrowthLeafTests: XCTestCase {
         XCTAssertEqual(GrowthLeaf.merged(current: nil, next: 12, sameDay: true), 12)
     }
 
+    /// 目標が無い(設定が空・0)時は「収穫!」にせず育てない(target 1 として扱うと 1 歩で収穫になっていた)。
+    func testMissingTargetDoesNotHarvest() {
+        let m = GrowthLeaf.model(raw: 3214, target: nil, step: 1000)
+        XCTAssertFalse(m.isComplete)
+        XCTAssertEqual(m.items, 0)
+        XCTAssertEqual(GrowthLeaf.model(raw: 3214, target: 8000, step: 1000), GrowthModel(value: 3214, target: 8000, step: 1000))
+    }
+
+    /// 樹冠は円の和集合: 重なった所も 1 つの輪郭で、円の外は含まない。
+    func testCanopyIsOneSilhouette() {
+        let blobs: [CanopyShape.Blob] = [.init(x: 0.3, y: 0.5, r: 0.2), .init(x: 0.6, y: 0.5, r: 0.2)]
+        let path = CanopyShape(blobs: blobs).path(in: CGRect(x: 0, y: 0, width: 100, height: 100))
+        XCTAssertTrue(path.contains(CGPoint(x: 45, y: 50)), "重なり")
+        XCTAssertTrue(path.contains(CGPoint(x: 15, y: 50)))
+        XCTAssertFalse(path.contains(CGPoint(x: 45, y: 10)))
+        XCTAssertEqual(path.boundingRect.minX, 10, accuracy: 0.5)
+        XCTAssertEqual(path.boundingRect.maxX, 80, accuracy: 0.5)
+    }
+
+    /// 日本語の文言(シミュレータが英語でも ja で引く)
+    @MainActor func testJapaneseWords() {
+        let saved = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja
+        defer { LanguagePreference.shared.setting = saved }
+        XCTAssertEqual(GrowthLeaf.itemName(.tree), "実")
+        XCTAssertEqual(GrowthLeaf.itemName(.flower), "花")
+        XCTAssertEqual(GrowthLeaf.completeText(.tree), "収穫!")
+        XCTAssertEqual(L("目標を決めると育ちます"), "目標を決めると育ちます")
+        LanguagePreference.shared.setting = .en
+        XCTAssertEqual(L("目標を決めると育ちます"), "Set a goal to make it grow")
+    }
+
     func testNumberText() {
         XCTAssertEqual(GrowthLeaf.numberText(8000), 8000.formatted(.number.grouping(.automatic)))
         XCTAssertEqual(GrowthLeaf.numberText(.nan), "—")
@@ -149,11 +181,17 @@ final class GrowthLeafTests: XCTestCase {
             throw XCTSkip("GROWTH_SNAPSHOT_DIR が無い")
         }
         let base = try XCTUnwrap(stepsTree().screens.first?.components.first)
+        // 日本語で描く(「歩」「実」の崩れを見る)。GROWTH_SNAPSHOT_LANG=en で英語
+        let lang = ProcessInfo.processInfo.environment["GROWTH_SNAPSHOT_LANG"] ?? ProcessInfo.processInfo.environment["SIMCTL_CHILD_GROWTH_SNAPSHOT_LANG"] ?? "ja"
+        let saved = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = lang == "en" ? .en : .ja
+        defer { LanguagePreference.shared.setting = saved }
         for kind in ["tree", "flower", "plant"] {
             for (name, v) in [("0", 0.0), ("3214", 3214), ("8000", 8000)] {
                 var c = base
                 c.kind = kind
                 let view = GrowthLeaf(c: c, steps: .value(v)).frame(width: 360, height: 480).background(Color.white)
+                    .environment(\.locale, LanguagePreference.shared.locale)
                 let r = ImageRenderer(content: view)
                 r.scale = 2
                 #if os(iOS)

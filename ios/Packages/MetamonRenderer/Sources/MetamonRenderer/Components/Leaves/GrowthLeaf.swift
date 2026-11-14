@@ -12,6 +12,8 @@ struct GrowthLeaf: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let c: Component
     @State private var steps: StepsPhase
+    /// `steps` の値が何日の歩数か(日付が変わったら減ってよい)
+    @State private var stepsDay: Date?
 
     enum StepsPhase: Equatable {
         case loading
@@ -32,16 +34,17 @@ struct GrowthLeaf: View {
     var body: some View {
         let target = Self.target(c, rt: rt)
         let raw: Double? = isSteps ? stepsValue : Self.recordValue(c, rt: rt)
-        let model = GrowthModel(value: raw ?? 0, target: target ?? 1, step: c.step)
+        let model = Self.model(raw: raw, target: target, step: c.step)
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
-            header(model)
+            header(model, target: target)
             GrowthScene(kind: kind, model: model, reduceMotion: reduceMotion)
                 .frame(maxWidth: .infinity, minHeight: 96, maxHeight: .infinity)
             footer(model, raw: raw, target: target)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .renderCard(padding: RenderTheme.Spacing.md, wash: true)
-        .sensoryFeedback(.increase, trigger: model.items)
+        // 1 つ増えた時だけ(開いた直後に 0 → 3 と跳ねる時・日付が変わって減る時は鳴らさない)
+        .sensoryFeedback(.increase, trigger: model.items) { old, new in new == old + 1 }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(c.label ?? "")
         .accessibilityValue(accessibilityValue(model, raw: raw, target: target))
@@ -53,7 +56,7 @@ struct GrowthLeaf: View {
 
     // MARK: 見出し・数値
 
-    private func header(_ model: GrowthModel) -> some View {
+    private func header(_ model: GrowthModel, target: Double?) -> some View {
         HStack(spacing: 6) {
             Image(systemName: Self.icon(kind))
                 .font(.caption.weight(.bold))
@@ -67,7 +70,7 @@ struct GrowthLeaf: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: RenderTheme.Spacing.sm)
-            Text(model.isComplete ? Self.completeText(kind) : "\(Self.itemName(kind)) \(model.items) / \(model.capacity)")
+            Text(target == nil ? "\(Self.itemName(kind)) —" : model.isComplete ? Self.completeText(kind) : "\(Self.itemName(kind)) \(model.items) / \(model.capacity)")
                 .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(model.isComplete ? Color.white : RenderTheme.Colors.positive)
                 .padding(.horizontal, 8)
@@ -101,7 +104,11 @@ struct GrowthLeaf: View {
             }
             .lineLimit(1)
             .minimumScaleFactor(0.6)
-            if let next = model.nextAt, raw != nil {
+            if target == nil {
+                Text(L("目標を決めると育ちます"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let next = model.nextAt, raw != nil {
                 Text(L("あと \(Self.numberText(max(next - model.value, 0))) \(unit)で次の\(Self.itemName(kind))"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -147,6 +154,12 @@ struct GrowthLeaf: View {
     }
 
     // MARK: 値(テストと共有)
+
+    /// 目標が無い(設定が空・0)時は育てない(target 1 で「収穫!」にしない)。
+    static func model(raw: Double?, target: Double?, step: Double?) -> GrowthModel {
+        guard let target else { return GrowthModel(value: 0, target: 1, step: 1) }
+        return GrowthModel(value: raw ?? 0, target: target, step: step)
+    }
 
     /// 育ち切る値。数値の `target`、または `targetExpr`({"setting"})の今の値。0 以下・空は nil。
     @MainActor
@@ -211,6 +224,13 @@ struct GrowthLeaf: View {
         return max(current, next)
     }
 
+    /// 新しい歩数を出す。同じ日の間は減らさない(前面に戻った時の読み直しも)。
+    private func show(steps value: Double) {
+        let today = Calendar.current.startOfDay(for: Date())
+        steps = .value(Self.merged(current: stepsValue, next: value, sameDay: stepsDay == today))
+        stepsDay = today
+    }
+
     private func loadSteps() async {
         #if APP_STORE_REVIEW
         steps = .failed(L("この版では歩数を読めません"))
@@ -218,27 +238,27 @@ struct GrowthLeaf: View {
         let source = HealthData.source
         do {
             let base = try await source.steps(days: 1).last?.value ?? 0
-            steps = .value(base)
+            // 許可のダイアログ等で背面に回って取り消された読みは捨てる(新しい task が読み直す・遅れて来た古い結果で上書きしない)
+            guard !Task.isCancelled else { return }
+            show(steps: base)
             // healthStat の live(#3694)と同じ口: 画面に出ている間だけ歩数計の増分を足し続ける(growth は live の有無に関わらず)
             let monitor = HealthLiveStepsMonitor(baseline: base, source: HealthData.liveSource) {
                 try await source.steps(days: 1).last?.value ?? 0
             }
-            var day = Calendar.current.startOfDay(for: Date())
-            monitor.onChange = { value in
-                let today = Calendar.current.startOfDay(for: Date())
-                steps = .value(Self.merged(current: stepsValue, next: value, sameDay: today == day))
-                day = today
-            }
+            monitor.onChange = { show(steps: $0) }
             monitor.start()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
             }
             monitor.stop()
         } catch HealthDataError.denied {
+            guard !Task.isCancelled else { return }
             steps = .denied
         } catch let e as HealthDataError {
+            guard !Task.isCancelled else { return }
             steps = .failed(e.errorDescription ?? "")
         } catch {
+            guard !Task.isCancelled else { return }
             steps = .failed(L("歩数を取得できませんでした"))
         }
         #endif
@@ -256,6 +276,11 @@ struct GrowthScene: View {
     @State private var popIndex: Int?
 
     private static let trunk = Color(red: 0.55, green: 0.38, blue: 0.24)
+    private static let trunkLight = Color(red: 0.66, green: 0.47, blue: 0.31)
+    /// 葉は不透明(重なりや幹が透けない)。下側の影の色・上側の明るい色
+    private static let leafShade = Color(red: 0.13, green: 0.45, blue: 0.24)
+    private static let leafTop = Color(red: 0.38, green: 0.72, blue: 0.36)
+    private static let leafBottom = Color(red: 0.22, green: 0.58, blue: 0.29)
     private static let fruit = Color(red: 0.92, green: 0.26, blue: 0.24)
     private static let gold = Color(red: 0.98, green: 0.78, blue: 0.22)
 
@@ -317,26 +342,22 @@ struct GrowthScene: View {
 
     private func tree(_ side: CGFloat) -> some View {
         ZStack {
+            // 幹と枝は葉の後ろ(葉の下から幹と枝の付け根だけが見える)
             ZStack {
-                TrunkShape().fill(Self.trunk)
-                ForEach(Array(Self.canopy.enumerated()), id: \.offset) { _, c in
-                    Circle()
-                        .fill(LinearGradient(colors: [RenderTheme.Colors.positive.opacity(0.95), RenderTheme.Colors.positive.opacity(0.75)], startPoint: .top, endPoint: .bottom))
-                        .frame(width: side * c.r * 2, height: side * c.r * 2)
-                        .position(x: side * c.x, y: side * c.y)
-                }
+                TrunkShape().fill(LinearGradient(colors: [Self.trunkLight, Self.trunk], startPoint: .leading, endPoint: .trailing))
+                Self.foliage(Self.canopy)
             }
             .frame(width: side, height: side)
             .scaleEffect(model.bodyScale, anchor: UnitPoint(x: 0.5, y: 0.92))
             ForEach(0..<model.capacity, id: \.self) { i in
                 if i < model.items {
                     Fruit(color: model.isComplete ? Self.gold : Self.fruit)
-                        .frame(width: side * 0.085, height: side * 0.085)
+                        .frame(width: side * 0.095, height: side * 0.095)
                         .position(point(i, side))
                         .transition(.scale(scale: 0.05).combined(with: .opacity))
                 } else {
                     Circle()
-                        .strokeBorder(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 1.2, dash: [2, 2]))
+                        .strokeBorder(Color.white.opacity(0.6), style: StrokeStyle(lineWidth: 1.2, dash: [2, 2]))
                         .frame(width: side * 0.06, height: side * 0.06)
                         .position(point(i, side))
                 }
@@ -344,23 +365,46 @@ struct GrowthScene: View {
         }
     }
 
-    private static let canopy: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
-        (0.30, 0.44, 0.15), (0.70, 0.44, 0.15), (0.36, 0.27, 0.16), (0.64, 0.27, 0.16), (0.5, 0.36, 0.22), (0.5, 0.17, 0.13),
+    private static let canopy: [CanopyShape.Blob] = [
+        .init(x: 0.30, y: 0.44, r: 0.15), .init(x: 0.70, y: 0.44, r: 0.15), .init(x: 0.36, y: 0.27, r: 0.16),
+        .init(x: 0.64, y: 0.27, r: 0.16), .init(x: 0.5, y: 0.36, r: 0.22), .init(x: 0.5, y: 0.17, r: 0.13),
     ]
+
+    /// 樹冠: 円の和集合を 1 つの不透明なシルエットにする。各円の下側に影(少し上にずらした明るい円を重ねる)・輪郭に影。
+    static func foliage(_ blobs: [CanopyShape.Blob]) -> some View {
+        let outline = CanopyShape(blobs: blobs)
+        return ZStack {
+            outline.fill(leafShade)
+            CanopyShape(blobs: blobs, lift: 0.14, shrink: 0.9)
+                .fill(LinearGradient(colors: [leafTop, leafBottom], startPoint: .top, endPoint: .bottom))
+                .clipShape(outline)
+            outline.stroke(leafShade.opacity(0.9), lineWidth: 1)
+        }
+        .compositingGroup()
+        .shadow(color: .black.opacity(0.18), radius: 3, y: 2)
+    }
 
     // MARK: flower
 
     private func flowers(_ side: CGFloat) -> some View {
-        ZStack {
-            ForEach(0..<model.capacity, id: \.self) { i in
+        // 奥(上)の花から順に描く(手前の茎が奥の花の上を通る)
+        let order = (0..<model.capacity).sorted { slots[$0].y < slots[$1].y }
+        return ZStack {
+            ForEach(order, id: \.self) { i in
                 let p = point(i, side)
                 if i < model.items {
                     Path { path in
                         path.move(to: CGPoint(x: p.x, y: side * 0.93))
                         path.addQuadCurve(to: p, control: CGPoint(x: p.x + side * 0.03, y: (p.y + side * 0.93) / 2))
                     }
-                    .stroke(RenderTheme.Colors.positive, style: StrokeStyle(lineWidth: max(side * 0.012, 1.5), lineCap: .round))
+                    .stroke(Self.leafBottom, style: StrokeStyle(lineWidth: max(side * 0.012, 1.5), lineCap: .round))
                     .transition(.opacity)
+                    LeafShape()
+                        .fill(Self.leafBottom)
+                        .frame(width: side * 0.07, height: side * 0.03)
+                        .rotationEffect(.degrees(i.isMultiple(of: 2) ? -30 : 210))
+                        .position(x: p.x + side * (i.isMultiple(of: 2) ? 0.045 : -0.02), y: side * 0.93 - (side * 0.93 - p.y) * 0.4)
+                        .transition(.opacity)
                     Bloom(color: Self.petal(i), center: model.isComplete ? Self.gold : Color(red: 0.99, green: 0.83, blue: 0.3))
                         .frame(width: side * 0.13, height: side * 0.13)
                         .position(p)
@@ -393,29 +437,26 @@ struct GrowthScene: View {
                 path.move(to: CGPoint(x: side * 0.5, y: side * 0.93))
                 path.addQuadCurve(to: CGPoint(x: side * 0.5, y: side * (0.92 - stemLength)), control: CGPoint(x: side * 0.46, y: side * (0.92 - stemLength / 2)))
             }
-            .stroke(model.isComplete ? Self.trunk : RenderTheme.Colors.positive, style: StrokeStyle(lineWidth: side * (model.isComplete ? 0.05 : 0.025), lineCap: .round))
-            if model.isComplete {
-                ForEach(Array(Self.canopy.enumerated()), id: \.offset) { _, c in
-                    Circle()
-                        .fill(RenderTheme.Colors.positive.opacity(0.85))
-                        .frame(width: side * c.r * 1.7, height: side * c.r * 1.7)
-                        .position(x: side * c.x, y: side * (c.y * 0.85 + 0.02))
-                }
-                .transition(.scale(scale: 0.2, anchor: .bottom).combined(with: .opacity))
-            }
+            .stroke(model.isComplete ? Self.trunk : Self.leafBottom, style: StrokeStyle(lineWidth: side * (model.isComplete ? 0.05 : 0.025), lineCap: .round))
             ForEach(0..<model.items, id: \.self) { i in
                 LeafShape()
-                    .fill(RenderTheme.Colors.positive)
+                    .fill(LinearGradient(colors: [Self.leafTop, Self.leafBottom], startPoint: .top, endPoint: .bottom))
                     .frame(width: side * 0.16, height: side * 0.07)
                     .rotationEffect(.degrees(slots[i].x < 0 ? 200 : -20))
                     .position(point(i, side))
                     .transition(.scale(scale: 0.05).combined(with: .opacity))
             }
             if model.items == 0 {
-                LeafShape().fill(RenderTheme.Colors.positive)
+                LeafShape().fill(Self.leafBottom)
                     .frame(width: side * 0.08, height: side * 0.04)
                     .rotationEffect(.degrees(-30))
                     .position(x: side * 0.54, y: side * (0.92 - stemLength))
+            }
+            // 育ち切ったら樹冠が茎と上の葉を覆う(透けない)
+            if model.isComplete {
+                Self.foliage(Self.canopy.map { .init(x: $0.x, y: $0.y * 0.85 + 0.02, r: $0.r * 0.85) })
+                    .frame(width: side, height: side)
+                    .transition(.scale(scale: 0.2, anchor: .bottom).combined(with: .opacity))
             }
         }
     }
@@ -465,12 +506,15 @@ private struct Fruit: View {
         GeometryReader { g in
             let d = min(g.size.width, g.size.height)
             ZStack {
-                Circle().fill(RadialGradient(colors: [color.opacity(0.85), color], center: UnitPoint(x: 0.35, y: 0.35), startRadius: 0, endRadius: d * 0.6))
-                Circle().fill(Color.white.opacity(0.55)).frame(width: d * 0.24, height: d * 0.24).offset(x: -d * 0.17, y: -d * 0.17)
+                // 不透明な地 + 明るい側(白を重ねても透けない)+ 細い縁
+                Circle().fill(color)
+                Circle().fill(RadialGradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0)], center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: d * 0.55))
+                Circle().strokeBorder(Color.black.opacity(0.14), lineWidth: max(d * 0.04, 0.75))
+                Circle().fill(Color.white.opacity(0.75)).frame(width: d * 0.2, height: d * 0.2).offset(x: -d * 0.18, y: -d * 0.18)
                 LeafShape().fill(Color(red: 0.25, green: 0.6, blue: 0.3)).frame(width: d * 0.45, height: d * 0.22).rotationEffect(.degrees(-35)).offset(x: d * 0.2, y: -d * 0.5)
             }
             .frame(width: d, height: d)
-            .shadow(color: .black.opacity(0.15), radius: 1.5, y: 1)
+            .shadow(color: .black.opacity(0.22), radius: 1.5, y: 1)
         }
     }
 }
@@ -528,5 +572,28 @@ struct TrunkShape: Shape {
         p.addLine(to: pt(0.52, 0.6))
         p.closeSubpath()
         return p
+    }
+}
+
+/// 円の和集合(0〜1 の正方形)。重なりを 1 つの輪郭にするので塗っても縁を引いても重なりが見えない。
+/// `lift` は円を半径の何倍上にずらすか、`shrink` は半径の倍率(樹冠の陰影用)。
+struct CanopyShape: Shape {
+    struct Blob: Equatable, Sendable {
+        var x: CGFloat
+        var y: CGFloat
+        var r: CGFloat
+    }
+
+    var blobs: [Blob]
+    var lift: CGFloat = 0
+    var shrink: CGFloat = 1
+
+    func path(in rect: CGRect) -> Path {
+        blobs.reduce(Path()) { acc, b in
+            let r = b.r * shrink * rect.width
+            let c = CGPoint(x: rect.minX + b.x * rect.width, y: rect.minY + (b.y - b.r * lift) * rect.height)
+            let circle = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2))
+            return acc.isEmpty ? circle : acc.union(circle)
+        }
     }
 }
