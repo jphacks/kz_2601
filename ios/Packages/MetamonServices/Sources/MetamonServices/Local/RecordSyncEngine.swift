@@ -51,6 +51,9 @@ public final class RecordSyncEngine {
     @ObservationIgnored public var encryptedFields: [String: [String: Set<String>]] = [:]
     /// 暗号化の鍵と封筒(#233)。テストはメモリの鍵を入れる
     @ObservationIgnored public var cipher = FieldCipher()
+    /// テスト専用: `write` がローカル DB に触れる直前に待つ。「保存の途中」(書き込みの await の間)を
+    /// テストが決定的に作るための口。製品では nil のまま
+    @ObservationIgnored public var beforeWrite: (@MainActor () async -> Void)?
 
     public init(store: RecordStore, queue: SyncQueue, client: any AppConfigClient, connectivity: any ConnectivityMonitor) {
         self.store = store
@@ -205,6 +208,7 @@ public final class RecordSyncEngine {
     /// `save` と同じ。書いた行の id も返す(作成なら仮 id `local-<clientId>` = 断られた時の `SyncEvent` の recordId)。
     public func write(appId: String, entity: String, recordId: String?, data plain: [String: JSONValue],
                       author: (uid: String?, name: String?)? = nil) async -> (records: [Record], recordId: String) {
+        await beforeWrite?()
         let (data, unsaved) = await seal(appId: appId, entity: entity, recordId: recordId, data: plain)
         let written: String
         let now = Self.timestamp.string(from: .now)
