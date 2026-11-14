@@ -79,7 +79,7 @@
     <string name="voice_gen_seconds">%1$d s</string>
     <string name="voice_gen_slow">This is taking a bit longer…</string>
     <string name="voice_gen_stop">Stop</string>
-    <string name="voice_gen_thinking">Thinking about what kind of app to make…</string>
+    <string name="voice_gen_thinking">Thinking about what to turn into…</string>
     <string name="voice_gen_usually">Usually about 10 s</string>
     <string name="voice_gen_warning">It\'s taking a while. Just a little longer</string>
     <string name="voice_hello_day">Hello</string>
@@ -205,10 +205,10 @@
     <string name="voice_tips_pick_hint">Puts it in the text box</string>
     <string name="voice_tips_title">How to ask</string>
     <string name="voice_title_editing">How should this app change?</string>
-    <string name="voice_title_first">What app do you want?</string>
-    <string name="voice_title_home">Welcome back.\nWhat shall we make next?</string>
-    <string name="voice_title_new_app">A new app.\nWhat kind of app?</string>
-    <string name="voice_title_returning">Welcome back.\nWhat shall we make today?</string>
+    <string name="voice_title_first">What shall I turn into?</string>
+    <string name="voice_title_home">Welcome back.\nWhat shall I turn into next?</string>
+    <string name="voice_title_new_app">A new app.\nWhat shall I turn into?</string>
+    <string name="voice_title_returning">Welcome back.\nWhat shall I turn into today?</string>
     <string name="voice_tomorrow">tomorrow</string>
     <string name="voice_unavailable_hint">Voice input isn\'t available on this device. Type below to start right away.</string>
     <string name="voice_unchanged_reason">Couldn\'t make the change. Tell me a bit more about what to change and how.</string>
