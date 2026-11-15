@@ -30,7 +30,8 @@ final class GrowthLeafTests: XCTestCase {
 
     func testDefaultsAndBadInput() {
         XCTAssertEqual(GrowthModel(value: 0, target: 8000, step: nil).capacity, 10, "step 省略は target の 1/10")
-        XCTAssertEqual(GrowthModel(value: 50, target: 100, step: 1).capacity, GrowthModel.maxItems, "小さすぎる step は 30 個に収める")
+        XCTAssertEqual(GrowthModel(value: 50, target: 100, step: 1).capacity, GrowthModel.maxItems, "一度に描くのは 30 個まで")
+        XCTAssertEqual(GrowthModel(value: 50, target: 100, step: 1).step, 1, "小さい step も変えない(1 歩ごとに 1 つ)")
         XCTAssertEqual(GrowthModel(value: 10, target: 0, step: nil).target, 1, "0 で割らない")
         XCTAssertEqual(GrowthModel(value: -5, target: 10, step: nil).items, 0)
         XCTAssertEqual(GrowthModel(value: .nan, target: 10, step: .infinity).items, 0)
@@ -39,6 +40,83 @@ final class GrowthLeafTests: XCTestCase {
         XCTAssertEqual(GrowthModel.Kind("flower"), .flower)
         XCTAssertEqual(GrowthModel.Kind("cactus"), .tree, "未知は tree")
         XCTAssertEqual(GrowthModel.Kind(nil), .tree)
+    }
+
+    /// 展示の形: 10 歩ごとに 1 つ・100 歩で収穫(数十歩で実が増える)。
+    func testTenStepsPerFruit() {
+        let m = GrowthModel(value: 37, target: 100, step: 10)
+        XCTAssertEqual(m.capacity, 10)
+        XCTAssertEqual(m.items, 3)
+        XCTAssertEqual(m.harvests, 0)
+        XCTAssertEqual(m.nextAt, 40)
+        XCTAssertEqual(GrowthModel(value: 99.99999999999, target: 100, step: 10).items, 9, "誤差で空に戻らない")
+        let done = GrowthModel(value: 100, target: 100, step: 10)
+        XCTAssertTrue(done.isComplete)
+        XCTAssertEqual(done.items, 10)
+        XCTAssertEqual(done.harvests, 0)
+    }
+
+    /// target ÷ step が 30 を超えると、30 個なったら摘んでまた 0 から(摘んだ回数を数える)。検証エラーにしない。
+    func testGoesRoundPastThirty() {
+        // 1000 ÷ 10 = 100 個 → 30 個ずつ 3 周 + 10 個
+        XCTAssertEqual(GrowthModel(value: 290, target: 1000, step: 10).items, 29)
+        let first = GrowthModel(value: 300, target: 1000, step: 10)
+        XCTAssertEqual(first.items, 0, "30 個目で摘む")
+        XCTAssertEqual(first.harvests, 1)
+        XCTAssertEqual(first.capacity, 30)
+        let mid = GrowthModel(value: 655, target: 1000, step: 10)
+        XCTAssertEqual(mid.harvests, 2)
+        XCTAssertEqual(mid.items, 5)
+        XCTAssertEqual(mid.nextAt, 660)
+        let done = GrowthModel(value: 1000, target: 1000, step: 10)
+        XCTAssertTrue(done.isComplete)
+        XCTAssertEqual(done.items, 30, "育ち切ったら全部")
+        XCTAssertEqual(done.harvests, 3, "最後の 1 周は「収穫!」で出す")
+        XCTAssertEqual(GrowthModel(value: 1e300, target: 1e300, step: 1e-300).items, 30, "巨大な数でも落ちない")
+        XCTAssertGreaterThanOrEqual(GrowthModel(value: 5e299, target: 1e300, step: 1e-300).harvests, 0)
+    }
+
+    /// since open: カードが出た時の歩数を 0 として数える。減らない・日をまたいでも前日分を持ち越す。
+    func testSinceOpenCountsFromWhenShown() {
+        XCTAssertEqual(GrowthLeaf.nextBaseline(current: nil, previousTotal: 0, nextTotal: 3214, sameDay: false), 3214, "最初の読みが 0")
+        XCTAssertEqual(GrowthLeaf.nextBaseline(current: 3214, previousTotal: 3214, nextTotal: 3260, sameDay: true), 3214)
+        XCTAssertEqual(GrowthLeaf.sinceValue(total: 3260, baseline: 3214), 46)
+        XCTAssertEqual(GrowthLeaf.sinceValue(total: 3200, baseline: 3214), 0, "負にしない")
+        XCTAssertEqual(GrowthLeaf.sinceValue(total: 3260, baseline: nil), 3260, "today は今日の合計")
+        XCTAssertNil(GrowthLeaf.sinceValue(total: nil, baseline: 3214))
+        // 23:59 に 3300(開いてから 86)→ 0 時に新しい日の 12
+        let b = GrowthLeaf.nextBaseline(current: 3214, previousTotal: 3300, nextTotal: 12, sameDay: false)
+        XCTAssertEqual(GrowthLeaf.sinceValue(total: 12, baseline: b), 98)
+    }
+
+    /// target 省略は step × 10。since はデコードされる。
+    @MainActor func testBoothShapeDecodes() throws {
+        let json = #"""
+        {"schemaVersion":1,"app":{"name":"展示","voiceEntry":"floating"},"initialScreen":"home","entities":[],
+         "screens":[{"id":"home","title":"h","components":[
+           {"type":"growth","id":"t","label":"歩くと実がなる木","metric":"steps","live":true,"since":"open","step":10}]}]}
+        """#
+        let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+        let c = try XCTUnwrap(dsl.screens.first?.components.first)
+        XCTAssertEqual(c.since, "open")
+        let rt = ConformanceRuntime(dsl: dsl, store: [:], currentUserId: "me")
+        XCTAssertEqual(GrowthLeaf.target(c, rt: rt), 100)
+        for phase: GrowthLeaf.StepsPhase in [.loading, .value(0), .value(3214)] {
+            let r = ImageRenderer(content: GrowthLeaf(c: c, steps: phase).frame(width: 360, height: 480))
+            r.scale = 1
+            XCTAssertNotNil(r.platformImage)
+        }
+        withExtendedLifetime(rt) {}
+    }
+
+    @MainActor func testHarvestWords() {
+        let saved = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja
+        defer { LanguagePreference.shared.setting = saved }
+        XCTAssertEqual(GrowthLeaf.harvestText(.tree, 2), "収穫 2 回")
+        XCTAssertEqual(L("最初から"), "最初から")
+        LanguagePreference.shared.setting = .en
+        XCTAssertEqual(GrowthLeaf.harvestText(.tree, 2), "Harvested 2×")
     }
 
     func testSlotsAreStableAndInside() {

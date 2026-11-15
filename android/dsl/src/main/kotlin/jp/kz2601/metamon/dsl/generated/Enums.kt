@@ -980,6 +980,22 @@ internal object ShowSerializer : LenientEnumSerializer<Show>(
     Show.UNKNOWN,
 )
 
+@Serializable(with = SinceSerializer::class)
+enum class Since(val wire: String) {
+    TODAY("today"),
+    OPEN("open"),
+
+    /** 知らない値(新しい版)。 */
+    UNKNOWN(""),
+}
+
+internal object SinceSerializer : LenientEnumSerializer<Since>(
+    "jp.kz2601.metamon.dsl.Since",
+    Since.entries,
+    Since::wire,
+    Since.UNKNOWN,
+)
+
 @Serializable(with = SizeSerializer::class)
 enum class Size(val wire: String) {
     COMPACT("compact"),

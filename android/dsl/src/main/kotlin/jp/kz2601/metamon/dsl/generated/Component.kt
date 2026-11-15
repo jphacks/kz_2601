@@ -300,6 +300,7 @@ data class Component(
     val period: Period? = null,
     @Serializable(with = LenientBooleanSerializer::class)
     val live: Boolean? = null,
+    val since: Since? = null,
     @Serializable(with = LenientIntSerializer::class)
     val keepMinutes: Int? = null,
     @Serializable(with = LenientIntSerializer::class)

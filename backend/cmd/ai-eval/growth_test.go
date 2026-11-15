@@ -28,6 +28,15 @@ func TestCheckGrowth(t *testing.T) {
 	if miss := checkGrowth(map[string]any{"growth": "flower"}, tree); len(miss) != 1 {
 		t.Errorf("wrong kind should miss: %v", miss)
 	}
+	booth := &dsl.App{Screens: []dsl.Screen{{Components: []dsl.Component{
+		{Type: dsl.CompGrowth, Label: "木", Metric: "steps", Live: true, Since: "open"},
+	}}}}
+	if miss := checkGrowth(map[string]any{"growthOpen": true}, booth); miss != nil {
+		t.Errorf("booth should pass: %v", miss)
+	}
+	if miss := checkGrowth(map[string]any{"growthOpen": true}, tree); len(miss) != 1 {
+		t.Errorf("today's steps is not open: %v", miss)
+	}
 	if miss := checkGrowth(map[string]any{}, tree); miss != nil {
 		t.Errorf("no key: %v", miss)
 	}

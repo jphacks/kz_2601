@@ -498,6 +498,7 @@ type Component struct {
 	Metric string `json:"metric,omitempty"` // steps|weight
 	Period string `json:"period,omitempty"` // today|week (default today)
 	Live   bool   `json:"live,omitempty"`   // steps: keep counting while the card is on screen (#3694)
+	Since  string `json:"since,omitempty"`  // growth steps: today (default) | open (count from when the card appeared)
 
 	// gridTable (#234). Entity / TitleField / SubtitleField / OnItemTap are shared.
 	ColumnField  string     `json:"columnField,omitempty"`  // x axis (e.g. weekday enum)

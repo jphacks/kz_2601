@@ -6,6 +6,7 @@ import MetamonDSL
 /// `step` ごとに実・花・葉が 1 つ増え(増えた瞬間にポンと出る)、`target` で育ち切る。絵は図形だけで描く(画像を持たない)。
 /// 歩数は `live` を省略しても、画面に出ていて前面にいる間はいつも歩数計を購読する(育つのを見るための部品なので)。
 /// 前面に戻るたびに今日の歩数を読み直す。表示はその間は減らさない(歩数計の問い合わせの遅れで実が一瞬消えないように)。
+/// `since: open` は、カードが出た時の今日の歩数を 0 として、そこから歩いた分で育てる(展示向け・開き直すか「最初から」で 0 に戻る)。
 struct GrowthLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.scenePhase) private var scenePhase
@@ -14,6 +15,8 @@ struct GrowthLeaf: View {
     @State private var steps: StepsPhase
     /// `steps` の値が何日の歩数か(日付が変わったら減ってよい)
     @State private var stepsDay: Date?
+    /// `since: open` の 0 にする今日の歩数(最初の読みで決まる・「最初から」で今の値に)
+    @State private var baseline: Double?
 
     enum StepsPhase: Equatable {
         case loading
@@ -30,10 +33,11 @@ struct GrowthLeaf: View {
 
     private var kind: GrowthModel.Kind { .init(c.kind) }
     private var isSteps: Bool { c.metric == "steps" }
+    private var isSinceOpen: Bool { isSteps && c.since == "open" }
 
     var body: some View {
         let target = Self.target(c, rt: rt)
-        let raw: Double? = isSteps ? stepsValue : Self.recordValue(c, rt: rt)
+        let raw: Double? = isSteps ? Self.sinceValue(total: stepsValue, baseline: isSinceOpen ? baseline : nil) : Self.recordValue(c, rt: rt)
         let model = Self.model(raw: raw, target: target, step: c.step)
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
             header(model, target: target)
@@ -45,9 +49,14 @@ struct GrowthLeaf: View {
         .renderCard(padding: RenderTheme.Spacing.md, wash: true)
         // 1 つ増えた時だけ(開いた直後に 0 → 3 と跳ねる時・日付が変わって減る時は鳴らさない)
         .sensoryFeedback(.increase, trigger: model.items) { old, new in new == old + 1 }
+        // 30 個なって摘んだ時
+        .sensoryFeedback(.success, trigger: model.harvests) { old, new in new == old + 1 }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(c.label ?? "")
         .accessibilityValue(accessibilityValue(model, raw: raw, target: target))
+        .accessibilityActions {
+            if isSinceOpen { Button(L("最初から")) { restart() } }
+        }
         .task(id: scenePhase == .active) {
             guard isSteps, scenePhase == .active else { return }
             await loadSteps()
@@ -70,6 +79,14 @@ struct GrowthLeaf: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: RenderTheme.Spacing.sm)
+            if model.harvests > 0 {
+                Text(Self.harvestText(kind, model.harvests))
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: model.harvests)
+            }
             Text(target == nil ? "\(Self.itemName(kind)) —" : model.isComplete ? Self.completeText(kind) : "\(Self.itemName(kind)) \(model.items) / \(model.capacity)")
                 .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(model.isComplete ? Color.white : RenderTheme.Colors.positive)
@@ -108,11 +125,24 @@ struct GrowthLeaf: View {
                 Text(L("目標を決めると育ちます"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if let next = model.nextAt, raw != nil {
-                Text(L("あと \(Self.numberText(max(next - model.value, 0))) \(unit)で次の\(Self.itemName(kind))"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+            } else {
+                HStack(spacing: RenderTheme.Spacing.sm) {
+                    if let next = model.nextAt, raw != nil {
+                        Text(L("あと \(Self.numberText(max(next - model.value, 0))) \(unit)で次の\(Self.itemName(kind))"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    if isSinceOpen, case .value = steps {
+                        Spacer(minLength: 0)
+                        // 展示で次の人に渡す時など、その場で 0 から
+                        Button(L("最初から"), systemImage: "arrow.counterclockwise") { restart() }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                            .tint(RenderTheme.Colors.positive)
+                    }
+                }
             }
         }
     }
@@ -155,6 +185,19 @@ struct GrowthLeaf: View {
 
     // MARK: 値(テストと共有)
 
+    /// `since: open` の表示する歩数: 今日の歩数 − 0 にした歩数(減らない・負にしない)。baseline が無ければ今日の歩数のまま。
+    static func sinceValue(total: Double?, baseline: Double?) -> Double? {
+        guard let total, let baseline else { return total }
+        return max(total - baseline, 0)
+    }
+
+    /// `since: open` の 0 にする歩数。最初の読みでその値。日付が変わったら前日に歩いた分を持ち越す(0 時をまたいでも減らない)。
+    static func nextBaseline(current: Double?, previousTotal: Double?, nextTotal: Double, sameDay: Bool) -> Double {
+        guard let current else { return nextTotal }
+        if sameDay { return current }
+        return current - (previousTotal ?? current)
+    }
+
     /// 目標が無い(設定が空・0)時は育てない(target 1 で「収穫!」にしない)。
     static func model(raw: Double?, target: Double?, step: Double?) -> GrowthModel {
         guard let target else { return GrowthModel(value: 0, target: 1, step: 1) }
@@ -164,6 +207,8 @@ struct GrowthLeaf: View {
     /// 育ち切る値。数値の `target`、または `targetExpr`({"setting"})の今の値。0 以下・空は nil。
     @MainActor
     static func target(_ c: Component, rt: any DSLRuntime) -> Double? {
+        // target 省略は step × 10(10 個で育ち切る)
+        if c.target == nil, c.targetExpr == nil, let s = c.step, s.isFinite, s > 0 { return s * 10 }
         guard let t = c.target ?? c.targetExpr.flatMap({ rt.evaluator().evaluate($0)?.number }), t.isFinite, t > 0 else { return nil }
         return t
     }
@@ -203,6 +248,15 @@ struct GrowthLeaf: View {
         }
     }
 
+    /// 30 個なって摘んだ回数(target ÷ step が 30 を超える時)
+    static func harvestText(_ kind: GrowthModel.Kind, _ n: Int) -> String {
+        switch kind {
+        case .tree: L("収穫 \(n) 回")
+        case .flower: L("満開 \(n) 回")
+        case .plant: L("育てた木 \(n) 本")
+        }
+    }
+
     static func completeText(_ kind: GrowthModel.Kind) -> String {
         switch kind {
         case .tree: L("収穫!")
@@ -227,8 +281,20 @@ struct GrowthLeaf: View {
     /// 新しい歩数を出す。同じ日の間は減らさない(前面に戻った時の読み直しも)。
     private func show(steps value: Double) {
         let today = Calendar.current.startOfDay(for: Date())
-        steps = .value(Self.merged(current: stepsValue, next: value, sameDay: stepsDay == today))
+        let sameDay = stepsDay == today
+        let previous = stepsValue
+        let total = Self.merged(current: previous, next: value, sameDay: sameDay)
+        if isSinceOpen {
+            baseline = Self.nextBaseline(current: baseline, previousTotal: previous, nextTotal: total, sameDay: sameDay)
+        }
+        steps = .value(total)
         stepsDay = today
+    }
+
+    /// `since: open` をその場で 0 から数え直す
+    private func restart() {
+        guard isSinceOpen, case .value(let total) = steps else { return }
+        baseline = total
     }
 
     private func loadSteps() async {

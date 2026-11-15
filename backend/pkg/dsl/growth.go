@@ -5,12 +5,19 @@ import "math"
 // growth: a picture that grows with one number (tree bears fruit / flower
 // blooms / plant grows). The number comes from exactly one of metric (device
 // steps, like healthStat), entity (aggregate of records) or value (Expr, like
-// stat.value). One fruit per step; target = fully grown.
+// stat.value). One fruit per step; target = fully grown. since open counts
+// steps from when the card appeared instead of today's total.
 
 // GrowthKinds is the closed set of growth.kind ("" = tree).
 var GrowthKinds = map[string]bool{"": true, "tree": true, "flower": true, "plant": true}
 
-// MaxGrowthItems caps target / step (fruits, flowers or leaves on screen).
+// GrowthSinces is the closed set of growth.since ("" = today).
+// open counts steps from when the card appeared (a booth demo starts at 0).
+var GrowthSinces = map[string]bool{"": true, "today": true, "open": true}
+
+// MaxGrowthItems is how many fruits, flowers or leaves are drawn at once.
+// When target / step is larger the picture goes round: 30 then harvest and
+// start over (clients count the rounds), so a small step is never an error.
 const MaxGrowthItems = 30
 
 func checkGrowth(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
@@ -34,6 +41,11 @@ func checkGrowth(where string, c *Component, entities map[string]*Entity, add fu
 	}
 	if c.Live && c.Metric != "steps" {
 		add("%s: growth live is only for metric steps", where)
+	}
+	if !GrowthSinces[c.Since] {
+		add("%s: growth since %q must be today or open", where, c.Since)
+	} else if c.Since == "open" && c.Metric != "steps" {
+		add("%s: growth since open is only for metric steps", where)
 	}
 	switch {
 	case c.Metric != "":
@@ -59,32 +71,34 @@ func checkGrowth(where string, c *Component, entities map[string]*Entity, add fu
 		ch := &exprChecker{entities: entities, add: add}
 		ch.check(where+".value", c.Value, nil, 1)
 	}
-	target := checkGrowthTarget(where, c.Target, entities, add)
+	stepOK := false
 	if c.Step != nil {
-		if *c.Step <= 0 || math.IsNaN(*c.Step) {
+		if *c.Step <= 0 || math.IsNaN(*c.Step) || math.IsInf(*c.Step, 0) {
 			add("%s: growth step must be > 0", where)
-		} else if target > 0 && target / *c.Step > MaxGrowthItems {
-			add("%s: growth target / step must be <= %d (one fruit per step); use a larger step", where, MaxGrowthItems)
+		} else {
+			stepOK = true
 		}
+	}
+	if c.Target != nil || !stepOK {
+		checkGrowthTarget(where, c.Target, entities, add)
 	}
 }
 
-// checkGrowthTarget returns the literal target (0 when it is a setting or invalid).
-func checkGrowthTarget(where string, t *Expr, entities map[string]*Entity, add func(string, ...any)) float64 {
+// checkGrowthTarget checks target (a number > 0 or a numeric setting).
+func checkGrowthTarget(where string, t *Expr, entities map[string]*Entity, add func(string, ...any)) {
 	if t == nil {
-		add("%s: growth needs target > 0 (the value at which it is fully grown)", where)
-		return 0
+		add("%s: growth needs target > 0 (the value at which it is fully grown) or step (target = step × 10)", where)
+		return
 	}
 	if v, ok := t.Number(); ok {
 		if v <= 0 {
 			add("%s: growth target must be > 0", where)
-			return 0
 		}
-		return v
+		return
 	}
 	if t.Kind != ExprSetting {
 		add(`%s: growth target must be a number or {"setting":"<fieldId>"}`, where)
-		return 0
+		return
 	}
 	_, f, n := SettingField(entities, t.Setting)
 	switch {
@@ -95,5 +109,4 @@ func checkGrowthTarget(where string, t *Expr, entities map[string]*Entity, add f
 	case !numericField(f.Type):
 		add(`%s: growth target {"setting":%q} must be an integer, number or currency field`, where, t.Setting)
 	}
-	return 0
 }

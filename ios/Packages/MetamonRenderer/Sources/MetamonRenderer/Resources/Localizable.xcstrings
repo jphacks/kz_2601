@@ -7137,6 +7137,23 @@
         }
       }
     },
+    "収穫 %lld 回" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harvested %lld×"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "収穫 %lld 回"
+          }
+        }
+      }
+    },
     "収穫!" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8185,6 +8202,23 @@
         }
       }
     },
+    "最初から" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start over"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初から"
+          }
+        }
+      }
+    },
     "最初の 1 件を追加しましょう" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8742,6 +8776,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "湿度"
+          }
+        }
+      }
+    },
+    "満開 %lld 回" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloomed %lld×"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "満開 %lld 回"
           }
         }
       }
@@ -9706,6 +9757,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "育つ絵"
+          }
+        }
+      }
+    },
+    "育てた木 %lld 本" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld trees grown"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "育てた木 %lld 本"
           }
         }
       }
