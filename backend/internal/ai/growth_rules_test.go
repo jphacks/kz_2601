@@ -21,7 +21,7 @@ func TestGrowthRulesReachPrompts(t *testing.T) {
 			break
 		}
 	}
-	for _, key := range []string{"metric", "live", "entity", "value", "step", "kind"} {
+	for _, key := range []string{"metric", "live", "since", "entity", "value", "step", "kind"} {
 		if !strings.Contains(line, key) {
 			t.Errorf("growth catalog line lacks %s: %q", key, line)
 		}
@@ -31,14 +31,14 @@ func TestGrowthRulesReachPrompts(t *testing.T) {
 // The chat builds the demo phrasings without a question and names no part.
 func TestGrowthChatRule(t *testing.T) {
 	for name, p := range map[string]string{"chatCreate": chatCreateSystemPrompt, "chatEdit": chatEditSystemPrompt} {
-		if !strings.Contains(p, "## 数で育つ絵") || !strings.Contains(p, "聞き返さずに ready") {
+		if !strings.Contains(p, "## 数で育つ絵") || !strings.Contains(p, "聞き返さずに ready") || !strings.Contains(p, "画面を開いた時から") {
 			t.Errorf("%s lacks the growth chat rule", name)
 		}
 	}
 	if !strings.HasSuffix(chatCreateSystemPrompt, chatCapabilityIndex) {
 		t.Error("chat create prompt must keep ending with the capability index")
 	}
-	if strings.Contains(growthChatRule, "growth") || strings.Contains(growthChatRule, "metric") {
+	if strings.Contains(growthChatRule, "growth") || strings.Contains(growthChatRule, "metric") || strings.Contains(growthChatRule, "since") {
 		t.Error("chat rule names a part (#258)")
 	}
 }

@@ -98,3 +98,41 @@ func TestGrowthGenerate_OlderClientRetries(t *testing.T) {
 		t.Fatalf("growth reached an older client: %s", res.DSL)
 	}
 }
+
+const boothTree = `{"schemaVersion":1,"app":{"name":"歩いて実る木","description":"開いてから 10 歩ごとに実がなる","icon":"tree.fill","voiceEntry":"floating"},
+ "initialScreen":"home","entities":[],
+ "screens":[{"id":"home","title":"歩いて実る木","components":[
+  {"type":"growth","id":"tree","area":"A1:F10","kind":"tree","label":"歩くと実がなる木","metric":"steps","live":true,"since":"open","step":10,"target":100}]}]}`
+
+// Booth phrasings (展示中に数十歩で実が増える): the rule asks for since open
+// with step 10 / target 100, and that DSL passes validation first time.
+func TestGrowthGenerate_BoothPhrasings(t *testing.T) {
+	for _, transcript := range []string{
+		"10 歩ごとに実がなる木のアプリ",
+		"展示用に歩くたびにすぐ実がなるアプリを作って",
+		"すぐ育つ木を歩いて育てたい",
+	} {
+		f := &fakeCaller{replies: []string{boothTree}}
+		svc, _ := newSvc(f)
+		res, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: transcript})
+		if err != nil {
+			t.Fatalf("%s: %v", transcript, err)
+		}
+		if res.Meta.Attempts != 1 {
+			t.Errorf("%s: regenerated (%d attempts)", transcript, res.Meta.Attempts)
+		}
+		sys := f.calls[0].System
+		for _, want := range []string{"「10 歩ごとに実がなる」", "「展示用」", "「すぐ育つ」", `**"since": "open"**`, `**"step": 10**`, `**"target": 100**`} {
+			if !strings.Contains(sys, want) {
+				t.Errorf("%s: system prompt lacks %q", transcript, want)
+			}
+		}
+		g := growthOf(t, res.DSL)
+		if g.Metric != "steps" || !g.Live || g.Since != "open" || g.Step == nil || *g.Step != 10 {
+			t.Errorf("%s: growth is not the booth shape: %+v", transcript, g)
+		}
+		if v, ok := g.Target.Number(); !ok || v != 100 {
+			t.Errorf("%s: target = %v, want 100", transcript, g.Target)
+		}
+	}
+}

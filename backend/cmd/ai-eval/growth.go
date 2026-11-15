@@ -10,6 +10,7 @@ import (
 //
 //	growth      (string) some growth has this kind (tree / flower / plant; "" in the DSL = tree)
 //	growthSteps (bool)   some growth reads device steps live (metric steps + live: true)
+//	growthOpen  (bool)   some growth counts steps from when it appeared (since open)
 //
 // Cases: internal/ai/eval/growth_cases.json (-cases).
 
@@ -52,6 +53,17 @@ func checkGrowth(exp map[string]any, a *dsl.App) []string {
 		}
 		if (n > 0) != want {
 			miss = append(miss, fmt.Sprintf("growthSteps=%d", n))
+		}
+	}
+	if want, ok := exp["growthOpen"].(bool); ok {
+		n := 0
+		for _, c := range parts {
+			if c.Metric == "steps" && c.Since == "open" {
+				n++
+			}
+		}
+		if (n > 0) != want {
+			miss = append(miss, fmt.Sprintf("growthOpen=%d", n))
 		}
 	}
 	return miss

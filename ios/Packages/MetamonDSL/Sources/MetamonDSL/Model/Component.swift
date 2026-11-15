@@ -77,7 +77,7 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case feed
     // leaf(共有のアプリの参加者どうしの音声・ビデオ通話・#447)。label は共用
     case callButton
-    // leaf(数値が増えるほど絵が育つ: 木に実がなる・花が咲く)。label / kind / metric / live / entity / aggregate / field / filter / value / target / step / unit は共用
+    // leaf(数値が増えるほど絵が育つ: 木に実がなる・花が咲く)。label / kind / metric / live / since / entity / aggregate / field / filter / value / target / step / unit は共用
     case growth
     case unknown
 
@@ -211,6 +211,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var metric: String?         // steps|weight
     public var period: String?         // today(既定)|week
     public var live: Bool?             // steps: 開いている間も歩数が増え続ける(#3694・既定 false)
+    public var since: String?          // growth の歩数: today(既定・今日の合計)|open(カードが出た時から数える)
     // gridTable(#234)。entity / titleField / subtitleField / onItemTap は共用
     public var columnField: String?    // 横軸(例: 曜日 enum)
     public var rowField: String?       // 縦軸(例: 時限 integer)
@@ -287,7 +288,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case nameField, balanceField
         case task, input, output, options, shape, count, items, length, inputPhoto, saveTo, inputFeeds, outputs
         case tone
-        case metric, period, live
+        case metric, period, live, since
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField, roleField, persona, speak, inputEntity
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, illustrate, fields, distance, allowRequests, autoAccept
@@ -394,6 +395,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         metric = try? c.decodeIfPresent(String.self, forKey: .metric)
         period = try? c.decodeIfPresent(String.self, forKey: .period)
         live = try? c.decodeIfPresent(Bool.self, forKey: .live)
+        since = try? c.decodeIfPresent(String.self, forKey: .since)
         columnField = try? c.decodeIfPresent(String.self, forKey: .columnField)
         rowField = try? c.decodeIfPresent(String.self, forKey: .rowField)
         columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)

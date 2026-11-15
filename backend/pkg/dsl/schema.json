@@ -4323,8 +4323,7 @@
       "additionalProperties": false,
       "required": [
         "type",
-        "label",
-        "target"
+        "label"
       ],
       "properties": {
         "type": {
@@ -4360,6 +4359,14 @@
           "type": "boolean",
           "description": "metric steps だけ。歩数は画面に出ている間いつも歩数計を購読して増え、そのたびに絵が育つ(この部品では省略しても true と同じ)。歩数を使う時は明示して \"live\": true を書く。"
         },
+        "since": {
+          "type": "string",
+          "enum": [
+            "today",
+            "open"
+          ],
+          "description": "metric steps だけ。どこから数えるか。today=今日の歩数(既定)/ open=この画面を開いた時(カードが出た時)の歩数を 0 として、そこから歩いた分で育てる。アプリや画面を開き直すと 0 から(展示・体験で毎回最初から見せる)。open のカードにはその場で 0 に戻すボタンも出る。"
+        },
         "entity": {
           "type": "string",
           "description": "数値を記録の集計から読む: aggregate(field)(既定 sum)。例: 貯金の entity の金額の合計。"
@@ -4392,12 +4399,12 @@
               "$ref": "#/$defs/ExprSetting"
             }
           ],
-          "description": "育ち切る(収穫・満開)値(> 0)。例: 歩数 8000・貯金 100000。利用者が変える目標なら {\"setting\":\"<fieldId>\"}。"
+          "description": "育ち切る(収穫・満開)値(> 0)。例: 歩数 8000・貯金 100000。利用者が変える目標なら {\"setting\":\"<fieldId>\"}。省略 = step × 10(target と step のどちらかは書く)。"
         },
         "step": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "実・花・葉が 1 つ増える量(例: 1000 歩ごとに実が 1 つ)。省略 = target の 1/10。target ÷ step は 30 以下。"
+          "description": "実・花・葉が 1 つ増える量(例: 1000 歩ごとに実が 1 つ・10 歩ごとに 1 つ)。どんなに小さくてもよい。省略 = target の 1/10。target ÷ step が 30 を超える時は、30 個なったら摘んで(収穫して)また 0 個から数え、その回数を出す。"
         },
         "unit": {
           "type": "string",
@@ -4405,7 +4412,7 @@
         }
       },
       "description": "数値が増えるほど絵が育つカード(木に実がなる・花が咲く・芽が木になる)。数値は歩数(metric)・記録の集計(entity)・計算式(value)のどれか 1 つから読み、step ごとに実・花・葉が 1 つ増え、増えた瞬間にポンと出る。target に届くと収穫・満開。数値と目標も出す。「歩くと木に実がなる」「歩くほど花が咲く」「貯金が増えると木が育つ」「勉強した回数で植物を育てる」など、積み上がりを育つ見た目で楽しみたい時に選ぶ(ただの達成率なら progressBar)。",
-      "x-usage": "絵が主役なので全幅 6〜8 行(例 A1:F7)。歩数なら metric steps(「リアルタイム」「歩くたびに」なら live: true)で entity 不要・同じ画面に歩数のカードを並べなくてよい。貯金・回数なら記録の entity + aggregate sum/count、その追加フォームは別の画面。step は「1000 歩ごとに 1 つ」のように言われた時だけ。"
+      "x-usage": "絵が主役なので全幅 6〜8 行(例 A1:F7)。歩数なら metric steps(「リアルタイム」「歩くたびに」なら live: true)で entity 不要・同じ画面に歩数のカードを並べなくてよい。貯金・回数なら記録の entity + aggregate sum/count、その追加フォームは別の画面。step は「1000 歩ごとに 1 つ」のように言われた時だけ。「10 歩ごとに実がなる」「歩くたびにすぐ実がなる」「展示用」「すぐ育つ」なら since open・step 10・target 100(開いてから数十歩で実が増える)。"
     },
     "FilterMe": {
       "type": "object",

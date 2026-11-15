@@ -82,6 +82,7 @@ var expectKeys = map[string]expectKind{
 	// checkGrowth: growth.go
 	"growth":      expectString,
 	"growthSteps": expectBool,
+	"growthOpen":  expectBool,
 	// checkCalendarAdd: calendar_add.go
 	"addToCalendar": expectBool,
 	"calendarAlert": expectBool,
